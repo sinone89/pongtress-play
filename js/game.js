@@ -25,10 +25,18 @@
 
   // ============ 레이아웃(phase별 영역 비율) ============
   // 위→아래: 적 필드 / 성벽(캐릭터) / 골 포켓(성벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
+  // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
+  const LOAD_FRAC = { field: .16, wall: .10, goal: .09, pins: .65 };
+  const BATTLE_FRAC = { field: .76, wall: .20, goal: .02, pins: .02 };
+  const lerp = (a, b, t) => a + (b - a) * t;
   function layout() {
-    const load = !S || S.phase === 'load';
-    const f = load ? { field: .16, wall: .10, goal: .09, pins: .65 }
-                   : { field: .50, wall: .12, goal: .08, pins: .30 };
+    const t = S ? (S.layoutT || 0) : 0;
+    const f = {
+      field: lerp(LOAD_FRAC.field, BATTLE_FRAC.field, t),
+      wall: lerp(LOAD_FRAC.wall, BATTLE_FRAC.wall, t),
+      goal: lerp(LOAD_FRAC.goal, BATTLE_FRAC.goal, t),
+      pins: lerp(LOAD_FRAC.pins, BATTLE_FRAC.pins, t)
+    };
     let y = 0; const r = {};
     r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;
     r.wall = { x: 0, y, w: W, h: H * f.wall }; y += r.wall.h;
@@ -58,7 +66,7 @@
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0,
       wallHpMax: wallMax, wallHp: wallMax,
       // 아래는 전투마다 초기화
-      phase: 'load', chars: [], pegs: [], pockets: [], balls: [],
+      phase: 'load', layoutT: 0, layoutTarget: 0, chars: [], pegs: [], pockets: [], balls: [],
       enemies: [], waves: [], waveIdx: 0, launchesLeft: 0, passiveBalls: 0,
       shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false,
       combat: null, over: false
@@ -227,6 +235,7 @@
   // ============ 장전 phase ============
   function enterLoad() {
     S.phase = 'load';
+    S.layoutTarget = 0;                             // 핀볼 화면으로 부드럽게 복귀
     S.turnAtk = 0;                                  // 공격 페그 버프는 이번 턴 한정
     for (const c of S.chars) { c.ammo = 0; c.armed = false; }
     for (const p of S.pegs) { p.alive = true; p.hits = 0; }   // 모든 페그 턴마다 부활(내구도 리셋)
@@ -358,6 +367,7 @@
   // ============ 전투 phase ============
   function enterBattle() {
     S.phase = 'battle';
+    S.layoutTarget = 1;                             // 전투 화면으로 부드럽게 확장(핀볼 페이드아웃)
     $('c-phase').textContent = '전투';
     // 액티브 스킬 발동(자동 또는 armed) 결정 → 샷 큐 구성
     S.shotQueue = [];
@@ -624,6 +634,10 @@
     ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'left';
     ctx.fillText('성벽 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax, r.wall.x + 8, r.wall.y + 12);
 
+    // ── 핀볼 영역(전투로 갈수록 페이드아웃 → 전투 화면에선 안 보임) ──
+    const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
+    if (pinAlpha > 0.01) {
+    ctx.save(); ctx.globalAlpha = pinAlpha;
     // 핀볼 필드
     ctx.fillStyle = '#00000022'; ctx.fillRect(r.pins.x, r.pins.y, r.pins.w, r.pins.h);
     for (const p of S.pegs) {
@@ -631,7 +645,7 @@
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
       const dmg = p.alive && !def.oneShot && !def.boost && (p.hits || 0) > 0;   // 금 간 일반 페그(내구도 2 이상일 때)
       const R = (p.pr || CFG.pegRadius) * (dmg ? 0.72 : 1);
-      ctx.save(); if (dmg) ctx.globalAlpha = 0.6;
+      ctx.save(); if (dmg) ctx.globalAlpha = 0.6 * pinAlpha;
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
       ctx.restore();
       if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
@@ -667,6 +681,8 @@
       ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(pk.type === 'charge' ? '◆' : '×', x + pw / 2, g.y + g.h / 2 + 4);
     }
+    ctx.restore();
+    }  // /pinAlpha
 
     // 플로팅 텍스트
     for (const f of anim.floats) {
@@ -708,6 +724,9 @@
   function loop(ts) {
     const d = Math.min(0.032, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
     if (S && !S.over) {
+      // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
+      const tgt = S.layoutTarget || 0;
+      if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
       if (S.phase === 'load') stepBalls(d);
       else if (S.phase === 'battle') { stepBattle(d); checkBossThreshold(); }
       for (let i = anim.floats.length - 1; i >= 0; i--) { anim.floats[i].t -= d * 1.2; if (anim.floats[i].t <= 0) anim.floats.splice(i, 1); }
