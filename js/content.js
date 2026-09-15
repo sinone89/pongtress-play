@@ -70,16 +70,16 @@ const ROSTER = [
 ];
 
 // ── 적 ──
-// 체력은 새 충전 방식(페그→볼)으로 공격 횟수가 크게 늘어난 것에 맞춰 상향
+// 체력은 새 충전 방식(페그→수확 볼, 연쇄 없음)으로 늘어난 공격 횟수에 맞춰 조정
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 55,  dmg: 7,  exp: 5,  color: '#7ac74f' },
-  bat:    { name: '박쥐',   hp: 34,  dmg: 5,  exp: 4,  color: '#9b6cff' },
-  orc:    { name: '오크',   hp: 130, dmg: 13, exp: 12, color: '#e0733a' }
+  goblin: { name: '고블린', hp: 30, dmg: 7,  exp: 5,  color: '#7ac74f' },
+  bat:    { name: '박쥐',   hp: 18, dmg: 5,  exp: 4,  color: '#9b6cff' },
+  orc:    { name: '오크',   hp: 70, dmg: 13, exp: 12, color: '#e0733a' }
 };
 
 // ── 보스: 거대 골렘(돌진형) ──
 const BOSS_GOLEM = {
-  name: '거대 골렘', hp: 1100, dmg: 34, exp: 90, color: '#8a8f9a',
+  name: '거대 골렘', hp: 600, dmg: 34, exp: 90, color: '#8a8f9a',
   thresholds: [0.75, 0.5, 0.25],   // 이 비율 이하로 처음 내려갈 때마다 후퇴+스턴
   retreat: 2, stunTurns: 1, vulnerable: 0.5   // 스턴 중 받는 피해 +50%
 };

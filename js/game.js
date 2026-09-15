@@ -281,8 +281,8 @@
         // 좌우 벽 반사
         if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; }
         if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; }
-        // 페그 충돌(결정적: 랜덤 없음). 모든 볼이 페그와 상호작용 → 연쇄.
-        for (const p of S.pegs) {
+        // 페그 충돌(결정적: 랜덤 없음). 수확 볼(변환된 볼)은 제외 → 연쇄 방지, 발사볼 경로의 페그만 변환.
+        if (!b.harvest) for (const p of S.pegs) {
           if (!p.alive) continue;
           const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
           const dx = b.x - px, dy = b.y - py, dist = Math.hypot(dx, dy), min = b.r + (p.pr || pegR);
@@ -305,17 +305,17 @@
     if (S.phase === 'load' && S.launchesLeft <= 0 && S.balls.length === 0) enterBattle();
   }
 
-  // 페그가 변환되어 생기는 볼(상향 부채꼴로 발사, 다른 페그와 상호작용 → 연쇄). 배수 페그는 n개 증식.
+  // 페그가 변환되어 생기는 "수확 볼": 상단으로 상승해 충전만 함(다른 페그와 상호작용 X → 연쇄 없음). 배수 페그는 n개.
   function spawnBalls(x, y, n, color) {
-    const sp = CFG.launchSpeed * 0.85;
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;   // 상향 부채꼴
-      S.balls.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: CFG.ballRadius, age: 0, color });
+      const vx = (Math.random() - 0.5) * 200;                    // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
+      S.balls.push({ x, y, vx, vy: -CFG.launchSpeed * 0.92, r: CFG.ballRadius, age: 0, color, harvest: true });
     }
   }
 
-  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 볼로 변환(연쇄), 배수 페그는 증식.
+  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 수확 볼로 변환, 배수 페그는 증식.
   function applyPegHit(b, p, def, px, py) {
+    if (b.harvest) return;                 // 수확 볼은 페그를 변환하지 않음(연쇄 방지)
     if (def.boost) {                       // 범퍼: 속도 킥(영구·변환 안 함)
       const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
       b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
