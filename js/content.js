@@ -14,7 +14,7 @@ const CFG = {
   pegRadius: 9,
   launchSpeed: 820,        // 발사 속도(고정). 조준은 각도만
   aimMinUp: 0.3,           // 조준 하한(수평 근처)을 막아 항상 위로 향하게 (vy < -aimMinUp*speed)
-  ballLifetime: 6,         // s, 이 시간 넘으면 사라지지 않고 상단에서 강제 충전
+  ballLifetime: 6,         // s, 이 시간 넘으면 제거하지 않고 상단으로 점점 강하게 유도(상단 포켓 도달 전엔 절대 소멸 안 함)
   battleShotDelay: 240,    // ms, 전투 phase 공격 1발 간 간격(보이게 느리게)
   battleStartDelay: 500,   // ms, 전투 phase 시작 후 첫 공격까지
   battleEndDelay: 800,     // ms, 마지막 공격 후 적 전진까지

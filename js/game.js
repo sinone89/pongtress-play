@@ -188,7 +188,12 @@
     for (let i = S.balls.length - 1; i >= 0; i--) {
       const b = S.balls[i];
       b.age = (b.age || 0) + dt;
-      if (b.age > CFG.ballLifetime) { landBall(b); S.balls.splice(i, 1); continue; }   // 오래 떠돌면 소멸 대신 상단에서 강제 충전
+      // 소멸 금지: 오래된 볼은 상단으로 점점 강하게 유도(상단 포켓에 실제로 도달해 충전될 때까지 사라지지 않음)
+      if (b.age > CFG.ballLifetime) {
+        const over = b.age - CFG.ballLifetime;
+        b.vy -= Math.min(2400, 400 + over * 800) * dt;   // 위로 가속(오래될수록 강하게)
+        if (over > 4) b.vx *= 0.92;                       // 아주 오래되면 수직에 가깝게 몰아 확실히 상단 도달
+      }
       const speed = Math.hypot(b.vx, b.vy);
       const sub = Math.min(8, 1 + Math.floor(speed * dt / pegR));
       const h = dt / sub;
