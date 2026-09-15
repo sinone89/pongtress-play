@@ -14,7 +14,7 @@
 
   // ── 전역 상태 ──
   let S = null;          // 런/전투 상태
-  let anim = { floats: [], flashes: [] };
+  let anim = { floats: [], flashes: [], shots: [] };
   let aimActive = false, aimX = 0, aimY = 0;
   let lastTs = 0;
 
@@ -36,8 +36,8 @@
     r.pins = { x: 0, y, w: W, h: H * f.pins };
     return r;
   }
-  // 발사대 위치(핀볼 영역 하단 중앙)
-  function launcher() { const p = layout().pins; return { x: p.x + p.w / 2, y: p.y + p.h - CFG.ballRadius - 4 }; }
+  // 발사대 위치(핀볼 영역 하단 중앙, 바닥에서 살짝 띄워 바닥 뱅크샷 여지를 둠)
+  function launcher() { const p = layout().pins; return { x: p.x + p.w / 2, y: p.y + p.h - Math.max(CFG.ballRadius + 4, p.h * 0.12) }; }
 
   function resize() {
     const rect = $('stage-wrap').getBoundingClientRect();
@@ -78,7 +78,7 @@
     // 캐릭터(레인 배치) — 프로토타입: party 순서대로 레인 0,1,2
     S.chars = S.party.map((id, lane) => ({ ref: roster(id), lane, ammo: 0, gauge: 0, armed: false }));
     S.passiveBalls = 0;
-    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = [];
+    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = [];
     buildBoard();
     // 패시브(보드 효과) 적용
     for (const c of S.chars) applyPassive(c.ref.passive);
@@ -137,12 +137,15 @@
     renderSkills();
   }
 
-  // 조준 방향(항상 위로 향하게 클램프)
+  // 조준 방향: 위/아래 모두 허용(아래로 쏘면 바닥 벽에 튕겨 위로 감 = 뱅크샷). 거의 수평이면 최소 기울기만 준다.
   function aimDir(tx, ty) {
     const L = launcher();
     let dx = tx - L.x, dy = ty - L.y;
     const len = Math.hypot(dx, dy) || 1; dx /= len; dy /= len;
-    if (dy > -CFG.aimMinUp) { dy = -CFG.aimMinUp; dx = Math.sign(dx || 1) * Math.sqrt(Math.max(0, 1 - dy * dy)); }
+    if (Math.abs(dy) < CFG.aimMinUp) {                       // 거의 수평 → 가까운 위/아래로 최소 기울기
+      dy = (dy < 0 ? -1 : 1) * CFG.aimMinUp;
+      dx = Math.sign(dx || 1) * Math.sqrt(Math.max(0, 1 - dy * dy));
+    }
     return { dx, dy };
   }
   function launchBall(dir) {
@@ -153,17 +156,18 @@
     S.launchesLeft--;
   }
 
-  // 조준 예측선: 첫 페그(또는 상단·바닥) 접촉까지 결정적으로 시뮬
+  // 조준 예측선: 실제 물리(무중력·좌우/바닥 반사)와 동일하게 첫 페그(또는 상단) 접촉까지 결정적으로 시뮬
   function simulateAim(dir) {
     const r = layout().pins, topY = r.y, botY = r.y + r.h, pegR = CFG.pegRadius, br = CFG.ballRadius;
     let x = launcher().x, y = launcher().y, vx = dir.dx * CFG.launchSpeed, vy = dir.dy * CFG.launchSpeed;
     const pts = [{ x, y }]; const dt = 1 / 120;
-    for (let i = 0; i < 500; i++) {
+    for (let i = 0; i < 900; i++) {
       vy += CFG.gravity * dt; x += vx * dt; y += vy * dt;
       if (x < r.x + br) { x = r.x + br; vx = Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (x > r.x + r.w - br) { x = r.x + r.w - br; vx = -Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
+      if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사(stepBalls와 동일)
       for (const p of S.pegs) { if (!p.alive) continue; const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h; if (Math.hypot(x - px, y - py) < br + pegR) { pts.push({ x, y }); return pts; } }
-      if (y <= topY || y - br > botY) { pts.push({ x, y }); return pts; }
+      if (y <= topY) { pts.push({ x, y }); return pts; }
       if (i % 2 === 0) pts.push({ x, y });
     }
     pts.push({ x, y }); return pts;
@@ -286,6 +290,12 @@
     if (e.isBoss && e.stun > 0) dmg = Math.round(dmg * (1 + BOSS_GOLEM.vulnerable));
     e.hp -= dmg;
     const pos = enemyPos(e);
+    // 발사 연출: 쏜 캐릭터 → 적으로 향하는 빔, 캐릭터 반짝임, 적 피격 흔들림
+    const c = S.chars.find(ch => ch.lane === shot.lane);
+    const from = c ? charPos(c) : { x: pos.x, y: layout().wall.y + layout().wall.h };
+    anim.shots.push({ sx: from.x, sy: from.y, ex: pos.x, ey: pos.y, t: 0, color: shot.big ? '#ffcf5c' : '#bff0ff', big: shot.big });
+    if (c) c.fireT = 1;
+    e.hitT = 1;
     anim.floats.push({ x: pos.x, y: pos.y, text: String(dmg), color: shot.big ? '#ffcf5c' : '#fff', t: .9, big: shot.big });
     anim.flashes.push({ x: pos.x, y: pos.y, t: 1, big: true });
     if (e.hp <= 0) killEnemy(e);
@@ -402,6 +412,11 @@
     const y = r.y + (CFG.fieldRows - 1 - e.row + 0.5) * (r.h / CFG.fieldRows);
     return { x, y };
   }
+  // 성벽 위 캐릭터(발사 주체) 위치
+  function charPos(c) {
+    const r = layout().wall; const laneW = r.w / CFG.lanes;
+    return { x: r.x + (c.lane + 0.5) * laneW, y: r.y + r.h / 2 - 4 };
+  }
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
@@ -413,11 +428,14 @@
     for (let l = 1; l < CFG.lanes; l++) { const x = r.field.w / CFG.lanes * l; ctx.beginPath(); ctx.moveTo(x, r.field.y); ctx.lineTo(x, r.wall.y + r.wall.h); ctx.stroke(); }
     // 적
     for (const e of S.enemies) {
-      const p = enemyPos(e); const rad = e.isBoss ? 26 : 15;
-      ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 7); ctx.fillStyle = e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
+      const p0 = enemyPos(e); const rad = e.isBoss ? 26 : 15;
+      const hit = e.hitT || 0;
+      const p = { x: p0.x + (hit > 0 ? (Math.random() - 0.5) * 6 * hit : 0), y: p0.y + (hit > 0 ? (Math.random() - 0.5) * 6 * hit : 0) };
+      ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 7);
+      ctx.fillStyle = hit > 0.35 ? '#ffffff' : e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
       if (e.isBoss) { ctx.lineWidth = 3; ctx.strokeStyle = '#fff6'; ctx.stroke(); }
       // hp bar
-      const bw = rad * 2, bx = p.x - rad, by = p.y + rad + 3;
+      const bw = rad * 2, bx = p0.x - rad, by = p0.y + rad + 3;
       ctx.fillStyle = '#0008'; ctx.fillRect(bx, by, bw, 4);
       ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), 4);
     }
@@ -425,8 +443,10 @@
     ctx.fillStyle = '#ffffff10'; ctx.fillRect(r.wall.x, r.wall.y, r.wall.w, r.wall.h);
     const laneW = r.wall.w / CFG.lanes;
     for (const c of S.chars) {
-      const x = r.wall.x + (c.lane + 0.5) * laneW, y = r.wall.y + r.wall.h / 2;
-      ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, 7); ctx.fill();
+      const fire = c.fireT || 0;
+      const x = r.wall.x + (c.lane + 0.5) * laneW, y = r.wall.y + r.wall.h / 2 - fire * 3;  // 발사 시 살짝 반동
+      if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y - 4, 10 + fire * 8, 0, 7); ctx.fill(); ctx.restore(); }
+      ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, 7); ctx.fill();
       ctx.fillStyle = '#fff'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(c.ref.name, x, y + 16);
       if (S.phase === 'load' && c.ammo > 0) { ctx.fillStyle = '#ffcf5c'; ctx.font = 'bold 12px system-ui'; ctx.fillText('◆' + c.ammo, x, y - 20); }
@@ -486,10 +506,29 @@
       ctx.globalAlpha = fl.t * 0.5; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(fl.x, fl.y, (fl.big ? 16 : 10) * (1.4 - fl.t), 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
     }
-    // 전투 시작 배너
+    // 전투 발사체(빔): 쏜 캐릭터 → 적
+    for (const s of anim.shots) {
+      const tt = Math.min(1, s.t);
+      const cx = s.sx + (s.ex - s.sx) * tt, cy = s.sy + (s.ey - s.sy) * tt;
+      const tailT = Math.max(0, tt - 0.3);
+      const bx = s.sx + (s.ex - s.sx) * tailT, by = s.sy + (s.ey - s.sy) * tailT;
+      ctx.save();
+      ctx.globalAlpha = 0.9 * Math.min(1, (1.15 - s.t) / 0.5);
+      ctx.strokeStyle = s.color; ctx.lineWidth = s.big ? 4 : 2.5; ctx.lineCap = 'round';
+      ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(cx, cy); ctx.stroke();
+      ctx.globalAlpha = Math.min(1, (1.15 - s.t) / 0.4);
+      ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(cx, cy, s.big ? 6 : 4, 0, 7); ctx.fill();
+      ctx.restore();
+    }
+    // 전투 시작 배너(가로 띠 + 글자)
     if (S.phase === 'battle' && S.battleStage === 'intro') {
+      const cy = r.field.y + r.field.h * 0.5;
+      ctx.save();
+      ctx.fillStyle = '#ffcf5c22'; ctx.fillRect(0, cy - 30, W, 60);
+      ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30, W, 2); ctx.fillRect(0, cy + 28, W, 2);
       ctx.fillStyle = '#ffcf5c'; ctx.textAlign = 'center'; ctx.font = 'bold 34px system-ui';
-      ctx.fillText('전투!', W / 2, r.field.y + r.field.h * 0.5);
+      ctx.fillText('전투!', W / 2, cy + 12);
+      ctx.restore();
     }
   }
 
@@ -501,6 +540,9 @@
       else if (S.phase === 'battle') { stepBattle(d); checkBossThreshold(); }
       for (let i = anim.floats.length - 1; i >= 0; i--) { anim.floats[i].t -= d * 1.2; if (anim.floats[i].t <= 0) anim.floats.splice(i, 1); }
       for (let i = anim.flashes.length - 1; i >= 0; i--) { anim.flashes[i].t -= d * 3; if (anim.flashes[i].t <= 0) anim.flashes.splice(i, 1); }
+      for (let i = anim.shots.length - 1; i >= 0; i--) { anim.shots[i].t += d * 6; if (anim.shots[i].t >= 1.15) anim.shots.splice(i, 1); }
+      for (const c of S.chars) if (c.fireT > 0) c.fireT = Math.max(0, c.fireT - d * 4);
+      for (const e of S.enemies) if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 5);
       draw();
     }
     requestAnimationFrame(loop);
@@ -557,7 +599,7 @@
 
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
-    get S() { return S; }, startRun, launchBall, enterBattle, CFG,
+    get S() { return S; }, get anim() { return anim; }, startRun, launchBall, enterBattle, CFG,
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     render() { if (S) draw(); }
   };
