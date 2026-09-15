@@ -103,20 +103,97 @@
     syncHud();
   }
 
+  // ============ 페그 배치 패턴(선/그림) ============
+  // 경로(꼭짓점 목록)를 일정 간격(step)으로 채워 점 배열 반환
+  function alongPath(verts, closed, step) {
+    const pts = [], segs = closed ? verts.length : verts.length - 1;
+    for (let s = 0; s < segs; s++) {
+      const a = verts[s], b = verts[(s + 1) % verts.length];
+      const dx = b.fx - a.fx, dy = b.fy - a.fy, len = Math.hypot(dx, dy), n = Math.max(1, Math.round(len / step));
+      for (let i = 0; i < n; i++) pts.push({ fx: a.fx + dx * i / n, fy: a.fy + dy * i / n });
+    }
+    return pts;
+  }
+  function ellipsePts(cx, cy, rx, ry, n) { const pts = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push({ fx: cx + Math.cos(a) * rx, fy: cy + Math.sin(a) * ry }); } return pts; }
+  // 너무 가까운 점 제거(겹침 방지). asp=영역 높이/너비(px)로 세로 비율 보정
+  function dedupePts(pts, asp, minGap) {
+    const out = [], g2 = minGap * minGap;
+    for (const p of pts) { let ok = true; for (const q of out) { const dx = p.fx - q.fx, dy = (p.fy - q.fy) * asp; if (dx * dx + dy * dy < g2) { ok = false; break; } } if (ok) out.push(p); }
+    return out;
+  }
+
+  // 패턴 라이브러리. asp로 둥근 도형을 화면상 둥글게 보정, cx/cy 중심
+  function pegPatterns(asp, step) {
+    const cx = 0.5, cy = 0.47;
+    const ax = (rr) => Math.min(0.42, rr * asp);   // x반경(과도 확장 방지)
+    return {
+      grid() {
+        const pts = [], cols = CFG.pegCols, rows = CFG.pegRows;
+        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const off = (r % 2) ? 0.5 / cols : 0; pts.push({ fx: (c + 0.5) / cols + off, fy: 0.10 + r * (0.76 / (rows - 1)) }); }
+        return pts;
+      },
+      chevrons() {
+        const pts = [], rows = 9, per = 12;
+        for (let r = 0; r < rows; r++) { const fy0 = 0.10 + r * (0.76 / (rows - 1)); for (let i = 0; i < per; i++) { const t = i / (per - 1); pts.push({ fx: 0.08 + t * 0.84, fy: fy0 + (Math.abs(t - 0.5) - 0.25) * 0.07 }); } }
+        return pts;
+      },
+      zigzag() {
+        let pts = []; const rows = 9;
+        for (let r = 0; r < rows; r++) { const fy = 0.11 + r * (0.74 / (rows - 1)), d = (r % 2) ? 1 : -1; pts = pts.concat(alongPath([{ fx: 0.1, fy: fy - d * 0.03 }, { fx: 0.5, fy: fy + d * 0.03 }, { fx: 0.9, fy: fy - d * 0.03 }], false, step)); }
+        return pts;
+      },
+      diamonds() {
+        let pts = [];
+        for (const rr of [0.13, 0.24, 0.35, 0.46]) { const rx = ax(rr), ry = rr; pts = pts.concat(alongPath([{ fx: cx, fy: cy - ry }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + ry }, { fx: cx - rx, fy: cy }], true, step)); }
+        pts.push({ fx: cx, fy: cy });
+        return pts;
+      },
+      rings() {
+        let pts = [];
+        for (const rr of [0.1, 0.2, 0.3, 0.42]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
+        pts.push({ fx: cx, fy: cy });
+        return pts;
+      },
+      heart() {
+        const pts = [];
+        for (const s of [1, 0.66, 0.34]) {
+          const n = Math.round(34 * s + 8);
+          for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2, x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); pts.push({ fx: cx + (x / 17) * 0.33 * s * asp * 0.72, fy: cy - 0.05 - (y / 17) * 0.34 * s }); }
+        }
+        pts.push({ fx: cx, fy: cy - 0.05 });
+        return pts;
+      },
+      star() {
+        const cyv = 0.46, outer = 0.44, inner = 0.18, verts = [];
+        for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = (k % 2) ? inner : outer; verts.push({ fx: cx + Math.cos(a) * rr * asp * 0.8, fy: cyv + Math.sin(a) * rr }); }
+        let pts = alongPath(verts, true, step);
+        pts = pts.concat(alongPath(verts.map(v => ({ fx: cx + (v.fx - cx) * 0.5, fy: cyv + (v.fy - cyv) * 0.5 })), true, step));
+        return pts;
+      },
+      cross() {
+        let pts = [];
+        pts = pts.concat(alongPath([{ fx: 0.13, fy: 0.12 }, { fx: 0.87, fy: 0.86 }], false, step));
+        pts = pts.concat(alongPath([{ fx: 0.87, fy: 0.12 }, { fx: 0.13, fy: 0.86 }], false, step));
+        pts = pts.concat(alongPath([{ fx: 0.13, fy: 0.12 }, { fx: 0.87, fy: 0.12 }, { fx: 0.87, fy: 0.86 }, { fx: 0.13, fy: 0.86 }], true, step));
+        return pts;
+      }
+    };
+  }
+
+  // 이번 판의 페그 좌표: 패턴 하나를 골라 생성 → 경계 클램프 → 겹침 제거
+  function pegLayout() {
+    const r = layout().pins, asp = (r.h / r.w) || 1.3, step = CFG.pegStep;
+    const P = pegPatterns(asp, step), keys = Object.keys(P);
+    const key = keys[Math.floor(Math.random() * keys.length)];
+    S._layoutName = key;
+    let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
+    return dedupePts(pts, asp, CFG.pegMinGap);
+  }
+
   // ============ 보드(페그·포켓) 생성 ============
   function buildBoard() {
     S.pegs = [];
-    // 페그: 격자 + 지터, 일부 배수 페그
-    const cols = CFG.pegCols, rows = CFG.pegRows;
-    for (let r = 0; r < rows; r++) {
-      for (let c = 0; c < cols; c++) {
-        const off = (r % 2) ? 0.5 / cols : 0;
-        const fx = (c + 0.5) / cols + off + (Math.random() - 0.5) * 0.04;
-        const fy = 0.14 + r * (0.7 / (rows - 1)) + (Math.random() - 0.5) * 0.03;
-        if (fx < 0.05 || fx > 0.95) continue;
-        S.pegs.push(makePeg(fx, fy, pickPegType()));
-      }
-    }
+    for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType()));
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
