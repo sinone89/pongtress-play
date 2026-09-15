@@ -22,16 +22,27 @@ const CFG = {
 };
 
 // ── 페그 종류(모양·기능) — 실제 핀볼처럼 다양하게 ──
-// shape: 렌더 모양 · weight: 판 생성 가중치 · oneShot: 맞으면 이번 턴 비활성(다음 턴 부활)
+// shape: 기본 렌더 모양 · size: 기본 크기 배수(반경) · weight: 판 생성 가중치 · oneShot: 맞으면 이번 턴 비활성(다음 턴 부활)
 // 기능: split(볼 분열 수) · boost(속도 킥 배수, 영구 범퍼) · gold(획득 골드) · atk(이번 턴 공격 버프)
 const PEG_TYPES = {
-  normal: { name: '일반',   color: '#8f86d6', shape: 'circle',   weight: 52, oneShot: false },
-  mult2:  { name: '증식×2', color: '#ffcf5c', shape: 'diamond',  weight: 15, oneShot: true,  split: 1, label: '×2' },
-  mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     weight: 5,  oneShot: true,  split: 4, label: '×5' },
-  bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   weight: 10, oneShot: false, boost: 1.28 },
-  gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      weight: 8,  oneShot: true,  gold: 15, label: '$' },
-  attack: { name: '공격',   color: '#ff6b6b', shape: 'triangle', weight: 6,  oneShot: true,  atk: 2,  label: '＋' }
+  normal: { name: '일반',   color: '#8f86d6', shape: 'circle',   size: 1.0,  weight: 52, oneShot: false },
+  mult2:  { name: '증식×2', color: '#ffcf5c', shape: 'diamond',  size: 1.05, weight: 15, oneShot: true,  split: 1, label: '×2' },
+  mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
+  bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 10, oneShot: false, boost: 1.28 },
+  gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
+  attack: { name: '공격',   color: '#ff6b6b', shape: 'triangle', size: 1.1,  weight: 6,  oneShot: true,  atk: 2,  label: '＋' }
 };
+// 일반(반사) 페그는 기능은 같되 모양을 여러 가지로(원 가중). 판이 실제 핀볼처럼 다채롭게 보이도록.
+const NORMAL_SHAPES = ['circle', 'circle', 'square', 'pentagon', 'pill'];
+
+// 페그 하나 생성: 종류별 기본 크기 × 개별 지터(±) → 물리 반경(pr)·모양(shape) 확정
+function makePeg(fx, fy, type) {
+  const def = PEG_TYPES[type] || PEG_TYPES.normal;
+  const jitter = 0.82 + Math.random() * 0.42;                 // 0.82~1.24 크기 편차
+  const pr = CFG.pegRadius * (def.size || 1) * jitter;
+  const shape = (type === 'normal') ? NORMAL_SHAPES[Math.floor(Math.random() * NORMAL_SHAPES.length)] : def.shape;
+  return { fx, fy, type, alive: true, pr, shape };
+}
 
 // 레벨업에 필요한 누적 경험치: 레벨 L→L+1
 function expToNext(level) { return 8 + level * 5; }
@@ -91,6 +102,6 @@ function openOneBlank(S) {
 }
 function addPegToBoard(S, type, n) {
   for (let i = 0; i < n; i++) {
-    S.pegs.push({ fx: 0.12 + Math.random() * 0.76, fy: 0.15 + Math.random() * 0.6, type, alive: true });
+    S.pegs.push(makePeg(0.12 + Math.random() * 0.76, 0.15 + Math.random() * 0.6, type));
   }
 }

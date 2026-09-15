@@ -114,7 +114,7 @@
         const fx = (c + 0.5) / cols + off + (Math.random() - 0.5) * 0.04;
         const fy = 0.14 + r * (0.7 / (rows - 1)) + (Math.random() - 0.5) * 0.03;
         if (fx < 0.05 || fx > 0.95) continue;
-        S.pegs.push({ fx, fy, type: pickPegType(), alive: true });
+        S.pegs.push(makePeg(fx, fy, pickPegType()));
       }
     }
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
@@ -175,7 +175,7 @@
       if (x < r.x + br) { x = r.x + br; vx = Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (x > r.x + r.w - br) { x = r.x + r.w - br; vx = -Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사(stepBalls와 동일)
-      for (const p of S.pegs) { if (!p.alive) continue; const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h; if (Math.hypot(x - px, y - py) < br + pegR) { pts.push({ x, y }); return pts; } }
+      for (const p of S.pegs) { if (!p.alive) continue; const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h; if (Math.hypot(x - px, y - py) < br + (p.pr || pegR)) { pts.push({ x, y }); return pts; } }
       if (y <= topY) { pts.push({ x, y }); return pts; }
       if (i % 2 === 0) pts.push({ x, y });
     }
@@ -208,7 +208,7 @@
         for (const p of S.pegs) {
           if (!p.alive) continue;
           const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
-          const dx = b.x - px, dy = b.y - py, dist = Math.hypot(dx, dy), min = b.r + pegR;
+          const dx = b.x - px, dy = b.y - py, dist = Math.hypot(dx, dy), min = b.r + (p.pr || pegR);
           if (dist < min) {
             const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : -1;
             b.x += nx * (min - dist); b.y += ny * (min - dist);
@@ -457,14 +457,21 @@
     for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? ri : ro, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.closePath();
   }
-  function drawPeg(px, py, R, def, alive) {
-    const col = alive ? def.color : '#2a2648';
+  function drawPeg(px, py, R, shape, color, alive) {
+    const col = alive ? color : '#2a2648';
     ctx.fillStyle = col;
-    switch (def.shape) {
+    switch (shape) {
       case 'diamond': polyPath(px, py, R * 1.18, 4, -Math.PI / 2); ctx.fill(); break;
+      case 'square': polyPath(px, py, R * 1.12, 4, Math.PI / 4); ctx.fill(); break;
+      case 'pentagon': polyPath(px, py, R * 1.15, 5, -Math.PI / 2); ctx.fill(); break;
       case 'triangle': ctx.beginPath(); ctx.moveTo(px, py - R * 1.25); ctx.lineTo(px + R * 1.15, py + R * 0.9); ctx.lineTo(px - R * 1.15, py + R * 0.9); ctx.closePath(); ctx.fill(); break;
       case 'hex': polyPath(px, py, R * 1.15, 6, Math.PI / 6); ctx.fill(); break;
       case 'star': starPath(px, py, R * 1.35, R * 0.62, 5); ctx.fill(); break;
+      case 'pill': {                                   // 가로 캡슐(두 반원 + 몸통)
+        const w = R * 0.8, h = R * 0.9;
+        ctx.beginPath(); ctx.arc(px - w, py, h, Math.PI / 2, -Math.PI / 2); ctx.arc(px + w, py, h, -Math.PI / 2, Math.PI / 2); ctx.closePath(); ctx.fill();
+        break;
+      }
       case 'bumper':
         ctx.beginPath(); ctx.arc(px, py, R * 1.4, 0, 7); ctx.fillStyle = col + '33'; ctx.fill();
         ctx.beginPath(); ctx.arc(px, py, R * 1.4, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
@@ -518,8 +525,9 @@
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-      drawPeg(px, py, CFG.pegRadius, def, p.alive);
-      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + 3); }
+      const R = p.pr || CFG.pegRadius;
+      drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
+      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round(R * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + R * 0.35); }
     }
     // 볼
     for (const b of S.balls) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = '#eafcff'; ctx.fill(); }
