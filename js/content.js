@@ -4,6 +4,9 @@
  */
 const CFG = {
   lanes: 3,
+  pegCols: 8,              // 핀볼판 페그 격자 열 수(밀도)
+  pegRows: 7,              // 핀볼판 페그 격자 행 수(밀도)
+  normalPegHits: 1,        // 일반 페그 내구도(충돌 N회 후 파괴). 1=맞으면 즉시 사라짐. 2 이상이면 금 간 상태 후 파괴
   fieldRows: 5,            // 적 대기 필드 세로 칸 수(레인당)
   launchesPerTurn: 2,      // 한 장전 턴에 쏘는 볼 수(기본). 패시브로 증가 예정
   maxBalls: 60,            // 볼 폭주 방지 상한
@@ -41,7 +44,7 @@ function makePeg(fx, fy, type) {
   const jitter = 0.82 + Math.random() * 0.42;                 // 0.82~1.24 크기 편차
   const pr = CFG.pegRadius * (def.size || 1) * jitter;
   const shape = (type === 'normal') ? NORMAL_SHAPES[Math.floor(Math.random() * NORMAL_SHAPES.length)] : def.shape;
-  return { fx, fy, type, alive: true, pr, shape };
+  return { fx, fy, type, alive: true, pr, shape, hits: 0 };
 }
 
 // 레벨업에 필요한 누적 경험치: 레벨 L→L+1

@@ -107,7 +107,7 @@
   function buildBoard() {
     S.pegs = [];
     // 페그: 격자 + 지터, 일부 배수 페그
-    const cols = 6, rows = 5;
+    const cols = CFG.pegCols, rows = CFG.pegRows;
     for (let r = 0; r < rows; r++) {
       for (let c = 0; c < cols; c++) {
         const off = (r % 2) ? 0.5 / cols : 0;
@@ -139,7 +139,7 @@
     S.phase = 'load';
     S.turnAtk = 0;                                  // 공격 페그 버프는 이번 턴 한정
     for (const c of S.chars) { c.ammo = 0; c.armed = false; }
-    for (const p of S.pegs) p.alive = true;        // 특수 페그 턴마다 초기화
+    for (const p of S.pegs) { p.alive = true; p.hits = 0; }   // 모든 페그 턴마다 부활(내구도 리셋)
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = [];
     $('c-phase').textContent = '장전';
@@ -238,15 +238,19 @@
 
   // 페그 종류별 효과(반사는 호출 전에 이미 적용됨)
   function applyPegHit(b, p, def, px, py) {
-    if (def.boost) {                       // 범퍼: 일정 속도로 킥(영구·활기)
+    if (def.boost) {                       // 범퍼: 일정 속도로 킥(영구·안 사라짐)
       const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
       b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
       anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
+      return;
     }
     if (def.split) splitBall(b, def.split);                                   // 배수: 볼 분열
     if (def.gold) { S.gold = (S.gold || 0) + def.gold; anim.floats.push({ x: px, y: py, text: '+' + def.gold + 'G', color: def.color, t: 1 }); }
     if (def.atk) { S.turnAtk = (S.turnAtk || 0) + def.atk; anim.floats.push({ x: px, y: py, text: '공격+' + def.atk, color: def.color, t: 1 }); }
-    if (def.oneShot) p.alive = false;      // 일회성: 이번 턴 비활성(다음 턴 부활)
+    if (def.oneShot) { p.alive = false; return; }   // 특수 페그: 일회성(이번 턴 비활성, 다음 턴 부활)
+    // 일반 페그: 내구도 소모 → 다 닳으면 파괴(충돌 시 사라짐, 턴마다 부활)
+    p.hits = (p.hits || 0) + 1;
+    if (p.hits >= (CFG.normalPegHits || 1)) p.alive = false;
   }
 
   function landBall(b) {
@@ -525,9 +529,12 @@
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-      const R = p.pr || CFG.pegRadius;
+      const dmg = p.alive && !def.oneShot && !def.boost && (p.hits || 0) > 0;   // 금 간 일반 페그(내구도 2 이상일 때)
+      const R = (p.pr || CFG.pegRadius) * (dmg ? 0.72 : 1);
+      ctx.save(); if (dmg) ctx.globalAlpha = 0.6;
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
-      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round(R * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + R * 0.35); }
+      ctx.restore();
+      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
     }
     // 볼
     for (const b of S.balls) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = '#eafcff'; ctx.fill(); }
