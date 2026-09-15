@@ -122,6 +122,26 @@
     return out;
   }
 
+  // 점이 다각형 내부인지(레이 캐스팅)
+  function pointInPoly(x, y, poly) {
+    let inside = false;
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const xi = poly[i][0], yi = poly[i][1], xj = poly[j][0], yj = poly[j][1];
+      if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+    }
+    return inside;
+  }
+  // 도형 실루엣을 격자로 채움. insideFn(u,v): u,v ∈ [-1,1] 중심좌표(빈 공간 최소화)
+  function fillShape(insideFn) {
+    const pts = [], nx = 24, ny = 30, hw = 0.42, hh = 0.39, cx = 0.5, cy = 0.47;
+    for (let iy = 0; iy <= ny; iy++) for (let ix = 0; ix <= nx; ix++) {
+      const off = (iy % 2) ? (1 / nx) : 0;                       // 엇갈림 배치
+      const u = ((ix / nx) + off) * 2 - 1, v = (iy / ny) * 2 - 1;
+      if (u >= -1 && u <= 1 && insideFn(u, v)) pts.push({ fx: cx + u * hw, fy: cy + v * hh });
+    }
+    return pts;
+  }
+
   // 패턴 라이브러리. asp로 둥근 도형을 화면상 둥글게 보정, cx/cy 중심
   function pegPatterns(asp, step) {
     const cx = 0.5, cy = 0.47;
@@ -132,45 +152,37 @@
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const off = (r % 2) ? 0.5 / cols : 0; pts.push({ fx: (c + 0.5) / cols + off, fy: 0.10 + r * (0.76 / (rows - 1)) }); }
         return pts;
       },
-      chevrons() {
-        const pts = [], rows = 9, per = 12;
-        for (let r = 0; r < rows; r++) { const fy0 = 0.10 + r * (0.76 / (rows - 1)); for (let i = 0; i < per; i++) { const t = i / (per - 1); pts.push({ fx: 0.08 + t * 0.84, fy: fy0 + (Math.abs(t - 0.5) - 0.25) * 0.07 }); } }
+      chevrons() {   // ∨ 여러 줄(진폭 크게)
+        const pts = [], rows = 8, per = 13;
+        for (let r = 0; r < rows; r++) { const fy0 = 0.11 + r * (0.74 / (rows - 1)); for (let i = 0; i < per; i++) { const t = i / (per - 1), vv = Math.abs(t - 0.5) * 2; pts.push({ fx: 0.08 + t * 0.84, fy: fy0 + (0.5 - vv) * 0.06 }); } }
         return pts;
       },
-      zigzag() {
-        let pts = []; const rows = 9;
-        for (let r = 0; r < rows; r++) { const fy = 0.11 + r * (0.74 / (rows - 1)), d = (r % 2) ? 1 : -1; pts = pts.concat(alongPath([{ fx: 0.1, fy: fy - d * 0.03 }, { fx: 0.5, fy: fy + d * 0.03 }, { fx: 0.9, fy: fy - d * 0.03 }], false, step)); }
+      zigzag() {     // 톱니(삼각파) 여러 줄 — 행 간격·진폭 크게 해서 모양이 보이게
+        let pts = []; const rows = 6, seg = 5;
+        for (let r = 0; r < rows; r++) { const fy = 0.13 + r * (0.68 / (rows - 1)), verts = []; for (let i = 0; i <= seg; i++) { const t = i / seg, up = (i % 2 === 0) ? -1 : 1; verts.push({ fx: 0.09 + t * 0.82, fy: fy + up * 0.05 }); } pts = pts.concat(alongPath(verts, false, step)); }
         return pts;
       },
-      diamonds() {
+      diamonds() {   // 동심 다이아(촘촘)
         let pts = [];
-        for (const rr of [0.13, 0.24, 0.35, 0.46]) { const rx = ax(rr), ry = rr; pts = pts.concat(alongPath([{ fx: cx, fy: cy - ry }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + ry }, { fx: cx - rx, fy: cy }], true, step)); }
+        for (const rr of [0.1, 0.19, 0.28, 0.37, 0.46]) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
         pts.push({ fx: cx, fy: cy });
         return pts;
       },
-      rings() {
+      rings() {      // 동심 원(촘촘)
         let pts = [];
-        for (const rr of [0.1, 0.2, 0.3, 0.42]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
+        for (const rr of [0.1, 0.18, 0.26, 0.34, 0.42]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
         pts.push({ fx: cx, fy: cy });
         return pts;
       },
-      heart() {
-        const pts = [];
-        for (const s of [1, 0.66, 0.34]) {
-          const n = Math.round(34 * s + 8);
-          for (let i = 0; i < n; i++) { const t = i / n * Math.PI * 2, x = 16 * Math.pow(Math.sin(t), 3), y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t); pts.push({ fx: cx + (x / 17) * 0.33 * s * asp * 0.72, fy: cy - 0.05 - (y / 17) * 0.34 * s }); }
-        }
-        pts.push({ fx: cx, fy: cy - 0.05 });
-        return pts;
+      heart() {      // 채운 하트 실루엣
+        return fillShape((u, v) => { const x = u * 1.15, y = -v * 1.15 + 0.15; const a = x * x + y * y - 1; return a * a * a - x * x * y * y * y < 0; });
       },
-      star() {
-        const cyv = 0.46, outer = 0.44, inner = 0.18, verts = [];
-        for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = (k % 2) ? inner : outer; verts.push({ fx: cx + Math.cos(a) * rr * asp * 0.8, fy: cyv + Math.sin(a) * rr }); }
-        let pts = alongPath(verts, true, step);
-        pts = pts.concat(alongPath(verts.map(v => ({ fx: cx + (v.fx - cx) * 0.5, fy: cyv + (v.fy - cyv) * 0.5 })), true, step));
-        return pts;
+      star() {       // 채운 5각 별 실루엣
+        const verts = [];
+        for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = (k % 2) ? 0.45 : 1.0; verts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
+        return fillShape((u, v) => pointInPoly(u, v, verts));
       },
-      cross() {
+      cross() {      // X + 테두리
         let pts = [];
         pts = pts.concat(alongPath([{ fx: 0.13, fy: 0.12 }, { fx: 0.87, fy: 0.86 }], false, step));
         pts = pts.concat(alongPath([{ fx: 0.87, fy: 0.12 }, { fx: 0.13, fy: 0.86 }], false, step));
@@ -180,11 +192,12 @@
     };
   }
 
+  let forcedPattern = null;   // 디버그: 특정 패턴 고정
   // 이번 판의 페그 좌표: 패턴 하나를 골라 생성 → 경계 클램프 → 겹침 제거
   function pegLayout() {
     const r = layout().pins, asp = (r.h / r.w) || 1.3, step = CFG.pegStep;
     const P = pegPatterns(asp, step), keys = Object.keys(P);
-    const key = keys[Math.floor(Math.random() * keys.length)];
+    const key = (forcedPattern && P[forcedPattern]) ? forcedPattern : keys[Math.floor(Math.random() * keys.length)];
     S._layoutName = key;
     let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
     return dedupePts(pts, asp, CFG.pegMinGap);
@@ -759,6 +772,7 @@
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
     get S() { return S; }, get anim() { return anim; }, startRun, launchBall, enterBattle, CFG,
+    setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(1.3, CFG.pegStep)); },
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     render() { if (S) draw(); }
   };
