@@ -21,6 +21,18 @@ const CFG = {
   enemyContactFlash: 250
 };
 
+// ── 페그 종류(모양·기능) — 실제 핀볼처럼 다양하게 ──
+// shape: 렌더 모양 · weight: 판 생성 가중치 · oneShot: 맞으면 이번 턴 비활성(다음 턴 부활)
+// 기능: split(볼 분열 수) · boost(속도 킥 배수, 영구 범퍼) · gold(획득 골드) · atk(이번 턴 공격 버프)
+const PEG_TYPES = {
+  normal: { name: '일반',   color: '#8f86d6', shape: 'circle',   weight: 52, oneShot: false },
+  mult2:  { name: '증식×2', color: '#ffcf5c', shape: 'diamond',  weight: 15, oneShot: true,  split: 1, label: '×2' },
+  mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     weight: 5,  oneShot: true,  split: 4, label: '×5' },
+  bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   weight: 10, oneShot: false, boost: 1.28 },
+  gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      weight: 8,  oneShot: true,  gold: 15, label: '$' },
+  attack: { name: '공격',   color: '#ff6b6b', shape: 'triangle', weight: 6,  oneShot: true,  atk: 2,  label: '＋' }
+};
+
 // 레벨업에 필요한 누적 경험치: 레벨 L→L+1
 function expToNext(level) { return 8 + level * 5; }
 

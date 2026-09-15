@@ -55,7 +55,7 @@
     const wallMax = party.reduce((s, id) => s + roster(id).hp, 0);
     S = {
       combatIndex: 0, level: 1, exp: 0, expNext: expToNext(1),
-      atkBonus: 0, bonusBalls: 0, party,
+      atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0,
       wallHpMax: wallMax, wallHp: wallMax,
       // 아래는 전투마다 초기화
       phase: 'load', chars: [], pegs: [], pockets: [], balls: [],
@@ -69,6 +69,17 @@
   }
 
   const roster = (id) => ROSTER.find(c => c.id === id);
+
+  // 페그 종류 가중치 추첨
+  const PEG_KEYS = Object.keys(PEG_TYPES);
+  const PEG_WEIGHT_TOTAL = PEG_KEYS.reduce((s, k) => s + PEG_TYPES[k].weight, 0);
+  function pickPegType() {
+    let r = Math.random() * PEG_WEIGHT_TOTAL;
+    for (const k of PEG_KEYS) { r -= PEG_TYPES[k].weight; if (r <= 0) return k; }
+    return 'normal';
+  }
+  // 이번 턴 캐릭터 발당 피해(런 버프 + 이번 턴 공격 페그 버프 포함)
+  function charDmg(c) { return c.ref.atk + S.atkBonus + (S.turnAtk || 0); }
 
   // ============ 전투 시작 ============
   function startCombat(idx) {
@@ -103,10 +114,7 @@
         const fx = (c + 0.5) / cols + off + (Math.random() - 0.5) * 0.04;
         const fy = 0.14 + r * (0.7 / (rows - 1)) + (Math.random() - 0.5) * 0.03;
         if (fx < 0.05 || fx > 0.95) continue;
-        let type = 'normal';
-        const rnd = Math.random();
-        if (rnd < 0.08) type = 'mult5'; else if (rnd < 0.28) type = 'mult2';
-        S.pegs.push({ fx, fy, type, alive: true });
+        S.pegs.push({ fx, fy, type: pickPegType(), alive: true });
       }
     }
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
@@ -129,6 +137,7 @@
   // ============ 장전 phase ============
   function enterLoad() {
     S.phase = 'load';
+    S.turnAtk = 0;                                  // 공격 페그 버프는 이번 턴 한정
     for (const c of S.chars) { c.ammo = 0; c.armed = false; }
     for (const p of S.pegs) p.alive = true;        // 특수 페그 턴마다 초기화
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
@@ -201,9 +210,9 @@
             const vdot = b.vx * nx + b.vy * ny;
             b.vx -= (1 + CFG.restitution) * vdot * nx;
             b.vy -= (1 + CFG.restitution) * vdot * ny;
-            anim.flashes.push({ x: px, y: py, t: 1 });
-            if (p.type === 'mult2') { splitBall(b, 1); p.alive = false; }
-            else if (p.type === 'mult5') { splitBall(b, 4); p.alive = false; }
+            const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
+            anim.flashes.push({ x: px, y: py, t: 1, color: def.color });
+            applyPegHit(b, p, def, px, py);
           }
         }
         // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
@@ -220,6 +229,19 @@
       const ang = -Math.PI / 2 + (Math.random() - 0.5) * 1.7;   // 상향 부채꼴로 분열
       S.balls.push({ x: b.x, y: b.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: b.r, age: 0 });
     }
+  }
+
+  // 페그 종류별 효과(반사는 호출 전에 이미 적용됨)
+  function applyPegHit(b, p, def, px, py) {
+    if (def.boost) {                       // 범퍼: 일정 속도로 킥(영구·활기)
+      const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
+      b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
+      anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
+    }
+    if (def.split) splitBall(b, def.split);                                   // 배수: 볼 분열
+    if (def.gold) { S.gold = (S.gold || 0) + def.gold; anim.floats.push({ x: px, y: py, text: '+' + def.gold + 'G', color: def.color, t: 1 }); }
+    if (def.atk) { S.turnAtk = (S.turnAtk || 0) + def.atk; anim.floats.push({ x: px, y: py, text: '공격+' + def.atk, color: def.color, t: 1 }); }
+    if (def.oneShot) p.alive = false;      // 일회성: 이번 턴 비활성(다음 턴 부활)
   }
 
   function landBall(b) {
@@ -247,7 +269,7 @@
       if (use) { applyActive(c, sk); c.gauge = 0; }
       c.armed = false;
       // 일반 공격: 탄환 수만큼
-      for (let k = 0; k < c.ammo; k++) S.shotQueue.push({ lane: c.lane, dmg: c.ref.atk + S.atkBonus });
+      for (let k = 0; k < c.ammo; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) });
     }
     // 스킬로 추가된 샷은 applyActive에서 unshift됨
     S.battleTimer = 0;
@@ -256,8 +278,8 @@
   }
 
   function applyActive(c, sk) {
-    if (sk.kind === 'bigHit') S.shotQueue.push({ lane: c.lane, dmg: (c.ref.atk + S.atkBonus) * sk.mult, big: true });
-    else if (sk.kind === 'extraShots') { for (let k = 0; k < sk.shots; k++) S.shotQueue.push({ lane: c.lane, dmg: c.ref.atk + S.atkBonus }); }
+    if (sk.kind === 'bigHit') S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) * sk.mult, big: true });
+    else if (sk.kind === 'extraShots') { for (let k = 0; k < sk.shots; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) }); }
     else if (sk.kind === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + sk.amount); anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + sk.amount, color: '#6cf', t: 1.2 }); }
   }
 
@@ -268,6 +290,7 @@
   }
 
   function stepBattle(dt) {
+    if (S.battleStage === 'done') return;   // 전투 종료(보상 대기/전진 처리 중)엔 정지 → 보상 선택지 재추첨 방지
     S.battleTimer += dt * 1000;
     // 도입: 필드가 커진 걸 잠깐 보여준 뒤 공격 시작
     if (S.battleStage === 'intro') {
@@ -418,6 +441,34 @@
     return { x: r.x + (c.lane + 0.5) * laneW, y: r.y + r.h / 2 - 4 };
   }
 
+  // ── 페그 모양 그리기 ──
+  function polyPath(cx, cy, rad, n, rot) {
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) { const a = rot + i * 2 * Math.PI / n, x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.closePath();
+  }
+  function starPath(cx, cy, ro, ri, n) {
+    ctx.beginPath();
+    for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? ri : ro, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
+    ctx.closePath();
+  }
+  function drawPeg(px, py, R, def, alive) {
+    const col = alive ? def.color : '#2a2648';
+    ctx.fillStyle = col;
+    switch (def.shape) {
+      case 'diamond': polyPath(px, py, R * 1.18, 4, -Math.PI / 2); ctx.fill(); break;
+      case 'triangle': ctx.beginPath(); ctx.moveTo(px, py - R * 1.25); ctx.lineTo(px + R * 1.15, py + R * 0.9); ctx.lineTo(px - R * 1.15, py + R * 0.9); ctx.closePath(); ctx.fill(); break;
+      case 'hex': polyPath(px, py, R * 1.15, 6, Math.PI / 6); ctx.fill(); break;
+      case 'star': starPath(px, py, R * 1.35, R * 0.62, 5); ctx.fill(); break;
+      case 'bumper':
+        ctx.beginPath(); ctx.arc(px, py, R * 1.4, 0, 7); ctx.fillStyle = col + '33'; ctx.fill();
+        ctx.beginPath(); ctx.arc(px, py, R * 1.4, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
+        ctx.beginPath(); ctx.arc(px, py, R * 0.66, 0, 7); ctx.fillStyle = col; ctx.fill();
+        break;
+      default: ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.fill();
+    }
+  }
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const r = layout();
@@ -461,11 +512,9 @@
     ctx.fillStyle = '#00000022'; ctx.fillRect(r.pins.x, r.pins.y, r.pins.w, r.pins.h);
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
-      ctx.beginPath(); ctx.arc(px, py, CFG.pegRadius, 0, 7);
-      if (!p.alive) { ctx.fillStyle = '#2a2648'; ctx.fill(); continue; }
-      ctx.fillStyle = p.type === 'mult5' ? '#ff5db1' : p.type === 'mult2' ? '#ffcf5c' : '#8f86d6';
-      ctx.fill();
-      if (p.type !== 'normal') { ctx.fillStyle = '#1a1430'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(p.type === 'mult5' ? '×5' : '×2', px, py + 3); }
+      const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
+      drawPeg(px, py, CFG.pegRadius, def, p.alive);
+      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold 9px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + 3); }
     }
     // 볼
     for (const b of S.balls) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = '#eafcff'; ctx.fill(); }
