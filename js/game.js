@@ -281,7 +281,7 @@
         // 좌우 벽 반사
         if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; }
         if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; }
-        // 페그 충돌(결정적: 랜덤 없음)
+        // 페그 충돌(결정적: 랜덤 없음). 모든 볼이 페그와 상호작용 → 연쇄.
         for (const p of S.pegs) {
           if (!p.alive) continue;
           const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
@@ -305,29 +305,28 @@
     if (S.phase === 'load' && S.launchesLeft <= 0 && S.balls.length === 0) enterBattle();
   }
 
-  function splitBall(b, n) {
-    const sp = Math.max(520, Math.hypot(b.vx, b.vy));
+  // 페그가 변환되어 생기는 볼(상향 부채꼴로 발사, 다른 페그와 상호작용 → 연쇄). 배수 페그는 n개 증식.
+  function spawnBalls(x, y, n, color) {
+    const sp = CFG.launchSpeed * 0.85;
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
-      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 1.7;   // 상향 부채꼴로 분열
-      S.balls.push({ x: b.x, y: b.y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: b.r, age: 0 });
+      const ang = -Math.PI / 2 + (Math.random() - 0.5) * 1.4;   // 상향 부채꼴
+      S.balls.push({ x, y, vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp, r: CFG.ballRadius, age: 0, color });
     }
   }
 
-  // 페그 종류별 효과(반사는 호출 전에 이미 적용됨)
+  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 볼로 변환(연쇄), 배수 페그는 증식.
   function applyPegHit(b, p, def, px, py) {
-    if (def.boost) {                       // 범퍼: 일정 속도로 킥(영구·안 사라짐)
+    if (def.boost) {                       // 범퍼: 속도 킥(영구·변환 안 함)
       const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
       b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
       anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
       return;
     }
-    if (def.split) splitBall(b, def.split);                                   // 배수: 볼 분열
+    // 그 외 모든 페그: 볼로 변환(일반1개 · 배수 ×2→2개 · ×5→5개). 페그 제거(턴마다 부활).
     if (def.gold) { S.gold = (S.gold || 0) + def.gold; anim.floats.push({ x: px, y: py, text: '+' + def.gold + 'G', color: def.color, t: 1 }); }
     if (def.atk) { S.turnAtk = (S.turnAtk || 0) + def.atk; anim.floats.push({ x: px, y: py, text: '공격+' + def.atk, color: def.color, t: 1 }); }
-    if (def.oneShot) { p.alive = false; return; }   // 특수 페그: 일회성(이번 턴 비활성, 다음 턴 부활)
-    // 일반 페그: 내구도 소모 → 다 닳으면 파괴(충돌 시 사라짐, 턴마다 부활)
-    p.hits = (p.hits || 0) + 1;
-    if (p.hits >= (CFG.normalPegHits || 1)) p.alive = false;
+    spawnBalls(px, py, 1 + (def.split || 0), def.color);
+    p.alive = false;
   }
 
   function landBall(b) {
@@ -337,8 +336,9 @@
     const pk = S.pockets[idx];
     if (pk && pk.type === 'charge') {
       const c = S.chars.find(ch => ch.lane === pk.lane);
-      if (c) { c.ammo++; c.gauge++; renderSkills(); }
-      anim.floats.push({ x: g.x + (idx + 0.5) * (g.w / 9), y: g.y + 10, text: '+1', color: laneHex(pk.lane), t: 1 });
+      const amt = b.charge || 1;
+      if (c) { c.ammo += amt; c.gauge += amt; renderSkills(); }
+      anim.floats.push({ x: g.x + (idx + 0.5) * (g.w / 9), y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1 });
     }
   }
 
@@ -357,7 +357,11 @@
       // 일반 공격: 탄환 수만큼
       for (let k = 0; k < c.ammo; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) });
     }
-    // 스킬로 추가된 샷은 applyActive에서 unshift됨
+    // 탄환이 많으면 볼리(한 번에 여러 발) + 간격 단축으로 전투 총 시간을 battleWindow 근처로 유지
+    const q = S.shotQueue.length;
+    S.shotBurst = Math.max(1, Math.ceil(q / 50));
+    const volleys = Math.max(1, Math.ceil(q / S.shotBurst));
+    S.shotDelay = Math.max(CFG.battleShotMinDelay, Math.min(CFG.battleShotDelay, Math.round(CFG.battleWindow / volleys)));
     S.battleTimer = 0;
     S.battleStage = 'intro';
     renderSkills();
@@ -388,13 +392,19 @@
       if (S.battleTimer < CFG.battleEndDelay) return;
       S.battleStage = 'done'; endBattle(); return;
     }
-    // 공격 진행
-    if (S.battleTimer < CFG.battleShotDelay) return;
+    // 공격 진행(탄환 수에 맞춰 자동 조절된 간격 + 볼리 발사로 늘어짐 방지)
+    if (S.battleTimer < (S.shotDelay || CFG.battleShotDelay)) return;
     S.battleTimer = 0;
-    if (S.shotQueue.length === 0) { S.battleStage = 'outro'; S.battleTimer = 0; return; }
-    const shot = S.shotQueue.shift();
-    const e = frontmostEnemy();
-    if (!e) { S.shotQueue = []; S.battleStage = 'outro'; S.battleTimer = 0; return; }
+    for (let n = 0; n < (S.shotBurst || 1); n++) {
+      if (S.shotQueue.length === 0) { S.battleStage = 'outro'; S.battleTimer = 0; return; }
+      const shot = S.shotQueue.shift();
+      const e = frontmostEnemy();
+      if (!e) { S.shotQueue = []; S.battleStage = 'outro'; S.battleTimer = 0; return; }
+      fireShot(shot, e);
+    }
+  }
+
+  function fireShot(shot, e) {
     let dmg = shot.dmg;
     if (e.isBoss && e.stun > 0) dmg = Math.round(dmg * (1 + BOSS_GOLEM.vulnerable));
     e.hp -= dmg;
@@ -613,8 +623,11 @@
       ctx.restore();
       if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
     }
-    // 볼
-    for (const b of S.balls) { ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7); ctx.fillStyle = '#eafcff'; ctx.fill(); }
+    // 볼(발사볼=흰색, 페그에서 변환된 볼=페그 색)
+    for (const b of S.balls) {
+      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7);
+      ctx.fillStyle = b.color || '#eafcff'; ctx.fill();
+    }
     // 발사대(하단 중앙) + 조준 가이드
     if (S.phase === 'load') {
       const L = launcher();

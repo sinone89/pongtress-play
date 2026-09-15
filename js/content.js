@@ -8,10 +8,12 @@ const CFG = {
   pegRows: 12,             // 조밀 격자 패턴의 행 수
   pegStep: 0.05,           // 패턴 선을 따라 페그를 놓는 간격(fx/fy). 작을수록 촘촘
   pegMinGap: 0.05,         // 페그 최소 간격(겹침 방지, 세로 비율 보정). 작을수록 촘촘
-  normalPegHits: 2,        // 일반 페그 내구도(충돌 N회 후 파괴). 1=맞으면 즉시 / 2=금 간 뒤 파괴(선이 더 오래 유지돼 충돌↑)
+  normalPegHits: 1,        // (레거시) 페그는 이제 충돌 시 볼로 변환됨 — 내구도 미사용
+  battleShotMinDelay: 45,  // ms, 전투 발사 최소 간격(탄환 많을 때 자동 단축 하한)
+  battleWindow: 2400,      // ms, 전투 발사 목표 총 시간(탄환 수로 나눠 간격 자동 결정)
   fieldRows: 5,            // 적 대기 필드 세로 칸 수(레인당)
   launchesPerTurn: 2,      // 한 장전 턴에 쏘는 볼 수(기본). 패시브로 증가 예정
-  maxBalls: 60,            // 볼 폭주 방지 상한
+  maxBalls: 140,           // 볼 폭주 방지 상한(수확 볼이 동시에 많이 뜨므로 상향)
   gravity: 0,              // 무중력(퍼즐 보블): 볼은 직선+반사로 이동, 무조건 위로 올라감
   restitution: 0.98,       // 페그 반사 시 에너지 거의 유지(가라앉지 않게)
   wallRestitution: 1.0,    // 벽·바닥 완전 반사
@@ -49,8 +51,8 @@ function makePeg(fx, fy, type) {
   return { fx, fy, type, alive: true, pr, shape, hits: 0 };
 }
 
-// 레벨업에 필요한 누적 경험치: 레벨 L→L+1
-function expToNext(level) { return 8 + level * 5; }
+// 레벨업에 필요한 누적 경험치: 레벨 L→L+1 (충전·처치가 늘어난 만큼 완만하게)
+function expToNext(level) { return 16 + level * 11; }
 
 // ── 캐릭터 (프로토타입: 처음부터 3명 배치. 편성/가챠는 다음 패스) ──
 // atk 공격력(발당 피해) · hp 체력(성벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
@@ -68,15 +70,16 @@ const ROSTER = [
 ];
 
 // ── 적 ──
+// 체력은 새 충전 방식(페그→볼)으로 공격 횟수가 크게 늘어난 것에 맞춰 상향
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 12, dmg: 7, exp: 4, color: '#7ac74f' },
-  bat:    { name: '박쥐',   hp: 7,  dmg: 5, exp: 3, color: '#9b6cff' },
-  orc:    { name: '오크',   hp: 26, dmg: 13, exp: 9, color: '#e0733a' }
+  goblin: { name: '고블린', hp: 55,  dmg: 7,  exp: 5,  color: '#7ac74f' },
+  bat:    { name: '박쥐',   hp: 34,  dmg: 5,  exp: 4,  color: '#9b6cff' },
+  orc:    { name: '오크',   hp: 130, dmg: 13, exp: 12, color: '#e0733a' }
 };
 
 // ── 보스: 거대 골렘(돌진형) ──
 const BOSS_GOLEM = {
-  name: '거대 골렘', hp: 240, dmg: 34, exp: 80, color: '#8a8f9a',
+  name: '거대 골렘', hp: 1100, dmg: 34, exp: 90, color: '#8a8f9a',
   thresholds: [0.75, 0.5, 0.25],   // 이 비율 이하로 처음 내려갈 때마다 후퇴+스턴
   retreat: 2, stunTurns: 1, vulnerable: 0.5   // 스턴 중 받는 피해 +50%
 };
