@@ -762,8 +762,6 @@
       for (const c of S.chars) if (c.fireT > 0) c.fireT = Math.max(0, c.fireT - d * 4);
       for (const e of S.enemies) if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 5);
       draw();
-      const bt = document.getElementById('build-tag');
-      if (bt) bt.textContent = 'b' + BUILD + ' pegs' + S.pegs.filter(p => p.alive).length + '/' + S.pegs.length + ' balls' + S.balls.length + ' L' + S.launchesLeft + ' c' + (S.combatIndex + 1) + ' ' + S.phase + ' lt' + (S.layoutT || 0).toFixed(2);
     }
     requestAnimationFrame(loop);
   }
