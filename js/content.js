@@ -117,39 +117,39 @@ const META_START = {
 };
 
 // ── 적 ──
-// 체력은 새 충전 방식(페그→수확 볼, 연쇄 없음)으로 늘어난 공격 횟수에 맞춰 조정
+// 적 상향(전투 난이도 강화) — 오크는 탱커라 한 턴에 안 죽고 성벽까지 밀고 들어옴
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 30, dmg: 7,  exp: 5,  color: '#7ac74f' },
-  bat:    { name: '박쥐',   hp: 18, dmg: 5,  exp: 4,  color: '#9b6cff' },
-  orc:    { name: '오크',   hp: 70, dmg: 13, exp: 12, color: '#e0733a' }
+  goblin: { name: '고블린', hp: 55,  dmg: 11, exp: 6,  color: '#7ac74f' },
+  bat:    { name: '박쥐',   hp: 34,  dmg: 8,  exp: 5,  color: '#9b6cff' },
+  orc:    { name: '오크',   hp: 110, dmg: 18, exp: 15, color: '#e0733a' }
 };
 
 // ── 보스: 거대 골렘(돌진형) ──
 const BOSS_GOLEM = {
-  name: '거대 골렘', hp: 600, dmg: 34, exp: 90, color: '#8a8f9a',
+  name: '거대 골렘', hp: 1100, dmg: 48, exp: 110, color: '#8a8f9a',
   thresholds: [0.75, 0.5, 0.25],   // 이 비율 이하로 처음 내려갈 때마다 후퇴+스턴
   retreat: 2, stunTurns: 1, vulnerable: 0.5   // 스턴 중 받는 피해 +50%
 };
 
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
-// 6열 필드에 맞춰 웨이브당 적 수를 늘려 우당탕탕한 전투가 되게 함
+// 웨이브는 전투가 진행될수록 점점 커지고 오크 비중↑ (초반 완만, 후반 압박)
 const COMBATS = [
   { name: '전투 1', waves: [
-    ['goblin', 'goblin', 'bat', 'goblin'],
-    ['goblin', 'bat', 'goblin', 'bat', 'goblin'],
+    ['goblin', 'goblin', 'bat'],
+    ['goblin', 'bat', 'goblin', 'bat'],
     ['bat', 'goblin', 'goblin', 'bat', 'goblin'],
     ['goblin', 'goblin', 'bat', 'goblin', 'bat', 'goblin'] ] },
   { name: '전투 2', waves: [
-    ['goblin', 'bat', 'goblin', 'orc', 'goblin'],
-    ['orc', 'goblin', 'bat', 'bat', 'goblin', 'bat'],
-    ['bat', 'bat', 'goblin', 'orc', 'bat'],
-    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin'] ] },
+    ['goblin', 'bat', 'goblin', 'orc'],
+    ['orc', 'goblin', 'bat', 'bat', 'goblin'],
+    ['bat', 'orc', 'goblin', 'bat', 'goblin', 'orc'],
+    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'bat'] ] },
   { name: '전투 3', waves: [
-    ['orc', 'goblin', 'bat', 'orc', 'goblin'],
-    ['bat', 'bat', 'bat', 'goblin', 'bat', 'goblin'],
+    ['orc', 'goblin', 'bat', 'orc'],
+    ['bat', 'orc', 'goblin', 'orc', 'goblin'],
     ['orc', 'orc', 'goblin', 'bat', 'orc', 'goblin'],
-    ['goblin', 'goblin', 'bat', 'orc', 'goblin', 'orc'] ] },
+    ['goblin', 'orc', 'bat', 'orc', 'goblin', 'orc', 'orc'] ] },
   { name: '보스 · 거대 골렘', boss: true }
 ];
 
