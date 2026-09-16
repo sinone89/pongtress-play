@@ -9,6 +9,14 @@
   const boot = (m) => { const b = $('boot-error'); if (b) { b.hidden = false; b.textContent = 'ERROR: ' + m; } };
   window.addEventListener('error', (e) => boot(e.message + ' @' + (e.lineno || '?')));
 
+  // 빌드 표시(캐시 진단용): 로드된 game.js 의 ?v= 를 좌하단·타이틀에 표기
+  (function () {
+    const s = [...document.scripts].find(x => /game\.js/.test(x.src));
+    const b = s ? ((s.src.match(/v=(\d+)/) || [])[1] || '?') : '?';
+    const tag = document.getElementById('build-tag'); if (tag) tag.textContent = 'build ' + b;
+    const ver = document.querySelector('.version'); if (ver) ver.textContent = 'prototype 0.2 · build ' + b;
+  })();
+
   const canvas = $('stage'); const ctx = canvas.getContext('2d');
   let W = 0, H = 0, dpr = 1;
 
