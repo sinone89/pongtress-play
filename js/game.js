@@ -299,7 +299,7 @@
           vx -= (1 + CFG.restitution) * vdot * nx;
           vy -= (1 + CFG.restitution) * vdot * ny;
           pts.push({ x, y }); hit.add(pi); nHit++;
-          if (nHit >= 12) return pts;                       // 앞쪽 궤적 위주(뒤는 draw에서 흐리게)
+          if (nHit >= 3) return pts;                        // 딱 3회 튕김까지만
           break;
         }
       }
