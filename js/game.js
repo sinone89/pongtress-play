@@ -248,7 +248,7 @@
     S.layoutTarget = 0;                             // 핀볼 화면으로 부드럽게 복귀
     S.turnAtk = 0;                                  // 공격 페그 버프는 이번 턴 한정
     for (const c of S.chars) { c.ammo = 0; c.armed = false; }
-    for (const p of S.pegs) { p.alive = true; p.used = false; }   // 페그는 항상 판에 남고, 매 턴 '사용됨' 해제
+    for (const p of S.pegs) p.alive = true;   // 특수·일반 페그 턴마다 부활
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = [];
     $('c-phase').textContent = '장전';
@@ -345,23 +345,20 @@
     }
   }
 
-  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 사라지지 않고 '사용됨'만 표시(판 유지), 수확 볼 생성.
+  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 볼로 변환되며 사라짐(볼이 지나갈 길이 뚫려 끼지 않음), 턴마다 부활.
   function applyPegHit(b, p, def, px, py) {
     if (b.harvest) return;                 // 수확 볼은 페그를 변환하지 않음(연쇄 방지)
-    if (def.boost) {                       // 범퍼: 속도 킥(영구·항상 유지)
+    if (def.boost) {                       // 범퍼: 속도 킥(영구·안 사라짐)
       const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
       b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
       anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
       return;
     }
-    if (p.used) return;                    // 이번 턴 이미 수확한 페그 → 반사만(판은 그대로 남음)
-    if ((b.harvests || 0) >= CFG.harvestPerBall) return;   // 이 볼의 수확 상한 초과 → 반사만
-    // 수확: 볼로 변환(일반1개 · 배수 ×2→2개 · ×5→5개). 페그는 남고 '사용됨' 표시(다음 턴 복구).
+    // 볼로 변환(일반1개 · 배수 ×2→2개 · ×5→5개). 페그는 사라지고 턴마다 부활.
     if (def.gold) { S.gold = (S.gold || 0) + def.gold; anim.floats.push({ x: px, y: py, text: '+' + def.gold + 'G', color: def.color, t: 1 }); }
     if (def.atk) { S.turnAtk = (S.turnAtk || 0) + def.atk; anim.floats.push({ x: px, y: py, text: '공격+' + def.atk, color: def.color, t: 1 }); }
     spawnBalls(px, py, 1 + (def.split || 0), def.color);
-    p.used = true;
-    b.harvests = (b.harvests || 0) + 1;
+    p.alive = false;
   }
 
   function landBall(b) {
@@ -672,12 +669,12 @@
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-      const R = (p.pr || CFG.pegRadius) * (p.used ? 0.9 : 1);
+      const R = (p.pr || CFG.pegRadius) * (p.alive ? 1 : 0.85);
       ctx.save();
-      if (p.used) ctx.globalAlpha = 0.32 * pinAlpha;     // 이번 턴 수확한 페그: 흐리게(반사는 계속, 다음 턴 복구)
-      drawPeg(px, py, R, p.shape || def.shape, def.color, true);
+      if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 페그: 흐린 유령(다음 턴 부활)
+      drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
       ctx.restore();
-      if (!p.used && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
+      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
     }
     // 볼(발사볼=흰색, 페그에서 변환된 볼=페그 색)
     for (const b of S.balls) {
@@ -765,7 +762,7 @@
       for (const e of S.enemies) if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 5);
       draw();
       const bt = document.getElementById('build-tag');
-      if (bt) bt.textContent = 'b' + BUILD + ' pegs' + S.pegs.length + ' used' + S.pegs.filter(p => p.used).length + ' balls' + S.balls.length + ' L' + S.launchesLeft + ' c' + (S.combatIndex + 1) + ' ' + S.phase + ' lt' + (S.layoutT || 0).toFixed(2);
+      if (bt) bt.textContent = 'b' + BUILD + ' pegs' + S.pegs.filter(p => p.alive).length + '/' + S.pegs.length + ' balls' + S.balls.length + ' L' + S.launchesLeft + ' c' + (S.combatIndex + 1) + ' ' + S.phase + ' lt' + (S.layoutT || 0).toFixed(2);
     }
     requestAnimationFrame(loop);
   }
