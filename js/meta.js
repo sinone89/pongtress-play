@@ -15,6 +15,8 @@ const Meta = (function () {
     M.currencies = Object.assign({ gold: 0, mats: 0, gems: 0, docs: 0 }, M.currencies);
     M.shards = M.shards || {}; M.owned = M.owned || {}; M.stats = Object.assign({ runsWon: 0, kills: 0, floors: 0 }, M.stats);
     M.claimed = M.claimed || {}; M.daily = M.daily || { freeGachaDate: '' };
+    M.maxStage = Math.min(STAGE_MAX, Math.max(1, M.maxStage || 1));
+    M.stage = Math.min(M.maxStage, Math.max(1, M.stage || 1));
     if (!Array.isArray(M.party)) M.party = ['knight', 'archer', 'guard'];
     while (M.party.length < 3) M.party.push(null);
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
@@ -35,6 +37,9 @@ const Meta = (function () {
   }
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }
+  function stage() { return M.stage; }
+  function maxStage() { return M.maxStage; }
+  function setStage(s) { if (s >= 1 && s <= M.maxStage) { M.stage = s; save(); } }
   function levelCap(id) { const st = (M.owned[id] || {}).star || 1; return GROWTH.levelCapByStar[st] || 12; }
 
   // ── 화폐 ──
@@ -109,14 +114,23 @@ const Meta = (function () {
 
   // ── 런 종료 정산 ──
   function onRunEnd(r) {
-    // r = { won, kills, floors, gold }
-    const earn = { gold: (r.gold || 0) + (r.floors || 0) * 20, mats: (r.floors || 0) * 8 + (r.won ? 30 : 0), gems: r.won ? 30 : 0, docs: 0 };
+    // r = { won, kills, floors, gold, stage }
+    const mul = stageScale(r.stage || 1).reward;
+    const earn = {
+      gold: Math.round(((r.gold || 0) + (r.floors || 0) * 20) * mul),
+      mats: Math.round(((r.floors || 0) * 8 + (r.won ? 30 : 0)) * mul),
+      gems: r.won ? Math.round(30 * mul) : 0, docs: 0
+    };
     gain(earn);
     M.stats.kills += (r.kills || 0);
     M.stats.floors += (r.floors || 0);
-    if (r.won) M.stats.runsWon += 1;
+    let unlocked = 0;
+    if (r.won) {
+      M.stats.runsWon += 1;
+      if ((r.stage || 1) >= M.maxStage && M.maxStage < STAGE_MAX) { M.maxStage = Math.min(STAGE_MAX, (r.stage || 1) + 1); unlocked = M.maxStage; }
+    }
     save();
-    return earn;
+    return Object.assign(earn, { unlocked });
   }
 
   // ═══════════ 로비 UI ═══════════
@@ -143,6 +157,18 @@ const Meta = (function () {
   }
 
   function renderSortie() {
+    // 스테이지 선택
+    const ss = $('stage-select');
+    if (ss) {
+      let h = '<div class="ss-btns">';
+      for (let s = 1; s <= STAGE_MAX; s++) {
+        const locked = s > M.maxStage, sel = s === M.stage;
+        h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? '🔒' : s) + '</button>';
+      }
+      ss.innerHTML = h + '</div>';
+      const sc = stageScale(M.stage);
+      $('stage-info').textContent = '스테이지 ' + M.stage + ' / 해금 ' + M.maxStage + ' · 적 체력 ×' + sc.hp.toFixed(1) + ' 공격 ×' + sc.dmg.toFixed(1) + ' · 보상 ×' + sc.reward.toFixed(1);
+    }
     const box = $('sortie-party'); box.innerHTML = '';
     let hp = 0, n = 0;
     partySlots().forEach((id, lane) => {
@@ -204,6 +230,7 @@ const Meta = (function () {
       + '<button class="btn" data-cheat="unlock">전 캐릭터 획득</button>'
       + '<button class="btn" data-cheat="shards">모든 조각 +999</button>'
       + '<button class="btn" data-cheat="max">전 캐릭터 Lv·★ 최대</button>'
+      + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
@@ -216,6 +243,7 @@ const Meta = (function () {
     else if (k === 'unlock') ROSTER.forEach(c => { if (!M.owned[c.id]) M.owned[c.id] = { level: 1, star: 1 }; });
     else if (k === 'shards') ROSTER.forEach(c => { M.shards[c.id] = (M.shards[c.id] || 0) + 999; });
     else if (k === 'max') Object.keys(M.owned).forEach(id => { M.owned[id].star = GROWTH.starMax; M.owned[id].level = GROWTH.levelCapByStar[GROWTH.starMax]; });
+    else if (k === 'stages') M.maxStage = STAGE_MAX;
     else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
     else if (k === 'freegacha') M.daily.freeGachaDate = '';
     else if (k === 'reset') { try { localStorage.removeItem(KEY); } catch (e) {} load(); }
@@ -266,6 +294,7 @@ const Meta = (function () {
     onSortie = opts && opts.onSortie;
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
+    $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
     // 편성 탭: 캐릭터 칩/레인 슬롯
     $('owned-list').onclick = (e) => { const el = e.target.closest('[data-char]'); if (el) openChar(el.dataset.char); };
     $('lane-slots').onclick = (e) => { const el = e.target.closest('[data-char]'); if (el) { toggleParty(el.dataset.char); renderTab(); } };
@@ -296,5 +325,5 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, get state() { return M; } };
 })();

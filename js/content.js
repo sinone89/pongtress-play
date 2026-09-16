@@ -105,12 +105,25 @@ const MISSIONS = [
   { id: 'floors12', name: '연전연승', desc: '전투 12회 클리어', stat: 'floors', goal: 12, reward: { gems: 100, mats: 80 } },
   { id: 'wins3', name: '삼전삼승', desc: '런 3회 클리어', stat: 'runsWon', goal: 3, reward: { gems: 200, docs: 20 } }
 ];
+// ── 스테이지 (높을수록 난이도↑) ──
+const STAGE_MAX = 5;
+function stageScale(s) {
+  s = Math.max(1, Math.min(STAGE_MAX, s || 1));
+  return {
+    hp: 1 + (s - 1) * 0.55,     // 적/보스 체력 배수: S1=1 … S5=3.2
+    dmg: 1 + (s - 1) * 0.30,    // 적 공격 배수: S1=1 … S5=2.2
+    exp: 1 + (s - 1) * 0.40,    // 경험치 배수
+    reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
+  };
+}
+
 // 시작 메타 상태(3인 보유로 바로 플레이 가능, 가챠용 보석 지급)
 const META_START = {
   currencies: { gold: 200, mats: 120, gems: 320, docs: 0 },
   shards: {},
   owned: { knight: { level: 1, star: 1 }, archer: { level: 1, star: 1 }, guard: { level: 1, star: 1 } },
   party: ['knight', 'archer', 'guard'],
+  stage: 1, maxStage: 1,
   stats: { runsWon: 0, kills: 0, floors: 0 },
   claimed: {},
   daily: { freeGachaDate: '' }

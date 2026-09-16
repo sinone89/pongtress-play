@@ -43,6 +43,13 @@ body {
 .party-card .pc-name { font-weight: 800; margin-bottom: 6px; }
 .party-card .pc-stat { font-size: 12px; color: var(--muted); }
 .lobby-panel h3 { margin: 18px 0 8px; font-size: 15px; }
+
+/* 스테이지 선택 */
+#stage-select { margin: 10px 0 4px; }
+.ss-btns { display: flex; gap: 8px; }
+.ss-btn { flex: 1; appearance: none; border: 1px solid #ffffff22; background: #ffffff10; color: var(--ink); font: inherit; font-weight: 800; font-size: 18px; padding: 12px 0; border-radius: 12px; cursor: pointer; }
+.ss-btn.sel { border-color: var(--cyan); background: #46e6d022; box-shadow: 0 0 10px #46e6d044; color: var(--cyan); }
+.ss-btn.locked { opacity: .4; font-size: 14px; }
 .btn:disabled { opacity: .45; cursor: default; box-shadow: none; }
 
 /* 편성/출격 레인 슬롯 */

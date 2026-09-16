@@ -69,8 +69,10 @@
   // ============ 런 시작 ============
   function startRun() {
     const party = Meta.partySlots();                // [id|null ×3] — 편성
+    const stage = Meta.stage(), scale = stageScale(stage);   // 스테이지 난이도 배수
     const wallMax = party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
     S = {
+      stage, scale,
       combatIndex: 0, level: 1, exp: 0, expNext: expToNext(1),
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0],
       runKills: 0, floorsCleared: 0,
@@ -117,7 +119,7 @@
     if (combat.boss) { spawnBoss(); S.waves = []; }
     else { S.waves = combat.waves.slice(); spawnWave(); }
     S.waveIdx = 0;
-    $('c-name').textContent = combat.name;
+    $('c-name').textContent = 'S' + S.stage + ' · ' + combat.name;
     enterLoad();
     syncHud();
   }
@@ -522,13 +524,15 @@
       const def = ENEMIES[type];
       const lane = k % CFG.fieldLanes;
       const row = CFG.fieldRows - 1 - Math.floor(k / CFG.fieldLanes);
-      S.enemies.push({ type, name: def.name, lane, row, hp: def.hp, maxHp: def.hp, dmg: def.dmg, exp: def.exp, color: def.color, stun: 0 });
+      const hp = Math.round(def.hp * S.scale.hp);
+      S.enemies.push({ type, name: def.name, lane, row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0 });
     });
   }
 
   function spawnBoss() {
     const b = BOSS_GOLEM;
-    S.enemies.push({ isBoss: true, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp: b.hp, maxHp: b.hp, dmg: b.dmg, exp: b.exp, color: b.color, stun: 0, thHit: 0 });
+    const hp = Math.round(b.hp * S.scale.hp);
+    S.enemies.push({ isBoss: true, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(b.dmg * S.scale.dmg), exp: Math.round(b.exp * S.scale.exp), color: b.color, stun: 0, thHit: 0 });
   }
 
   // 보스 임계 체크(전투 phase 데미지 적용 후 호출용) — 매 프레임 검사
@@ -570,13 +574,14 @@
   function earnedText(e) { return '획득 🪙' + e.gold + ' 🔩' + e.mats + (e.gems ? ' 💎' + e.gems : ''); }
   function winRun() {
     if (S.over) return; S.over = true;
-    const e = Meta.onRunEnd({ won: true, kills: S.runKills, floors: S.floorsCleared, gold: S.gold });
-    endResult('승리', '모든 전투와 보스를 돌파했습니다. 레벨 ' + S.level + '. · ' + earnedText(e));
+    const e = Meta.onRunEnd({ won: true, kills: S.runKills, floors: S.floorsCleared, gold: S.gold, stage: S.stage });
+    const unlock = e.unlocked ? ' · 스테이지 ' + e.unlocked + ' 해금!' : '';
+    endResult('승리', '스테이지 ' + S.stage + ' 클리어! 레벨 ' + S.level + '. · ' + earnedText(e) + unlock);
   }
   function loseRun() {
     if (S.over) return; S.over = true;
-    const e = Meta.onRunEnd({ won: false, kills: S.runKills, floors: S.floorsCleared, gold: S.gold });
-    endResult('패배', S.combat.name + '에서 성벽이 무너졌습니다. 전투 ' + S.floorsCleared + '회 돌파. · ' + earnedText(e));
+    const e = Meta.onRunEnd({ won: false, kills: S.runKills, floors: S.floorsCleared, gold: S.gold, stage: S.stage });
+    endResult('패배', 'S' + S.stage + ' · ' + S.combat.name + '에서 성벽이 무너졌습니다. 전투 ' + S.floorsCleared + '회 돌파. · ' + earnedText(e));
   }
   function endResult(title, body) {
     $('result-title').textContent = title; $('result-body').textContent = body; $('result').hidden = false;
