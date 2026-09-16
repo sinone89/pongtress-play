@@ -10,11 +10,12 @@
   window.addEventListener('error', (e) => boot(e.message + ' @' + (e.lineno || '?')));
 
   // 빌드 표시(캐시 진단용): 로드된 game.js 의 ?v= 를 좌하단·타이틀에 표기
+  let BUILD = '?';
   (function () {
     const s = [...document.scripts].find(x => /game\.js/.test(x.src));
-    const b = s ? ((s.src.match(/v=(\d+)/) || [])[1] || '?') : '?';
-    const tag = document.getElementById('build-tag'); if (tag) tag.textContent = 'build ' + b;
-    const ver = document.querySelector('.version'); if (ver) ver.textContent = 'prototype 0.2 · build ' + b;
+    BUILD = s ? ((s.src.match(/v=(\d+)/) || [])[1] || '?') : '?';
+    const tag = document.getElementById('build-tag'); if (tag) tag.textContent = 'build ' + BUILD;
+    const ver = document.querySelector('.version'); if (ver) ver.textContent = 'prototype 0.2 · build ' + BUILD;
   })();
 
   const canvas = $('stage'); const ctx = canvas.getContext('2d');
@@ -763,6 +764,8 @@
       for (const c of S.chars) if (c.fireT > 0) c.fireT = Math.max(0, c.fireT - d * 4);
       for (const e of S.enemies) if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 5);
       draw();
+      const bt = document.getElementById('build-tag');
+      if (bt) bt.textContent = 'b' + BUILD + ' pegs' + S.pegs.length + ' used' + S.pegs.filter(p => p.used).length + ' balls' + S.balls.length + ' L' + S.launchesLeft + ' c' + (S.combatIndex + 1) + ' ' + S.phase + ' lt' + (S.layoutT || 0).toFixed(2);
     }
     requestAnimationFrame(loop);
   }
