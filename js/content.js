@@ -3,7 +3,8 @@
  * 밸런스 수치는 여기 한곳. game.js 보다 먼저 로드된다.
  */
 const CFG = {
-  lanes: 3,
+  lanes: 3,                // 캐릭터 편성(성벽) 레인 수 — 골칸·포켓도 이 값 기준
+  fieldLanes: 6,           // 적 필드 열 수(캐릭터 레인과 분리). 공격은 레인 무관 맨 앞 타겟
   pegCols: 9,              // 조밀 격자 패턴의 열 수
   pegRows: 12,             // 조밀 격자 패턴의 행 수
   pegStep: 0.05,           // 패턴 선을 따라 페그를 놓는 간격(fx/fy). 작을수록 촘촘
@@ -132,10 +133,23 @@ const BOSS_GOLEM = {
 
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
+// 6열 필드에 맞춰 웨이브당 적 수를 늘려 우당탕탕한 전투가 되게 함
 const COMBATS = [
-  { name: '전투 1', waves: [['goblin','goblin'], ['goblin'], ['bat','goblin'], ['bat']] },
-  { name: '전투 2', waves: [['goblin','bat','goblin'], ['orc'], ['bat','bat'], ['goblin','orc']] },
-  { name: '전투 3', waves: [['orc','goblin'], ['bat','bat','bat'], ['orc','orc'], ['goblin','goblin','bat']] },
+  { name: '전투 1', waves: [
+    ['goblin', 'goblin', 'bat', 'goblin'],
+    ['goblin', 'bat', 'goblin', 'bat', 'goblin'],
+    ['bat', 'goblin', 'goblin', 'bat', 'goblin'],
+    ['goblin', 'goblin', 'bat', 'goblin', 'bat', 'goblin'] ] },
+  { name: '전투 2', waves: [
+    ['goblin', 'bat', 'goblin', 'orc', 'goblin'],
+    ['orc', 'goblin', 'bat', 'bat', 'goblin', 'bat'],
+    ['bat', 'bat', 'goblin', 'orc', 'bat'],
+    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin'] ] },
+  { name: '전투 3', waves: [
+    ['orc', 'goblin', 'bat', 'orc', 'goblin'],
+    ['bat', 'bat', 'bat', 'goblin', 'bat', 'goblin'],
+    ['orc', 'orc', 'goblin', 'bat', 'orc', 'goblin'],
+    ['goblin', 'goblin', 'bat', 'orc', 'goblin', 'orc'] ] },
   { name: '보스 · 거대 골렘', boss: true }
 ];
 

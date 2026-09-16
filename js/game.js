@@ -505,15 +505,15 @@
     const w = S.waves.shift(); if (!w) return;
     w.forEach((type, k) => {
       const def = ENEMIES[type];
-      const lane = k % CFG.lanes;
-      const row = CFG.fieldRows - 1 - Math.floor(k / CFG.lanes);
+      const lane = k % CFG.fieldLanes;
+      const row = CFG.fieldRows - 1 - Math.floor(k / CFG.fieldLanes);
       S.enemies.push({ type, name: def.name, lane, row, hp: def.hp, maxHp: def.hp, dmg: def.dmg, exp: def.exp, color: def.color, stun: 0 });
     });
   }
 
   function spawnBoss() {
     const b = BOSS_GOLEM;
-    S.enemies.push({ isBoss: true, name: b.name, lane: 1, row: CFG.fieldRows - 1, hp: b.hp, maxHp: b.hp, dmg: b.dmg, exp: b.exp, color: b.color, stun: 0, thHit: 0 });
+    S.enemies.push({ isBoss: true, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp: b.hp, maxHp: b.hp, dmg: b.dmg, exp: b.exp, color: b.color, stun: 0, thHit: 0 });
   }
 
   // 보스 임계 체크(전투 phase 데미지 적용 후 호출용) — 매 프레임 검사
@@ -573,7 +573,7 @@
 
   function enemyPos(e) {
     const r = layout().field;
-    const laneW = r.w / CFG.lanes;
+    const laneW = r.w / CFG.fieldLanes;
     const x = r.x + (e.lane + 0.5) * laneW;
     const y = r.y + (CFG.fieldRows - 1 - e.row + 0.5) * (r.h / CFG.fieldRows);
     return { x, y };
@@ -622,14 +622,14 @@
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const r = layout();
-    const fr = r.field, cellW = fr.w / CFG.lanes, cellH = fr.h / CFG.fieldRows;
+    const fr = r.field, cellW = fr.w / CFG.fieldLanes, cellH = fr.h / CFG.fieldRows;
     // 필드 배경
     ctx.fillStyle = '#ffffff08'; ctx.fillRect(fr.x, fr.y, fr.w, fr.h);
     // 위험 지대(맨 아래 행 = 성벽 접점) 강조 → 적이 다가옴을 인지
     ctx.fillStyle = '#ff5b5b16'; ctx.fillRect(fr.x, fr.y + fr.h - cellH, fr.w, cellH);
     // 전진 칸 격자(레인 세로 + 행 가로)
     ctx.strokeStyle = '#ffffff16'; ctx.lineWidth = 1; ctx.beginPath();
-    for (let c = 1; c < CFG.lanes; c++) { const x = fr.x + c * cellW; ctx.moveTo(x, fr.y); ctx.lineTo(x, fr.y + fr.h); }
+    for (let c = 1; c < CFG.fieldLanes; c++) { const x = fr.x + c * cellW; ctx.moveTo(x, fr.y); ctx.lineTo(x, fr.y + fr.h); }
     for (let rr = 1; rr < CFG.fieldRows; rr++) { const y = fr.y + rr * cellH; ctx.moveTo(fr.x, y); ctx.lineTo(fr.x + fr.w, y); }
     ctx.stroke();
     // 위험 지대 경계선(점선 빨강)
