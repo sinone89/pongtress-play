@@ -277,17 +277,32 @@
     S.launchesLeft--;
   }
 
-  // 조준 예측선: 실제 물리(무중력·좌우/바닥 반사)와 동일하게 첫 페그(또는 상단) 접촉까지 결정적으로 시뮬
+  // 조준 예측선: 실제 물리처럼 페그를 맞으면 튕기고 '통과'(맞은 페그는 이후 무시=제거된 것처럼)하며 상단까지 경로를 이어서 표시
   function simulateAim(dir) {
     const r = layout().pins, topY = r.y, botY = r.y + r.h, pegR = CFG.pegRadius, br = CFG.ballRadius;
     let x = launcher().x, y = launcher().y, vx = dir.dx * CFG.launchSpeed, vy = dir.dy * CFG.launchSpeed;
     const pts = [{ x, y }]; const dt = 1 / 120;
-    for (let i = 0; i < 900; i++) {
+    const hit = new Set(); let nHit = 0;
+    for (let i = 0; i < 1600; i++) {
       vy += CFG.gravity * dt; x += vx * dt; y += vy * dt;
       if (x < r.x + br) { x = r.x + br; vx = Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (x > r.x + r.w - br) { x = r.x + r.w - br; vx = -Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
-      if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사(stepBalls와 동일)
-      for (const p of S.pegs) { if (!p.alive) continue; const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h; if (Math.hypot(x - px, y - py) < br + (p.pr || pegR)) { pts.push({ x, y }); return pts; } }
+      if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사
+      for (let pi = 0; pi < S.pegs.length; pi++) {
+        const p = S.pegs[pi]; if (!p.alive || hit.has(pi)) continue;
+        const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h, pr = p.pr || pegR;
+        const dx = x - px, dy = y - py, dist = Math.hypot(dx, dy), min = br + pr;
+        if (dist < min) {                                   // 페그 반사 후 그 페그는 무시(제거된 것처럼 통과)
+          const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : -1;
+          x += nx * (min - dist); y += ny * (min - dist);
+          const vdot = vx * nx + vy * ny;
+          vx -= (1 + CFG.restitution) * vdot * nx;
+          vy -= (1 + CFG.restitution) * vdot * ny;
+          pts.push({ x, y }); hit.add(pi); nHit++;
+          if (nHit >= 12) return pts;                       // 앞쪽 궤적 위주(뒤는 draw에서 흐리게)
+          break;
+        }
+      }
       if (y <= topY) { pts.push({ x, y }); return pts; }
       if (i % 2 === 0) pts.push({ x, y });
     }
@@ -395,7 +410,7 @@
     }
     // 탄환이 많으면 볼리(한 번에 여러 발) + 간격 단축으로 전투 총 시간을 battleWindow 근처로 유지
     const q = S.shotQueue.length;
-    S.shotBurst = Math.max(1, Math.ceil(q / 50));
+    S.shotBurst = Math.max(1, Math.ceil(q / 80));   // 볼리 발사는 탄환이 아주 많을 때만(전투 늘어짐 방지)
     const volleys = Math.max(1, Math.ceil(q / S.shotBurst));
     S.shotDelay = Math.max(CFG.battleShotMinDelay, Math.min(CFG.battleShotDelay, Math.round(CFG.battleWindow / volleys)));
     S.battleTimer = 0;
@@ -702,10 +717,14 @@
       ctx.beginPath(); ctx.arc(L.x, L.y, 11, 0, 7); ctx.fill();
       if (aimActive && S.launchesLeft > 0) {
         const pts = simulateAim(aimDir(aimX, aimY));
-        ctx.save(); ctx.strokeStyle = '#ffffffaa'; ctx.lineWidth = 2; ctx.setLineDash([5, 7]);
-        ctx.beginPath(); ctx.moveTo(pts[0].x, pts[0].y); for (const pt of pts) ctx.lineTo(pt.x, pt.y); ctx.stroke();
+        ctx.save(); ctx.lineWidth = 2.5; ctx.setLineDash([5, 7]); ctx.lineCap = 'round';
+        for (let k = 1; k < pts.length; k++) {              // 뒤로 갈수록 흐려지는 예측선
+          const a = 0.9 * (1 - (k - 1) / pts.length);
+          ctx.strokeStyle = 'rgba(255,255,255,' + Math.max(0.07, a).toFixed(3) + ')';
+          ctx.beginPath(); ctx.moveTo(pts[k - 1].x, pts[k - 1].y); ctx.lineTo(pts[k].x, pts[k].y); ctx.stroke();
+        }
         const end = pts[pts.length - 1];
-        ctx.setLineDash([]); ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4, 0, 7); ctx.fill();
+        ctx.setLineDash([]); ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4, 0, 7); ctx.fill();
         ctx.restore();
       }
     }
