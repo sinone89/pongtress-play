@@ -26,8 +26,8 @@
   // ============ 레이아웃(phase별 영역 비율) ============
   // 위→아래: 적 필드 / 성벽(캐릭터) / 골 포켓(성벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
   // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
-  const LOAD_FRAC = { field: .16, wall: .10, goal: .09, pins: .65 };
-  const BATTLE_FRAC = { field: .76, wall: .20, goal: .02, pins: .02 };
+  const LOAD_FRAC = { field: .15, wall: .13, goal: .09, pins: .63 };
+  const BATTLE_FRAC = { field: .72, wall: .24, goal: .02, pins: .02 };
   const lerp = (a, b, t) => a + (b - a) * t;
   function layout() {
     const t = S ? (S.layoutT || 0) : 0;
@@ -598,41 +598,57 @@
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const r = layout();
+    const fr = r.field, cellW = fr.w / CFG.lanes, cellH = fr.h / CFG.fieldRows;
     // 필드 배경
-    ctx.fillStyle = '#ffffff08'; ctx.fillRect(r.field.x, r.field.y, r.field.w, r.field.h);
-    // 레인 구분선
-    ctx.strokeStyle = '#ffffff12'; ctx.lineWidth = 1;
-    for (let l = 1; l < CFG.lanes; l++) { const x = r.field.w / CFG.lanes * l; ctx.beginPath(); ctx.moveTo(x, r.field.y); ctx.lineTo(x, r.wall.y + r.wall.h); ctx.stroke(); }
+    ctx.fillStyle = '#ffffff08'; ctx.fillRect(fr.x, fr.y, fr.w, fr.h);
+    // 위험 지대(맨 아래 행 = 성벽 접점) 강조 → 적이 다가옴을 인지
+    ctx.fillStyle = '#ff5b5b16'; ctx.fillRect(fr.x, fr.y + fr.h - cellH, fr.w, cellH);
+    // 전진 칸 격자(레인 세로 + 행 가로)
+    ctx.strokeStyle = '#ffffff16'; ctx.lineWidth = 1; ctx.beginPath();
+    for (let c = 1; c < CFG.lanes; c++) { const x = fr.x + c * cellW; ctx.moveTo(x, fr.y); ctx.lineTo(x, fr.y + fr.h); }
+    for (let rr = 1; rr < CFG.fieldRows; rr++) { const y = fr.y + rr * cellH; ctx.moveTo(fr.x, y); ctx.lineTo(fr.x + fr.w, y); }
+    ctx.stroke();
+    // 위험 지대 경계선(점선 빨강)
+    ctx.strokeStyle = '#ff6b6b77'; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(fr.x, fr.y + fr.h - cellH); ctx.lineTo(fr.x + fr.w, fr.y + fr.h - cellH); ctx.stroke(); ctx.setLineDash([]);
     // 적
+    const showLabels = cellH > 42;
     for (const e of S.enemies) {
-      const p0 = enemyPos(e); const rad = e.isBoss ? 26 : 15;
+      const p0 = enemyPos(e);
+      const rad = Math.min(cellW, cellH) * (e.isBoss ? 0.72 : 0.42);
       const hit = e.hitT || 0;
-      const p = { x: p0.x + (hit > 0 ? (Math.random() - 0.5) * 6 * hit : 0), y: p0.y + (hit > 0 ? (Math.random() - 0.5) * 6 * hit : 0) };
-      ctx.beginPath(); ctx.arc(p.x, p.y, rad, 0, 7);
+      const px = p0.x + (hit > 0 ? (Math.random() - 0.5) * rad * 0.5 * hit : 0), py = p0.y + (hit > 0 ? (Math.random() - 0.5) * rad * 0.5 * hit : 0);
+      ctx.beginPath(); ctx.arc(px, py, rad, 0, 7);
       ctx.fillStyle = hit > 0.35 ? '#ffffff' : e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
-      if (e.isBoss) { ctx.lineWidth = 3; ctx.strokeStyle = '#fff6'; ctx.stroke(); }
-      // hp bar
-      const bw = rad * 2, bx = p0.x - rad, by = p0.y + rad + 3;
-      ctx.fillStyle = '#0008'; ctx.fillRect(bx, by, bw, 4);
-      ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), 4);
+      ctx.lineWidth = e.isBoss ? 3 : 2; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
+      // HP 숫자(원 안)
+      if (showLabels) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(rad * 0.82) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + 1); ctx.textBaseline = 'alphabetic'; }
+      // 이름(위, 공간 있을 때만)
+      if (showLabels && py - rad - 5 > fr.y + cellH * 0.18) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(cellH * 0.15) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(e.name, px, py - rad - 6); }
+      // hp bar(아래, 얇게)
+      const bw = rad * 1.8, bx = p0.x - bw / 2, bh = Math.max(4, Math.round(cellH * 0.07)), by = p0.y + rad + 3;
+      ctx.fillStyle = '#0009'; ctx.fillRect(bx, by, bw, bh);
+      ctx.fillStyle = '#ff6b6b'; ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), bh);
     }
-    // 성벽
-    ctx.fillStyle = '#ffffff10'; ctx.fillRect(r.wall.x, r.wall.y, r.wall.w, r.wall.h);
-    const laneW = r.wall.w / CFG.lanes;
+    // 성벽(캐릭터 방어선)
+    const wr = r.wall, cw = wr.w / CFG.lanes;
+    ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
+    const crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22));
+    const cFont = Math.max(11, Math.round(crad * 0.62)), showChar = wr.h > 55;
     for (const c of S.chars) {
       const fire = c.fireT || 0;
-      const x = r.wall.x + (c.lane + 0.5) * laneW, y = r.wall.y + r.wall.h / 2 - fire * 3;  // 발사 시 살짝 반동
-      if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y - 4, 10 + fire * 8, 0, 7); ctx.fill(); ctx.restore(); }
-      ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y - 4, 10, 0, 7); ctx.fill();
-      ctx.fillStyle = '#fff'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(c.ref.name, x, y + 16);
-      if (S.phase === 'load' && c.ammo > 0) { ctx.fillStyle = '#ffcf5c'; ctx.font = 'bold 12px system-ui'; ctx.fillText('◆' + c.ammo, x, y - 20); }
+      const x = wr.x + (c.lane + 0.5) * cw, y = wr.y + wr.h * 0.34 - fire * 4;
+      if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad + fire * 10, 0, 7); ctx.fill(); ctx.restore(); }
+      ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
+      if (showChar) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + cFont + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(c.ref.name, x, y + crad + cFont + 1); }
+      if (S.phase === 'load' && c.ammo > 0) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(crad * 1.0) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.ammo, x, y + 1); ctx.textBaseline = 'alphabetic'; }
     }
-    // 성벽 HP 바
-    ctx.fillStyle = '#0006'; ctx.fillRect(r.wall.x + 6, r.wall.y + r.wall.h - 8, r.wall.w - 12, 5);
-    ctx.fillStyle = '#46e6d0'; ctx.fillRect(r.wall.x + 6, r.wall.y + r.wall.h - 8, (r.wall.w - 12) * Math.max(0, S.wallHp / S.wallHpMax), 5);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 11px system-ui'; ctx.textAlign = 'left';
-    ctx.fillText('성벽 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax, r.wall.x + 8, r.wall.y + 12);
+    // 성벽 HP 바(두껍게 + 큰 글자)
+    const hbH = Math.max(8, Math.round(wr.h * 0.16)), hbY = wr.y + wr.h - hbH - 3, hbW = wr.w - 16;
+    ctx.fillStyle = '#0007'; ctx.fillRect(wr.x + 8, hbY, hbW, hbH);
+    ctx.fillStyle = '#46e6d0'; ctx.fillRect(wr.x + 8, hbY, hbW * Math.max(0, S.wallHp / S.wallHpMax), hbH);
+    ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(11, Math.round(hbH * 0.82)) + 'px system-ui'; ctx.textAlign = 'left';
+    ctx.fillText('🛡 ' + Math.ceil(S.wallHp) + ' / ' + S.wallHpMax, wr.x + 14, hbY + hbH - Math.max(2, hbH * 0.2));
 
     // ── 핀볼 영역(전투로 갈수록 페이드아웃 → 전투 화면에선 안 보임) ──
     const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
@@ -678,8 +694,8 @@
       ctx.fillRect(x + 1, g.y + 2, pw - 2, g.h - 4);
       ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, g.y + 2, pw - 2, g.h - 4);
       ctx.fillStyle = pk.type === 'charge' ? laneHex(pk.lane) : '#4a4570';
-      ctx.font = 'bold 12px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(pk.type === 'charge' ? '◆' : '×', x + pw / 2, g.y + g.h / 2 + 4);
+      ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, g.h * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(pk.type === 'charge' ? '◆' : '×', x + pw / 2, g.y + g.h / 2 + Math.min(pw * 0.18, g.h * 0.18));
     }
     ctx.restore();
     }  // /pinAlpha
