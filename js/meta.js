@@ -194,6 +194,34 @@ const Meta = (function () {
     }).join('');
   }
 
+  // ── 치트(디버그) ──
+  function renderCheat() {
+    const box = $('cheat-box');
+    box.innerHTML = '<h2>치트 · 디버그</h2>'
+      + '<p class="muted">🪙' + M.currencies.gold + ' 🔩' + M.currencies.mats + ' 💎' + M.currencies.gems + ' 📜' + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
+      + '<div class="cd-btns">'
+      + '<button class="btn" data-cheat="cur">화폐 전체 +9999</button>'
+      + '<button class="btn" data-cheat="unlock">전 캐릭터 획득</button>'
+      + '<button class="btn" data-cheat="shards">모든 조각 +999</button>'
+      + '<button class="btn" data-cheat="max">전 캐릭터 Lv·★ 최대</button>'
+      + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
+      + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
+      + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
+      + '</div>'
+      + '<button class="btn cd-close" data-close="1">닫기</button>';
+  }
+  function openCheat() { renderCheat(); $('cheat-modal').hidden = false; }
+  function doCheat(k) {
+    if (k === 'cur') ['gold', 'mats', 'gems', 'docs'].forEach(c => M.currencies[c] += 9999);
+    else if (k === 'unlock') ROSTER.forEach(c => { if (!M.owned[c.id]) M.owned[c.id] = { level: 1, star: 1 }; });
+    else if (k === 'shards') ROSTER.forEach(c => { M.shards[c.id] = (M.shards[c.id] || 0) + 999; });
+    else if (k === 'max') Object.keys(M.owned).forEach(id => { M.owned[id].star = GROWTH.starMax; M.owned[id].level = GROWTH.levelCapByStar[GROWTH.starMax]; });
+    else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
+    else if (k === 'freegacha') M.daily.freeGachaDate = '';
+    else if (k === 'reset') { try { localStorage.removeItem(KEY); } catch (e) {} load(); }
+    save(); renderCheat(); renderLobby();
+  }
+
   function renderTab() {
     for (const t of ['sortie', 'formation', 'shop', 'mission']) $('tab-' + t).hidden = (t !== activeTab);
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(x => x.classList.toggle('active', x.dataset.tab === activeTab));
@@ -260,7 +288,13 @@ const Meta = (function () {
       else if (pt) { toggleParty(pt.dataset.party); openChar(pt.dataset.party); }
     };
     $('gacha-modal').onclick = (e) => { if (e.target.dataset.close || e.target === $('gacha-modal')) $('gacha-modal').hidden = true; };
+    // 치트: 좌하단 build 태그 탭
+    const tag = $('build-tag'); if (tag) tag.onclick = openCheat;
+    $('cheat-modal').onclick = (e) => {
+      if (e.target.dataset.close || e.target === $('cheat-modal')) { $('cheat-modal').hidden = true; return; }
+      const b = e.target.closest('[data-cheat]'); if (b) doCheat(b.dataset.cheat);
+    };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, get state() { return M; } };
 })();
