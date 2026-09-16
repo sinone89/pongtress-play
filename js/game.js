@@ -68,11 +68,12 @@
 
   // ============ 런 시작 ============
   function startRun() {
-    const party = ROSTER.map(c => c.id);            // 프로토타입: 기본 3인
-    const wallMax = party.reduce((s, id) => s + roster(id).hp, 0);
+    const party = Meta.partySlots();                // [id|null ×3] — 편성
+    const wallMax = party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
     S = {
       combatIndex: 0, level: 1, exp: 0, expNext: expToNext(1),
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0],
+      runKills: 0, floorsCleared: 0,
       wallHpMax: wallMax, wallHp: wallMax,
       // 아래는 전투마다 초기화
       phase: 'load', layoutT: 0, layoutTarget: 0, chars: [], pegs: [], pockets: [], balls: [],
@@ -103,8 +104,9 @@
     S.combatIndex = idx;
     const combat = COMBATS[idx];
     S.combat = combat; S.over = false;
-    // 캐릭터(레인 배치) — 프로토타입: party 순서대로 레인 0,1,2
-    S.chars = S.party.map((id, lane) => ({ ref: roster(id), lane, ammo: 0, gauge: 0, armed: false }));
+    // 캐릭터(레인 배치): 편성 슬롯 순서 = 레인 0,1,2. 빈 슬롯은 캐릭터 없음. 레벨/성급 반영.
+    S.chars = [];
+    S.party.forEach((id, lane) => { if (id) S.chars.push({ ref: Meta.leveledDef(id), lane, ammo: 0, gauge: 0, armed: false }); });
     S.passiveBalls = 0;
     S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = [];
     buildBoard();
@@ -456,8 +458,9 @@
 
   function killEnemy(e) {
     const idx = S.enemies.indexOf(e); if (idx >= 0) S.enemies.splice(idx, 1);
+    S.runKills = (S.runKills || 0) + 1;
     gainExp(e.exp);
-    if (e.isBoss) { winRun(); }
+    if (e.isBoss) { S.floorsCleared = (S.floorsCleared || 0) + 1; winRun(); }
   }
 
   function gainExp(x) {
@@ -545,11 +548,21 @@
 
   // ============ 승패 ============
   function winCombat() {
+    S.floorsCleared = (S.floorsCleared || 0) + 1;
     if (S.combatIndex + 1 < COMBATS.length) { startCombat(S.combatIndex + 1); }
     else winRun();
   }
-  function winRun() { S.over = true; endResult('승리', '모든 전투와 보스를 돌파했습니다. 레벨 ' + S.level + ' 도달.'); }
-  function loseRun() { S.over = true; endResult('패배', S.combat.name + '에서 성벽이 무너졌습니다.'); }
+  function earnedText(e) { return '획득 🪙' + e.gold + ' 🔩' + e.mats + (e.gems ? ' 💎' + e.gems : ''); }
+  function winRun() {
+    if (S.over) return; S.over = true;
+    const e = Meta.onRunEnd({ won: true, kills: S.runKills, floors: S.floorsCleared, gold: S.gold });
+    endResult('승리', '모든 전투와 보스를 돌파했습니다. 레벨 ' + S.level + '. · ' + earnedText(e));
+  }
+  function loseRun() {
+    if (S.over) return; S.over = true;
+    const e = Meta.onRunEnd({ won: false, kills: S.runKills, floors: S.floorsCleared, gold: S.gold });
+    endResult('패배', S.combat.name + '에서 성벽이 무너졌습니다. 전투 ' + S.floorsCleared + '회 돌파. · ' + earnedText(e));
+  }
   function endResult(title, body) {
     $('result-title').textContent = title; $('result-body').textContent = body; $('result').hidden = false;
   }
@@ -789,25 +802,11 @@
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
 
-  // ============ 로비 ============
-  function renderLobby() {
-    const pv = $('party-preview'); pv.replaceChildren();
-    for (const id of ROSTER.map(c => c.id)) {
-      const c = roster(id); const d = document.createElement('div'); d.className = 'party-card';
-      d.innerHTML = '<div class="pc-name">' + c.name + '</div><div class="pc-stat">공격 ' + c.atk + ' · 체력 ' + c.hp + ' · 골칸 ' + c.gol + '</div>';
-      pv.append(d);
-    }
-  }
-
   // ============ 와이어링 ============
-  $('btn-start').onclick = () => { show('lobby'); renderLobby(); };
-  document.querySelectorAll('.tabbtn').forEach(t => t.onclick = () => {
-    document.querySelectorAll('.tabbtn').forEach(x => x.classList.toggle('active', x === t));
-    $('tab-sortie').hidden = t.dataset.tab !== 'sortie';
-    $('tab-shop').hidden = t.dataset.tab !== 'shop';
-  });
-  $('btn-sortie').onclick = () => startRun();
-  $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); renderLobby(); };
+  Meta.load();
+  Meta.init({ onSortie: startRun });
+  $('btn-start').onclick = () => { show('lobby'); Meta.renderLobby(); };
+  $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('btn-auto').onclick = () => { S.autoSkill = !S.autoSkill; $('btn-auto').textContent = '자동 ' + (S.autoSkill ? 'ON' : 'OFF'); $('btn-auto').classList.toggle('on', S.autoSkill); };
   canvas.addEventListener('pointerdown', aimDown);
   canvas.addEventListener('pointermove', aimMove);

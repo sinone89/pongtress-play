@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=045">
+  <link rel="stylesheet" href="css/game.css?v=046">
 </head>
 <body>
   <div id="app">
@@ -27,26 +27,49 @@
     <!-- 로비 -->
     <section id="lobby" class="screen" hidden>
       <header id="lobby-top">
-        <span class="cur"><b id="cur-gold">0</b> 골드</span>
-        <span class="cur"><b id="cur-gem">0</b> 보석</span>
+        <span class="cur">🪙<b id="cur-gold">0</b></span>
+        <span class="cur">🔩<b id="cur-mats">0</b></span>
+        <span class="cur">💎<b id="cur-gems">0</b></span>
+        <span class="cur">📜<b id="cur-docs">0</b></span>
       </header>
       <main id="lobby-main">
         <div id="tab-sortie" class="lobby-panel">
           <h2>출격</h2>
-          <p class="muted">런 = 3전투 + 보스. 편성·가챠는 다음 업데이트. 지금은 기본 3인으로 출전.</p>
-          <div id="party-preview"></div>
+          <p class="muted">런 = 3전투 + 보스. 클리어하면 화폐를 벌어 로비에서 성장합니다.</p>
+          <div id="sortie-party"></div>
+          <p id="sortie-info" class="muted"></p>
           <button id="btn-sortie" class="btn primary">출격</button>
+          <p id="sortie-warn" class="muted" hidden></p>
+        </div>
+        <div id="tab-formation" class="lobby-panel" hidden>
+          <h2>편성</h2>
+          <div id="lane-slots"></div>
+          <p class="muted">보유 캐릭터 — 탭하여 상세/편성</p>
+          <div id="owned-list"></div>
         </div>
         <div id="tab-shop" class="lobby-panel" hidden>
-          <h2>상점</h2>
-          <p class="muted">가챠·조각 교환은 준비 중입니다.</p>
+          <h2>상점 · 가챠</h2>
+          <div id="gacha-box"></div>
+          <h3>문서 교환소</h3>
+          <div id="doc-shop"></div>
+        </div>
+        <div id="tab-mission" class="lobby-panel" hidden>
+          <h2>미션</h2>
+          <div id="mission-list"></div>
         </div>
       </main>
       <nav id="lobby-nav">
         <button class="tabbtn active" data-tab="sortie">출격</button>
+        <button class="tabbtn" data-tab="formation">편성</button>
         <button class="tabbtn" data-tab="shop">상점</button>
+        <button class="tabbtn" data-tab="mission">미션</button>
       </nav>
     </section>
+
+    <!-- 캐릭터 상세 -->
+    <div id="char-modal" class="modal" hidden><div class="modal-box" id="char-modal-box"></div></div>
+    <!-- 가챠 결과 -->
+    <div id="gacha-modal" class="modal" hidden><div class="modal-box" id="gacha-modal-box"></div></div>
 
     <!-- 전투 오버레이 -->
     <section id="combat" class="screen" hidden>
@@ -88,7 +111,8 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/content.js?v=045"></script>
-  <script src="js/game.js?v=045"></script>
+  <script src="js/content.js?v=046"></script>
+  <script src="js/meta.js?v=046"></script>
+  <script src="js/game.js?v=046"></script>
 </body>
 </html>
