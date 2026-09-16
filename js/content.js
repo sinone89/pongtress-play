@@ -103,7 +103,21 @@ const REWARDS = [
 ];
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──
+// 골칸 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 골칸을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영
 function openOneBlank(S) {
+  if (!S.pocketBonus) S.pocketBonus = [0, 0, 0];
+  const lane = S.chars.map(c => c.lane).find(l => {
+    const c = S.chars.find(ch => ch.lane === l);
+    return c && (c.ref.gol + (S.pocketBonus[l] || 0)) < 3;
+  });
+  if (lane === undefined) return false;                 // 모든 레인 골칸이 이미 꽉 참
+  S.pocketBonus[lane] = (S.pocketBonus[lane] || 0) + 1;
+  const pk = S.pockets.find(p => p.lane === lane && p.type === 'blank');
+  if (pk) pk.type = 'charge';                           // 현재 판에도 즉시 반영
+  return true;
+}
+// 임시 골칸 개방(패시브): 현재 판의 꽝칸 하나만 충전칸으로(영구 아님, 다음 전투엔 재계산)
+function openBlankTemp(S) {
   const lanesWithChar = new Set(S.chars.map(c => c.lane));
   const cand = S.pockets.filter(p => p.type === 'blank' && lanesWithChar.has(p.lane));
   if (cand.length) cand[0].type = 'charge';

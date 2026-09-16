@@ -63,7 +63,7 @@
     const wallMax = party.reduce((s, id) => s + roster(id).hp, 0);
     S = {
       combatIndex: 0, level: 1, exp: 0, expNext: expToNext(1),
-      atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0,
+      atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0],
       wallHpMax: wallMax, wallHp: wallMax,
       // 아래는 전투마다 초기화
       phase: 'load', layoutT: 0, layoutTarget: 0, chars: [], pegs: [], pockets: [], balls: [],
@@ -220,7 +220,8 @@
     for (let i = 0; i < 9; i++) {
       const lane = Math.floor(i / 3), sub = i % 3;
       const c = S.chars.find(ch => ch.lane === lane);
-      const type = (c && sub < c.ref.gol) ? 'charge' : 'blank';
+      const golN = c ? Math.min(3, c.ref.gol + ((S.pocketBonus && S.pocketBonus[lane]) || 0)) : 0;   // 보상으로 연 골칸은 다음 전투에도 유지
+      const type = (c && sub < golN) ? 'charge' : 'blank';
       S.pockets.push({ lane, type });
     }
   }
@@ -229,7 +230,7 @@
     if (!p) return;
     if (p.kind === 'addBall') S.passiveBalls += p.n;
     else if (p.kind === 'addPeg') addPegToBoard(S, p.peg, p.n);
-    else if (p.kind === 'closeBlank') { for (let i = 0; i < p.n; i++) openOneBlank(S); }
+    else if (p.kind === 'closeBlank') { for (let i = 0; i < p.n; i++) openBlankTemp(S); }
   }
 
   // ============ 장전 phase ============
@@ -572,7 +573,7 @@
     ctx.closePath();
   }
   function drawPeg(px, py, R, shape, color, alive) {
-    const col = alive ? color : '#2a2648';
+    const col = color;   // 죽은 페그는 caller가 낮은 알파(유령)로 그림
     ctx.fillStyle = col;
     switch (shape) {
       case 'diamond': polyPath(px, py, R * 1.18, 4, -Math.PI / 2); ctx.fill(); break;
@@ -659,9 +660,9 @@
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-      const dmg = p.alive && !def.oneShot && !def.boost && (p.hits || 0) > 0;   // 금 간 일반 페그(내구도 2 이상일 때)
-      const R = (p.pr || CFG.pegRadius) * (dmg ? 0.72 : 1);
-      ctx.save(); if (dmg) ctx.globalAlpha = 0.6 * pinAlpha;
+      const R = (p.pr || CFG.pegRadius) * (p.alive ? 1 : 0.85);
+      ctx.save();
+      if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 페그: 흐린 유령(다음 턴 부활 표시)
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
       ctx.restore();
       if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
