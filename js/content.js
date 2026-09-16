@@ -136,20 +136,20 @@ const BOSS_GOLEM = {
 // 웨이브는 전투가 진행될수록 점점 커지고 오크 비중↑ (초반 완만, 후반 압박)
 const COMBATS = [
   { name: '전투 1', waves: [
-    ['goblin', 'goblin', 'bat'],
-    ['goblin', 'bat', 'goblin', 'bat'],
-    ['bat', 'goblin', 'goblin', 'bat', 'goblin'],
-    ['goblin', 'goblin', 'bat', 'goblin', 'bat', 'goblin'] ] },
+    ['goblin', 'goblin', 'bat', 'goblin'],
+    ['goblin', 'bat', 'goblin', 'bat', 'goblin'],
+    ['bat', 'goblin', 'goblin', 'bat', 'goblin', 'bat'],
+    ['goblin', 'goblin', 'bat', 'goblin', 'bat', 'goblin', 'goblin'] ] },
   { name: '전투 2', waves: [
-    ['goblin', 'bat', 'goblin', 'orc'],
-    ['orc', 'goblin', 'bat', 'bat', 'goblin'],
-    ['bat', 'orc', 'goblin', 'bat', 'goblin', 'orc'],
-    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'bat'] ] },
+    ['goblin', 'bat', 'goblin', 'orc', 'goblin'],
+    ['orc', 'goblin', 'bat', 'bat', 'goblin', 'orc'],
+    ['bat', 'orc', 'goblin', 'bat', 'goblin', 'orc', 'goblin'],
+    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'bat', 'orc'] ] },
   { name: '전투 3', waves: [
-    ['orc', 'goblin', 'bat', 'orc'],
-    ['bat', 'orc', 'goblin', 'orc', 'goblin'],
-    ['orc', 'orc', 'goblin', 'bat', 'orc', 'goblin'],
-    ['goblin', 'orc', 'bat', 'orc', 'goblin', 'orc', 'orc'] ] },
+    ['orc', 'goblin', 'bat', 'orc', 'goblin'],
+    ['bat', 'orc', 'goblin', 'orc', 'goblin', 'orc'],
+    ['orc', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'orc'],
+    ['goblin', 'orc', 'bat', 'orc', 'goblin', 'orc', 'orc', 'goblin', 'orc'] ] },
   { name: '보스 · 거대 골렘', boss: true }
 ];
 
