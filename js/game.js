@@ -211,8 +211,9 @@
 
   let forcedPattern = null;   // 디버그: 특정 패턴 고정
   // 이번 판의 페그 좌표: 패턴 하나를 골라 생성 → 경계 클램프 → 겹침 제거
+  // ⚠ 항상 '장전' 영역 비율로 생성(전투 시작 시 layoutT=1이면 핀볼 영역이 납작해 dedupe가 판을 뭉갬 — 전투2+ 페그 급감 버그)
   function pegLayout() {
-    const r = layout().pins, asp = (r.h / r.w) || 1.3, step = CFG.pegStep;
+    const asp = ((H * LOAD_FRAC.pins) / W) || 1.3, step = CFG.pegStep;
     const P = pegPatterns(asp, step), keys = Object.keys(P);
     const key = (forcedPattern && P[forcedPattern]) ? forcedPattern : keys[Math.floor(Math.random() * keys.length)];
     S._layoutName = key;
