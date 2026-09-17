@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=060">
+  <link rel="stylesheet" href="css/game.css?v=061">
 </head>
 <body>
   <div id="app">
@@ -31,6 +31,7 @@
         <span class="cur">🔩<b id="cur-mats">0</b></span>
         <span class="cur">💎<b id="cur-gems">0</b></span>
         <span class="cur">📜<b id="cur-docs">0</b></span>
+        <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
       </header>
       <main id="lobby-main">
         <div id="tab-sortie" class="lobby-panel">
@@ -88,6 +89,7 @@
         <div id="skill-row"></div>
         <div id="control-row">
           <span id="aim-hint" class="aim-hint">핀볼판을 드래그해 조준 · 떼면 발사</span>
+          <button class="ctl mute-btn"><span class="mute-icon">🔊</span></button>
           <button id="btn-auto" class="ctl">자동 OFF</button>
         </div>
       </footer>
@@ -115,8 +117,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/content.js?v=060"></script>
-  <script src="js/meta.js?v=060"></script>
-  <script src="js/game.js?v=060"></script>
+  <script src="js/audio.js?v=061"></script>
+  <script src="js/content.js?v=061"></script>
+  <script src="js/meta.js?v=061"></script>
+  <script src="js/game.js?v=061"></script>
 </body>
 </html>

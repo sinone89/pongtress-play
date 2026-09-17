@@ -301,7 +301,7 @@ const Meta = (function () {
       const el = e.target.closest('[data-gacha]'); if (!el || el.disabled) return;
       const which = el.dataset.gacha;
       const res = which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
-      if (res) { showGachaResult(res); renderLobby(); }
+      if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
     };
     $('doc-shop').onclick = (e) => { const el = e.target.closest('[data-doc]'); if (el) { buyShards(el.dataset.doc); renderShop(); renderBar(); } };
     // 미션

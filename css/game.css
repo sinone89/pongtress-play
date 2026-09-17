@@ -36,6 +36,8 @@ body {
 #lobby-top { display: flex; gap: 10px; justify-content: space-between; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); font-size: 14px; }
 #lobby-top .cur { display: flex; align-items: center; gap: 3px; }
 #lobby-top .cur b { color: var(--amber); }
+.mute-btn { appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
+.lobby-mute { margin-left: auto; }
 #lobby-main { flex: 1; overflow: auto; padding: 8px 18px; }
 .lobby-panel h2 { margin: 6px 0 10px; }
 #party-preview { display: flex; gap: 10px; margin: 16px 0 24px; flex-wrap: wrap; }

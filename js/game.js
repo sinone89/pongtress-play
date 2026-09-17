@@ -277,6 +277,7 @@
     if (!dir) { const a = -Math.PI / 2 + (Math.random() - 0.5) * 1.5; dir = { dx: Math.cos(a), dy: Math.sin(a) }; }  // sim용 랜덤 상향
     S.balls.push({ x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed, vy: dir.dy * CFG.launchSpeed, r: CFG.ballRadius, age: 0 });
     S.launchesLeft--;
+    Sound.play('launch');
   }
 
   // 조준 예측선: 실제 물리처럼 페그를 맞으면 튕기고 '통과'(맞은 페그는 이후 무시=제거된 것처럼)하며 상단까지 경로를 이어서 표시
@@ -346,6 +347,7 @@
             b.vy -= (1 + CFG.restitution) * vdot * ny;
             const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
             anim.flashes.push({ x: px, y: py, t: 1, color: def.color });
+            Sound.play('peg');
             applyPegHit(b, p, def, px, py);
           }
         }
@@ -390,6 +392,7 @@
       const c = S.chars.find(ch => ch.lane === pk.lane);
       const amt = b.charge || 1;
       if (c) { c.ammo += amt; c.gauge += amt; renderSkills(); }
+      Sound.play('charge');
       anim.floats.push({ x: g.x + (idx + 0.5) * (g.w / 9), y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1 });
     }
   }
@@ -470,19 +473,21 @@
     e.hitT = 1;
     anim.floats.push({ x: pos.x, y: pos.y, text: String(dmg), color: shot.big ? '#ffcf5c' : '#fff', t: .9, big: shot.big });
     anim.flashes.push({ x: pos.x, y: pos.y, t: 1, big: true });
+    Sound.play('shot');
     if (e.hp <= 0) killEnemy(e);
   }
 
   function killEnemy(e) {
     const idx = S.enemies.indexOf(e); if (idx >= 0) S.enemies.splice(idx, 1);
     S.runKills = (S.runKills || 0) + 1;
+    Sound.play('kill');
     gainExp(e.exp);
     if (e.isBoss) { S.floorsCleared = (S.floorsCleared || 0) + 1; winRun(); }
   }
 
   function gainExp(x) {
     S.exp += x;
-    while (S.exp >= S.expNext) { S.exp -= S.expNext; S.level++; S.expNext = expToNext(S.level); S.pendingRewards++; }
+    while (S.exp >= S.expNext) { S.exp -= S.expNext; S.level++; S.expNext = expToNext(S.level); S.pendingRewards++; Sound.play('level'); }
     syncHud();
   }
 
@@ -501,6 +506,7 @@
       e.row -= 1;
       if (e.row < 0) {
         S.wallHp -= e.dmg;
+        Sound.play('wall');
         anim.floats.push({ x: W / 2, y: layout().wall.y + 20, text: '-' + e.dmg, color: '#ff6b6b', t: 1.2, big: true });
         if (e.isBoss) { e.row = boss_retreatRow(); }   // 보스는 큰 피해 후 뒤로
         else { const i = S.enemies.indexOf(e); if (i >= 0) S.enemies.splice(i, 1); }
@@ -585,6 +591,7 @@
   }
   function endResult(title, body) {
     $('result-title').textContent = title; $('result-body').textContent = body; $('result').hidden = false;
+    Sound.play(title === '승리' ? 'win' : 'lose');
   }
 
   // ============ 렌더 ============
@@ -822,14 +829,16 @@
 
   // ============ 입력 ============
   function canvasPoint(e) { const rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
-  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
+  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); Sound.resume(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
 
   // ============ 와이어링 ============
   Meta.load();
   Meta.init({ onSortie: startRun });
-  $('btn-start').onclick = () => { show('lobby'); Meta.renderLobby(); };
+  Sound.syncIcons();
+  document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
+  $('btn-start').onclick = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('btn-auto').onclick = () => { S.autoSkill = !S.autoSkill; $('btn-auto').textContent = '자동 ' + (S.autoSkill ? 'ON' : 'OFF'); $('btn-auto').classList.toggle('on', S.autoSkill); };
   canvas.addEventListener('pointerdown', aimDown);
