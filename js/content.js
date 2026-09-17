@@ -167,6 +167,17 @@ const BOSSES = {
 function stageBoss(s) { return s >= 5 ? 'legion' : s >= 3 ? 'slime' : 'golem'; }
 const BOSS_GOLEM = BOSSES.golem;   // 하위호환
 
+// ── 스테이지별 고정 페그판 ──
+// [전투0, 전투1, 전투2, 보스] 순. 매 판 랜덤이던 것을 스테이지·전투마다 고정 → 밸런스 재현성 확보.
+// 중앙 집중형 그림 패턴(heart/star/rings/diamonds)에는 좌우 레일이 자동 추가되어 양옆 레인도 장전 가능(pegLayout 참조).
+const STAGE_BOARDS = {
+  1: ['grid', 'chevrons', 'diamonds', 'cross'],
+  2: ['chevrons', 'zigzag', 'rings', 'grid'],
+  3: ['zigzag', 'diamonds', 'heart', 'cross'],
+  4: ['cross', 'chevrons', 'star', 'rings'],
+  5: ['grid', 'zigzag', 'star', 'heart']
+};
+
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
 // 웨이브는 전투가 진행될수록 점점 커지고 오크 비중↑ (초반 완만, 후반 압박)

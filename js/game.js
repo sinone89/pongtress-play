@@ -112,8 +112,9 @@
     S.passiveBalls = 0;
     S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = [];
     buildBoard();
-    // 패시브(보드 효과) 적용
-    for (const c of S.chars) applyPassive(c.ref.passive);
+    // 패시브(보드 효과) 적용 — 페그 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
+    { const _r = Math.random; Math.random = makeRng((S.stage || 1) * 100003 + (S.combatIndex + 1) * 619 + 31);
+      try { for (const c of S.chars) applyPassive(c.ref.passive); } finally { Math.random = _r; } }
     // 적/웨이브
     S.enemies = [];
     if (combat.boss) { spawnBoss(); S.waves = []; }
@@ -122,6 +123,12 @@
     $('c-name').textContent = 'S' + S.stage + ' · ' + combat.name;
     enterLoad();
     syncHud();
+  }
+
+  // 시드 난수(mulberry32) — 스테이지·전투별 고정 페그판을 재현 가능하게
+  function makeRng(seed) {
+    let t = (seed >>> 0) || 1;
+    return () => { t = (t + 0x6D2B79F5) >>> 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) >>> 0; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   }
 
   // ============ 페그 배치 패턴(선/그림) ============
@@ -167,6 +174,8 @@
   function pegPatterns(asp, step) {
     const cx = 0.5, cy = 0.47;
     const ax = (rr) => Math.min(0.42, rr * asp);   // x반경(과도 확장 방지)
+    // 좌우 레일: 중앙 집중형 그림 패턴에서도 양옆 레인(좌/우 캐릭터)이 장전할 수 있도록 가장자리 기둥 페그
+    const rails = (rows = 8) => { const p = []; for (const fx of [0.10, 0.90]) for (let i = 0; i < rows; i++) p.push({ fx, fy: 0.11 + i * (0.74 / (rows - 1)) }); return p; };
     return {
       grid() {
         const pts = [], cols = CFG.pegCols, rows = CFG.pegRows;
@@ -183,25 +192,25 @@
         for (let r = 0; r < rows; r++) { const fy = 0.13 + r * (0.68 / (rows - 1)), verts = []; for (let i = 0; i <= seg; i++) { const t = i / seg, up = (i % 2 === 0) ? -1 : 1; verts.push({ fx: 0.09 + t * 0.82, fy: fy + up * 0.05 }); } pts = pts.concat(alongPath(verts, false, step)); }
         return pts;
       },
-      diamonds() {   // 동심 다이아(촘촘)
+      diamonds() {   // 동심 다이아(촘촘) + 좌우 레일(중앙 반경 축소로 레일 공간 확보)
         let pts = [];
-        for (const rr of [0.1, 0.19, 0.28, 0.37, 0.46]) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
+        for (const rr of [0.09, 0.17, 0.25, 0.33]) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
         pts.push({ fx: cx, fy: cy });
-        return pts;
+        return pts.concat(rails());
       },
-      rings() {      // 동심 원(촘촘)
+      rings() {      // 동심 원(촘촘) + 좌우 레일
         let pts = [];
-        for (const rr of [0.1, 0.18, 0.26, 0.34, 0.42]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
+        for (const rr of [0.09, 0.16, 0.23, 0.30]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
         pts.push({ fx: cx, fy: cy });
-        return pts;
+        return pts.concat(rails());
       },
-      heart() {      // 채운 하트 실루엣
-        return fillShape((u, v) => { const x = u * 1.15, y = -v * 1.15 + 0.15; const a = x * x + y * y - 1; return a * a * a - x * x * y * y * y < 0; });
+      heart() {      // 채운 하트 실루엣 + 좌우 레일
+        return fillShape((u, v) => { const x = u * 1.15, y = -v * 1.15 + 0.15; const a = x * x + y * y - 1; return a * a * a - x * x * y * y * y < 0; }).concat(rails());
       },
-      star() {       // 채운 5각 별 실루엣
+      star() {       // 채운 5각 별 실루엣 + 좌우 레일
         const verts = [];
         for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = (k % 2) ? 0.45 : 1.0; verts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
-        return fillShape((u, v) => pointInPoly(u, v, verts));
+        return fillShape((u, v) => pointInPoly(u, v, verts)).concat(rails());
       },
       cross() {      // X + 테두리
         let pts = [];
@@ -219,7 +228,13 @@
   function pegLayout() {
     const asp = ((H * LOAD_FRAC.pins) / W) || 1.3, step = CFG.pegStep;
     const P = pegPatterns(asp, step), keys = Object.keys(P);
-    const key = (forcedPattern && P[forcedPattern]) ? forcedPattern : keys[Math.floor(Math.random() * keys.length)];
+    let key;
+    if (forcedPattern && P[forcedPattern]) key = forcedPattern;   // 디버그: 강제 패턴
+    else {
+      const board = STAGE_BOARDS[S.stage] || STAGE_BOARDS[1];     // 스테이지·전투별 고정 판
+      key = board[S.combatIndex] || board[board.length - 1];
+      if (!P[key]) key = keys[0];
+    }
     S._layoutName = key;
     let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
     return dedupePts(pts, asp, CFG.pegMinGap);
@@ -228,7 +243,11 @@
   // ============ 보드(페그·포켓) 생성 ============
   function buildBoard() {
     S.pegs = [];
-    for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType()));
+    // 페그 종류·크기·모양도 스테이지·전투별로 고정(시드 난수) → 같은 스테이지는 항상 동일한 판
+    const seed = (S.stage || 1) * 100003 + (S.combatIndex + 1) * 619;
+    const _rand = Math.random; Math.random = makeRng(seed);
+    try { for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType())); }
+    finally { Math.random = _rand; }
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
