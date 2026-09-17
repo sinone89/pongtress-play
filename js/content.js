@@ -111,8 +111,8 @@ const STAGE_MAX = 5;
 function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
-    hp: 1 + (s - 1) * 0.60,     // 적/보스 체력 배수: S1=1 … S5=3.4
-    dmg: 1 + (s - 1) * 0.40,    // 적 공격 배수: S1=1 … S5=2.6 (성벽 압박)
+    hp: 1 + (s - 1) * 0.70,     // 적/보스 체력 배수: S1=1 … S5=3.8
+    dmg: 1 + (s - 1) * 0.45,    // 적 공격 배수: S1=1 … S5=2.8 (성벽 압박)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
   };
@@ -133,12 +133,12 @@ const META_START = {
 // ── 적 ──
 // 적 종류 — speed(턴당 전진 칸), armor(피격 시 고정 감소). 스테이지가 높을수록 강한 적 등장.
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 55,  dmg: 11, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
-  bat:    { name: '박쥐',   hp: 34,  dmg: 8,  exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
-  orc:    { name: '오크',   hp: 110, dmg: 18, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
-  wolf:   { name: '늑대',   hp: 40,  dmg: 10, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
-  brute:  { name: '강철거인', hp: 160, dmg: 20, exp: 22, color: '#7f8aa0', speed: 1, armor: 3 },  // 방어(피격 -3)
-  slime:  { name: '슬라임', hp: 66,  dmg: 10, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
+  goblin: { name: '고블린', hp: 82,  dmg: 14, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
+  bat:    { name: '박쥐',   hp: 52,  dmg: 11, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
+  orc:    { name: '오크',   hp: 165, dmg: 24, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
+  wolf:   { name: '늑대',   hp: 62,  dmg: 14, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
+  brute:  { name: '강철거인', hp: 240, dmg: 27, exp: 22, color: '#7f8aa0', speed: 1, armor: 5 },  // 방어(피격 -5)
+  slime:  { name: '슬라임', hp: 100, dmg: 14, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
 };
 // 스테이지별 적 풀(가중치) — 상위 스테이지에 강한 적이 섞임
 const STAGE_POOL = {
@@ -157,11 +157,11 @@ function pickEnemyType(s) {
 
 // ── 보스 3종 (스테이지 티어별) ──
 const BOSSES = {
-  golem:  { name: '거대 골렘', kind: 'golem', hp: 1100, dmg: 48, exp: 110, color: '#8a8f9a',
+  golem:  { name: '거대 골렘', kind: 'golem', hp: 1500, dmg: 54, exp: 110, color: '#8a8f9a',
             thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌진형: HP% 후퇴+스턴, 스턴 중 피해+50%
-  slime:  { name: '거대 슬라임', kind: 'slime', hp: 900, dmg: 30, exp: 130, color: '#5ad0a0',
+  slime:  { name: '거대 슬라임', kind: 'slime', hp: 1250, dmg: 34, exp: 130, color: '#5ad0a0',
             thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분열형: 임계마다 슬라임 분열
-  legion: { name: '고블린 군주', kind: 'legion', hp: 1350, dmg: 26, exp: 150, color: '#6fae4f',
+  legion: { name: '고블린 군주', kind: 'legion', hp: 1850, dmg: 30, exp: 150, color: '#6fae4f',
             addType: 'goblin' }                                                            // 정지형: 매 턴 부하 소환
 };
 function stageBoss(s) { return s >= 5 ? 'legion' : s >= 3 ? 'slime' : 'golem'; }
@@ -170,22 +170,23 @@ const BOSS_GOLEM = BOSSES.golem;   // 하위호환
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
 // 웨이브는 전투가 진행될수록 점점 커지고 오크 비중↑ (초반 완만, 후반 압박)
+// 웨이브 길이 = 마릿수(종류는 스테이지 풀에서 결정). 필드 6열×5행=30칸 → 최대 ~18로 압박
 const COMBATS = [
   { name: '전투 1', waves: [
-    ['goblin', 'goblin', 'bat', 'goblin'],
-    ['goblin', 'bat', 'goblin', 'bat', 'goblin'],
-    ['bat', 'goblin', 'goblin', 'bat', 'goblin', 'bat'],
-    ['goblin', 'goblin', 'bat', 'goblin', 'bat', 'goblin', 'goblin'] ] },
+    new Array(7).fill('x'),
+    new Array(9).fill('x'),
+    new Array(11).fill('x'),
+    new Array(13).fill('x') ] },
   { name: '전투 2', waves: [
-    ['goblin', 'bat', 'goblin', 'orc', 'goblin'],
-    ['orc', 'goblin', 'bat', 'bat', 'goblin', 'orc'],
-    ['bat', 'orc', 'goblin', 'bat', 'goblin', 'orc', 'goblin'],
-    ['goblin', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'bat', 'orc'] ] },
+    new Array(9).fill('x'),
+    new Array(11).fill('x'),
+    new Array(13).fill('x'),
+    new Array(15).fill('x') ] },
   { name: '전투 3', waves: [
-    ['orc', 'goblin', 'bat', 'orc', 'goblin'],
-    ['bat', 'orc', 'goblin', 'orc', 'goblin', 'orc'],
-    ['orc', 'orc', 'goblin', 'bat', 'orc', 'goblin', 'orc'],
-    ['goblin', 'orc', 'bat', 'orc', 'goblin', 'orc', 'orc', 'goblin', 'orc'] ] },
+    new Array(11).fill('x'),
+    new Array(13).fill('x'),
+    new Array(15).fill('x'),
+    new Array(18).fill('x') ] },
   { name: '보스 · 거대 골렘', boss: true }
 ];
 
