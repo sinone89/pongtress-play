@@ -111,8 +111,8 @@ const STAGE_MAX = 5;
 function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
-    hp: 1 + (s - 1) * 0.70,     // 적/보스 체력 배수: S1=1 … S5=3.8
-    dmg: 1 + (s - 1) * 0.45,    // 적 공격 배수: S1=1 … S5=2.8 (성벽 압박)
+    hp: 1 + (s - 1) * 0.65,     // 적/보스 체력 배수: S1=1 … S5=3.6
+    dmg: 1 + (s - 1) * 0.42,    // 적 공격 배수: S1=1 … S5=2.68 (성벽 압박)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
   };
@@ -133,12 +133,12 @@ const META_START = {
 // ── 적 ──
 // 적 종류 — speed(턴당 전진 칸), armor(피격 시 고정 감소). 스테이지가 높을수록 강한 적 등장.
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 82,  dmg: 14, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
-  bat:    { name: '박쥐',   hp: 52,  dmg: 11, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
-  orc:    { name: '오크',   hp: 165, dmg: 24, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
-  wolf:   { name: '늑대',   hp: 62,  dmg: 14, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
-  brute:  { name: '강철거인', hp: 240, dmg: 27, exp: 22, color: '#7f8aa0', speed: 1, armor: 5 },  // 방어(피격 -5)
-  slime:  { name: '슬라임', hp: 100, dmg: 14, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
+  goblin: { name: '고블린', hp: 68,  dmg: 13, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
+  bat:    { name: '박쥐',   hp: 43,  dmg: 10, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
+  orc:    { name: '오크',   hp: 138, dmg: 22, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
+  wolf:   { name: '늑대',   hp: 51,  dmg: 13, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
+  brute:  { name: '강철거인', hp: 200, dmg: 24, exp: 22, color: '#7f8aa0', speed: 1, armor: 4 },  // 방어(피격 -4)
+  slime:  { name: '슬라임', hp: 84,  dmg: 13, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
 };
 // 스테이지별 적 풀(가중치) — 상위 스테이지에 강한 적이 섞임
 const STAGE_POOL = {
@@ -157,11 +157,11 @@ function pickEnemyType(s) {
 
 // ── 보스 3종 (스테이지 티어별) ──
 const BOSSES = {
-  golem:  { name: '거대 골렘', kind: 'golem', hp: 1500, dmg: 54, exp: 110, color: '#8a8f9a',
+  golem:  { name: '거대 골렘', kind: 'golem', hp: 1320, dmg: 50, exp: 110, color: '#8a8f9a',
             thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌진형: HP% 후퇴+스턴, 스턴 중 피해+50%
-  slime:  { name: '거대 슬라임', kind: 'slime', hp: 1250, dmg: 34, exp: 130, color: '#5ad0a0',
+  slime:  { name: '거대 슬라임', kind: 'slime', hp: 1080, dmg: 32, exp: 130, color: '#5ad0a0',
             thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분열형: 임계마다 슬라임 분열
-  legion: { name: '고블린 군주', kind: 'legion', hp: 1850, dmg: 30, exp: 150, color: '#6fae4f',
+  legion: { name: '고블린 군주', kind: 'legion', hp: 1600, dmg: 28, exp: 150, color: '#6fae4f',
             addType: 'goblin' }                                                            // 정지형: 매 턴 부하 소환
 };
 function stageBoss(s) { return s >= 5 ? 'legion' : s >= 3 ? 'slime' : 'golem'; }
