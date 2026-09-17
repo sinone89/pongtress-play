@@ -72,8 +72,8 @@ const ROSTER = [
     active: { name: '방벽', gauge: 18, kind: 'heal', amount: 24 },     // 성벽 HP 회복
     passive: { name: '정리', kind: 'closeBlank', n: 1 } },            // 시작 시 꽝 1칸 닫힘(→충전)
   { id: 'rogue', name: '도적', rarity: 'common', atk: 6, hp: 22, gol: 1,
-    active: { name: '난사', gauge: 13, kind: 'extraShots', shots: 5 },
-    passive: { name: '재장전', kind: 'addBall', n: 1 } },
+    active: { name: '교란', gauge: 14, kind: 'stun', count: 3, turns: 1 },   // 앞 3명 기절(전진 스킵)
+    passive: { name: '설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
   { id: 'priest', name: '사제', rarity: 'rare', atk: 4, hp: 30, gol: 2,
     active: { name: '치유', gauge: 16, kind: 'heal', amount: 36 },
     passive: { name: '축복', kind: 'closeBlank', n: 1 } },
@@ -81,7 +81,7 @@ const ROSTER = [
     active: { name: '광란', gauge: 16, kind: 'bigHit', mult: 3 },
     passive: { name: '분노', kind: 'addPeg', peg: 'attack', n: 1 } },
   { id: 'mage', name: '마법사', rarity: 'epic', atk: 12, hp: 18, gol: 2,
-    active: { name: '폭발', gauge: 14, kind: 'bigHit', mult: 4 },
+    active: { name: '폭발', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },   // 앞 4명 광역
     passive: { name: '증폭', kind: 'addPeg', peg: 'mult5', n: 1 } }
 ];
 
@@ -195,7 +195,9 @@ const REWARDS = [
   { id: 'atk',    name: '연마',      desc: '모든 캐릭터 공격력 +1 (이번 런)', apply: (S) => { S.atkBonus += 1; } },
   { id: 'open',   name: '골칸 개방', desc: '꽝 포켓 1칸을 충전 칸으로', apply: (S) => { openOneBlank(S); } },
   { id: 'ball',   name: '증설',      desc: '이번 런 장전 볼 +1', apply: (S) => { S.bonusBalls += 1; } },
-  { id: 'mult',   name: '증식판',    desc: '핀볼판에 ×2 페그 추가', apply: (S) => { addPegToBoard(S, 'mult2', 2); } }
+  { id: 'mult',   name: '증식판',    desc: '핀볼판에 ×2 페그 추가', apply: (S) => { addPegToBoard(S, 'mult2', 2); } },
+  { id: 'buff',   name: '버프 칸',   desc: '꽝 포켓 1칸을 버프(성벽 회복) 칸으로', apply: (S) => { S.buffBonus = (S.buffBonus || 0) + 1; const pk = S.pockets.find(p => p.type === 'blank'); if (pk) pk.type = 'buff'; } },
+  { id: 'bumper', name: '범퍼 설치', desc: '핀볼판에 범퍼 2개 추가', apply: (S) => { addPegToBoard(S, 'bumper', 2); } }
 ];
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──

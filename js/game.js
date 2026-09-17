@@ -74,7 +74,7 @@
     S = {
       stage, scale,
       combatIndex: 0, level: 1, exp: 0, expNext: expToNext(1),
-      atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0],
+      atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0], buffBonus: 0,
       runKills: 0, floorsCleared: 0,
       wallHpMax: wallMax, wallHp: wallMax,
       // 아래는 전투마다 초기화
@@ -238,6 +238,9 @@
       const type = (c && sub < golN) ? 'charge' : 'blank';
       S.pockets.push({ lane, type });
     }
+    // 버프 칸(보상): 꽝칸 일부를 버프(성벽 회복) 칸으로
+    let bb = S.buffBonus || 0;
+    for (const p of S.pockets) { if (bb <= 0) break; if (p.type === 'blank') { p.type = 'buff'; bb--; } }
   }
 
   function applyPassive(p) {
@@ -394,6 +397,11 @@
       if (c) { c.ammo += amt; c.gauge += amt; renderSkills(); }
       Sound.play('charge');
       anim.floats.push({ x: g.x + (idx + 0.5) * (g.w / 9), y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1 });
+    } else if (pk && pk.type === 'buff') {
+      const amt = (b.charge || 1) * 6;
+      S.wallHp = Math.min(S.wallHpMax, S.wallHp + amt);
+      Sound.play('charge');
+      anim.floats.push({ x: g.x + (idx + 0.5) * (g.w / 9), y: g.y + 10, text: '+' + amt, color: '#6cf', t: 1 });
     }
   }
 
@@ -427,6 +435,8 @@
     if (sk.kind === 'bigHit') S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) * sk.mult, big: true });
     else if (sk.kind === 'extraShots') { for (let k = 0; k < sk.shots; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) }); }
     else if (sk.kind === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + sk.amount); anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + sk.amount, color: '#6cf', t: 1.2 }); }
+    else if (sk.kind === 'aoe') { for (let k = 0; k < (sk.shots || 3); k++) S.shotQueue.push({ lane: c.lane, dmg: Math.round(charDmg(c) * (sk.mult || 1.3)), aoe: sk.count || 4, big: true }); }   // 광역: 앞 N명 동시 타격
+    else if (sk.kind === 'stun') { frontmostN(sk.count || 3).forEach(e => { e.stun = (e.stun || 0) + (sk.turns || 1); anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 16, text: '기절', color: '#8cf', t: 1.1 }); }); }   // 앞 N명 기절(전진 스킵)
   }
 
   function frontmostEnemy() {
@@ -461,20 +471,29 @@
   }
 
   function fireShot(shot, e) {
+    const c = S.chars.find(ch => ch.lane === shot.lane);
+    const targets = shot.aoe ? frontmostN(shot.aoe) : [e];
+    let beam = null;
+    for (const t of targets) { const p = enemyPos(t); if (!beam) beam = p; hitEnemy(t, shot); }
+    if (beam) {
+      const from = c ? charPos(c) : { x: beam.x, y: layout().wall.y + layout().wall.h };
+      anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: shot.big ? '#ffcf5c' : '#bff0ff', big: shot.big });
+    }
+    if (c) c.fireT = 1;
+    Sound.play('shot');
+  }
+  function frontmostN(n) {
+    return S.enemies.slice().sort((a, b) => (a.row - b.row) || (a.lane - b.lane)).slice(0, n);
+  }
+  function hitEnemy(e, shot) {
     let dmg = shot.dmg;
     if (e.armor) dmg = Math.max(1, dmg - e.armor);                                            // 방어(강철거인)
     if (e.isBoss && e.stun > 0 && S.bossDef && S.bossDef.vulnerable) dmg = Math.round(dmg * (1 + S.bossDef.vulnerable));  // 골렘 스턴 취약
     e.hp -= dmg;
     const pos = enemyPos(e);
-    // 발사 연출: 쏜 캐릭터 → 적으로 향하는 빔, 캐릭터 반짝임, 적 피격 흔들림
-    const c = S.chars.find(ch => ch.lane === shot.lane);
-    const from = c ? charPos(c) : { x: pos.x, y: layout().wall.y + layout().wall.h };
-    anim.shots.push({ sx: from.x, sy: from.y, ex: pos.x, ey: pos.y, t: 0, color: shot.big ? '#ffcf5c' : '#bff0ff', big: shot.big });
-    if (c) c.fireT = 1;
     e.hitT = 1;
-    anim.floats.push({ x: pos.x, y: pos.y, text: String(dmg), color: shot.big ? '#ffcf5c' : '#fff', t: .9, big: shot.big });
+    anim.floats.push({ x: pos.x, y: pos.y, text: String(Math.round(dmg)), color: shot.big ? '#ffcf5c' : '#fff', t: .9, big: shot.big });
     anim.flashes.push({ x: pos.x, y: pos.y, t: 1, big: true });
-    Sound.play('shot');
     if (e.hp <= 0) killEnemy(e);
   }
 
@@ -503,7 +522,7 @@
     S._turns = (S._turns || 0) + 1;
     // 보스 스턴이면 이번 턴 전진 스킵
     for (const e of S.enemies.slice()) {
-      if (e.isBoss && e.stun > 0) { e.stun--; continue; }
+      if (e.stun > 0) { e.stun--; continue; }   // 기절(스킬) — 이번 턴 전진 스킵
       e.row -= (e.speed || 1);   // 빠른 적(늑대)은 2칸
       if (e.row < 0) {
         S.wallHp -= e.dmg;
@@ -764,12 +783,13 @@
     const g = r.goal, pw = g.w / 9;
     for (let i = 0; i < 9; i++) {
       const pk = S.pockets[i]; const x = g.x + i * pw;
-      ctx.fillStyle = pk.type === 'charge' ? laneHex(pk.lane) + '55' : '#ffffff08';
+      const isC = pk.type === 'charge', isB = pk.type === 'buff';
+      ctx.fillStyle = isC ? laneHex(pk.lane) + '55' : isB ? '#66ccff33' : '#ffffff08';
       ctx.fillRect(x + 1, g.y + 2, pw - 2, g.h - 4);
       ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, g.y + 2, pw - 2, g.h - 4);
-      ctx.fillStyle = pk.type === 'charge' ? laneHex(pk.lane) : '#4a4570';
+      ctx.fillStyle = isC ? laneHex(pk.lane) : isB ? '#6cf' : '#4a4570';
       ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, g.h * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(pk.type === 'charge' ? '◆' : '×', x + pw / 2, g.y + g.h / 2 + Math.min(pw * 0.18, g.h * 0.18));
+      ctx.fillText(isC ? '◆' : isB ? '♥' : '×', x + pw / 2, g.y + g.h / 2 + Math.min(pw * 0.18, g.h * 0.18));
     }
     ctx.restore();
     }  // /pinAlpha
