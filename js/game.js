@@ -462,7 +462,8 @@
 
   function fireShot(shot, e) {
     let dmg = shot.dmg;
-    if (e.isBoss && e.stun > 0) dmg = Math.round(dmg * (1 + BOSS_GOLEM.vulnerable));
+    if (e.armor) dmg = Math.max(1, dmg - e.armor);                                            // 방어(강철거인)
+    if (e.isBoss && e.stun > 0 && S.bossDef && S.bossDef.vulnerable) dmg = Math.round(dmg * (1 + S.bossDef.vulnerable));  // 골렘 스턴 취약
     e.hp -= dmg;
     const pos = enemyPos(e);
     // 발사 연출: 쏜 캐릭터 → 적으로 향하는 빔, 캐릭터 반짝임, 적 피격 흔들림
@@ -503,7 +504,7 @@
     // 보스 스턴이면 이번 턴 전진 스킵
     for (const e of S.enemies.slice()) {
       if (e.isBoss && e.stun > 0) { e.stun--; continue; }
-      e.row -= 1;
+      e.row -= (e.speed || 1);   // 빠른 적(늑대)은 2칸
       if (e.row < 0) {
         S.wallHp -= e.dmg;
         Sound.play('wall');
@@ -513,6 +514,11 @@
       }
     }
     if (S.wallHp <= 0) { S.wallHp = 0; loseRun(); return; }
+    // 고블린 군주(정지형): 매 턴 부하 소환
+    if (S.combat.boss && S.bossDef && S.bossDef.kind === 'legion' && S.enemies.some(x => x.isBoss) && S.enemies.length < 22) {
+      const def = ENEMIES[S.bossDef.addType], lane = Math.floor(Math.random() * CFG.fieldLanes), hp = Math.round(def.hp * S.scale.hp);
+      S.enemies.push({ type: S.bossDef.addType, name: def.name, lane, row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
+    }
     // 스폰
     if (!S.combat.boss) {
       if (S.enemies.length === 0 && S.waves.length === 0) { winCombat(); return; }
@@ -526,30 +532,43 @@
 
   function spawnWave() {
     const w = S.waves.shift(); if (!w) return;
-    w.forEach((type, k) => {
-      const def = ENEMIES[type];
+    w.forEach((_, k) => {
+      const type = pickEnemyType(S.stage), def = ENEMIES[type];   // 종류는 스테이지 풀에서 (웨이브 길이=마릿수)
       const lane = k % CFG.fieldLanes;
       const row = CFG.fieldRows - 1 - Math.floor(k / CFG.fieldLanes);
       const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type, name: def.name, lane, row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0 });
+      S.enemies.push({ type, name: def.name, lane, row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
     });
   }
 
   function spawnBoss() {
-    const b = BOSS_GOLEM;
+    const b = BOSSES[stageBoss(S.stage)]; S.bossDef = b;
     const hp = Math.round(b.hp * S.scale.hp);
-    S.enemies.push({ isBoss: true, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(b.dmg * S.scale.dmg), exp: Math.round(b.exp * S.scale.exp), color: b.color, stun: 0, thHit: 0 });
+    S.enemies.push({ isBoss: true, kind: b.kind, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(b.dmg * S.scale.dmg), exp: Math.round(b.exp * S.scale.exp), color: b.color, stun: 0, thHit: 0, speed: 1, armor: 0 });
   }
 
-  // 보스 임계 체크(전투 phase 데미지 적용 후 호출용) — 매 프레임 검사
+  // 보스 임계 체크(전투 phase 데미지 적용 후) — 보스 종류별 동작
   function checkBossThreshold() {
     const e = S.enemies.find(x => x.isBoss); if (!e) return;
+    const b = S.bossDef; if (!b || !b.thresholds) return;
     const frac = e.hp / e.maxHp;
-    while (e.thHit < BOSS_GOLEM.thresholds.length && frac <= BOSS_GOLEM.thresholds[e.thHit]) {
+    while (e.thHit < b.thresholds.length && frac <= b.thresholds[e.thHit]) {
       e.thHit++;
-      e.row = Math.min(CFG.fieldRows - 1, e.row + BOSS_GOLEM.retreat);
-      e.stun = BOSS_GOLEM.stunTurns;
-      anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '휘청!', color: '#ffcf5c', t: 1.2 });
+      if (b.kind === 'golem') {   // 돌진형: 후퇴 + 스턴
+        e.row = Math.min(CFG.fieldRows - 1, e.row + b.retreat); e.stun = b.stunTurns;
+        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '휘청!', color: '#ffcf5c', t: 1.2 });
+      } else if (b.kind === 'slime') {   // 분열형: 슬라임 소환
+        splitBossSlime(e, b.splitCount);
+        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '분열!', color: '#5ad0a0', t: 1.2 }); Sound.play('kill');
+      }
+    }
+  }
+  function splitBossSlime(e, n) {
+    const def = ENEMIES.slime;
+    for (let i = 0; i < (n || 2) && S.enemies.length < 26; i++) {
+      const lane = Math.max(0, Math.min(CFG.fieldLanes - 1, e.lane + (i - Math.floor(n / 2))));
+      const hp = Math.round(def.hp * S.scale.hp);
+      S.enemies.push({ type: 'slime', name: def.name, lane, row: e.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0 });
     }
   }
 

@@ -112,7 +112,7 @@ function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
     hp: 1 + (s - 1) * 0.60,     // 적/보스 체력 배수: S1=1 … S5=3.4
-    dmg: 1 + (s - 1) * 0.45,    // 적 공격 배수: S1=1 … S5=2.8 (성벽 압박이 성장과 함께 가도록 가파르게)
+    dmg: 1 + (s - 1) * 0.40,    // 적 공격 배수: S1=1 … S5=2.6 (성벽 압박)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
   };
@@ -131,19 +131,41 @@ const META_START = {
 };
 
 // ── 적 ──
-// 적 상향(전투 난이도 강화) — 오크는 탱커라 한 턴에 안 죽고 성벽까지 밀고 들어옴
+// 적 종류 — speed(턴당 전진 칸), armor(피격 시 고정 감소). 스테이지가 높을수록 강한 적 등장.
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 55,  dmg: 11, exp: 6,  color: '#7ac74f' },
-  bat:    { name: '박쥐',   hp: 34,  dmg: 8,  exp: 5,  color: '#9b6cff' },
-  orc:    { name: '오크',   hp: 110, dmg: 18, exp: 15, color: '#e0733a' }
+  goblin: { name: '고블린', hp: 55,  dmg: 11, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
+  bat:    { name: '박쥐',   hp: 34,  dmg: 8,  exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
+  orc:    { name: '오크',   hp: 110, dmg: 18, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
+  wolf:   { name: '늑대',   hp: 40,  dmg: 10, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
+  brute:  { name: '강철거인', hp: 160, dmg: 20, exp: 22, color: '#7f8aa0', speed: 1, armor: 3 },  // 방어(피격 -3)
+  slime:  { name: '슬라임', hp: 66,  dmg: 10, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
 };
+// 스테이지별 적 풀(가중치) — 상위 스테이지에 강한 적이 섞임
+const STAGE_POOL = {
+  1: [['goblin', 3], ['bat', 2]],
+  2: [['goblin', 3], ['bat', 2], ['orc', 1]],
+  3: [['goblin', 3], ['orc', 2], ['wolf', 1]],
+  4: [['goblin', 2], ['orc', 2], ['wolf', 2], ['brute', 1], ['slime', 1]],
+  5: [['orc', 2], ['wolf', 2], ['brute', 1], ['slime', 2], ['goblin', 1]]
+};
+function pickEnemyType(s) {
+  const pool = STAGE_POOL[Math.min(STAGE_MAX, Math.max(1, s))] || STAGE_POOL[1];
+  const tot = pool.reduce((a, p) => a + p[1], 0); let r = Math.random() * tot;
+  for (const [t, w] of pool) { r -= w; if (r <= 0) return t; }
+  return pool[0][0];
+}
 
-// ── 보스: 거대 골렘(돌진형) ──
-const BOSS_GOLEM = {
-  name: '거대 골렘', hp: 1100, dmg: 48, exp: 110, color: '#8a8f9a',
-  thresholds: [0.75, 0.5, 0.25],   // 이 비율 이하로 처음 내려갈 때마다 후퇴+스턴
-  retreat: 2, stunTurns: 1, vulnerable: 0.5   // 스턴 중 받는 피해 +50%
+// ── 보스 3종 (스테이지 티어별) ──
+const BOSSES = {
+  golem:  { name: '거대 골렘', kind: 'golem', hp: 1100, dmg: 48, exp: 110, color: '#8a8f9a',
+            thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌진형: HP% 후퇴+스턴, 스턴 중 피해+50%
+  slime:  { name: '거대 슬라임', kind: 'slime', hp: 900, dmg: 30, exp: 130, color: '#5ad0a0',
+            thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분열형: 임계마다 슬라임 분열
+  legion: { name: '고블린 군주', kind: 'legion', hp: 1350, dmg: 26, exp: 150, color: '#6fae4f',
+            addType: 'goblin' }                                                            // 정지형: 매 턴 부하 소환
 };
+function stageBoss(s) { return s >= 5 ? 'legion' : s >= 3 ? 'slime' : 'golem'; }
+const BOSS_GOLEM = BOSSES.golem;   // 하위호환
 
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
