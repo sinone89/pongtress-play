@@ -848,8 +848,10 @@
 
   // 헤드리스 자가 테스트: ?sim=1 로 런을 자동 진행하며 런타임 오류·상태를 #boot-error 에 남긴다.
   function runSelfTest() {
+    const qs = new URLSearchParams(location.search);
+    const stg = +qs.get('stage'); if (stg >= 1 && stg <= STAGE_MAX) { Meta.state.maxStage = STAGE_MAX; Meta.state.stage = stg; }  // 밸런스 테스트용 스테이지 지정
     startRun();
-    if (new URLSearchParams(location.search).has('win')) { S.atkBonus += 60; S.autoSkill = true; }
+    if (qs.has('win')) { S.atkBonus += 60; S.autoSkill = true; }
     let ticks = 0, launched = 0;
     const iv = setInterval(() => {
       ticks++;
