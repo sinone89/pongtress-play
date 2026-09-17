@@ -29,11 +29,9 @@ const Meta = (function () {
   function leveledDef(id) {
     const b = base(id), o = M.owned[id] || { level: 1, star: 1 };
     const lv = o.level || 1, st = o.star || 1;
-    return Object.assign({}, b, {
-      level: lv, star: st,
-      atk: b.atk + (lv - 1) * GROWTH.atkPerLevel + (st - 1) * GROWTH.starAtkBonus,
-      hp: b.hp + (lv - 1) * GROWTH.hpPerLevel + (st - 1) * GROWTH.starHpBonus
-    });
+    const am = 1 + (lv - 1) * GROWTH.atkPct + (st - 1) * GROWTH.starAtkPct;
+    const hm = 1 + (lv - 1) * GROWTH.hpPct + (st - 1) * GROWTH.starHpPct;
+    return Object.assign({}, b, { level: lv, star: st, atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm) });
   }
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }

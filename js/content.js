@@ -86,12 +86,13 @@ const ROSTER = [
 ];
 
 // ── 메타(로비, 런 밖) 설정 ──
+// 성장은 기본 스탯 비례(%)로 — 캐릭터마다 같은 배율. 최대(★5 Lv42) ≈ ×2.8
 const GROWTH = {
-  atkPerLevel: 1, hpPerLevel: 4,                 // 레벨 1당 증가(1레벨 기준 위로)
-  starAtkBonus: 2, starHpBonus: 8,               // 성급(★) 1당 추가
+  atkPct: 0.04, hpPct: 0.04,                     // 레벨 1당 기본 스탯의 % (최대 ★5 Lv42 ≈ ×3.4)
+  starAtkPct: 0.18, starHpPct: 0.18,             // 성급(★) 1당 기본 스탯의 %
   levelCapByStar: [0, 12, 18, 25, 33, 42],       // ★1~5 레벨 상한(인덱스=성급)
   starMax: 5,
-  levelUpCost: (lvl) => 40 + (lvl - 1) * 25,     // lvl→lvl+1 골드
+  levelUpCost: (lvl) => 30 + (lvl - 1) * 18,     // lvl→lvl+1 골드(완만화)
   promoteCost: (star) => ({ shards: 8 + star * 8, mats: 20 + star * 20 })  // ★star→star+1 조각+재화
 };
 const GACHA = {
@@ -110,8 +111,8 @@ const STAGE_MAX = 5;
 function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
-    hp: 1 + (s - 1) * 0.55,     // 적/보스 체력 배수: S1=1 … S5=3.2
-    dmg: 1 + (s - 1) * 0.30,    // 적 공격 배수: S1=1 … S5=2.2
+    hp: 1 + (s - 1) * 0.60,     // 적/보스 체력 배수: S1=1 … S5=3.4
+    dmg: 1 + (s - 1) * 0.45,    // 적 공격 배수: S1=1 … S5=2.8 (성벽 압박이 성장과 함께 가도록 가파르게)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
   };

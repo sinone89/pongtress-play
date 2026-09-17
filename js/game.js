@@ -850,6 +850,8 @@
   function runSelfTest() {
     const qs = new URLSearchParams(location.search);
     const stg = +qs.get('stage'); if (stg >= 1 && stg <= STAGE_MAX) { Meta.state.maxStage = STAGE_MAX; Meta.state.stage = stg; }  // 밸런스 테스트용 스테이지 지정
+    const lv = +qs.get('lvl'), sr = +qs.get('star');
+    if (lv >= 1 || sr >= 1) Object.keys(Meta.state.owned).forEach(id => { if (lv >= 1) Meta.state.owned[id].level = lv; if (sr >= 1) Meta.state.owned[id].star = sr; });
     startRun();
     if (qs.has('win')) { S.atkBonus += 60; S.autoSkill = true; }
     let ticks = 0, launched = 0;
