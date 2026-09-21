@@ -5,7 +5,7 @@
 const Meta = (function () {
   const KEY = 'pongtress_meta_v1';
   const $ = (id) => document.getElementById(id);
-  let M = null, activeTab = 'sortie', onSortie = null;
+  let M = null, activeTab = 'home', onSortie = null;
 
   // ── 저장/로드 ──
   function load() {
@@ -159,8 +159,11 @@ const Meta = (function () {
       + '</button>';
   }
 
+  // 홈 = 자동전투 연출(풀블리드) + 방치 보상
+  function renderHome() { renderIdleCard(); idleStart(); }
+
+  // 출격 = 스테이지 선택 + 편성 부대 + 출격 버튼
   function renderSortie() {
-    // 스테이지 선택(상단)
     const ss = $('stage-select');
     if (ss) {
       let h = '<div class="ss-btns">';
@@ -170,14 +173,21 @@ const Meta = (function () {
       }
       ss.innerHTML = h + '</div>';
       const sc = stageScale(M.stage);
-      $('stage-info').textContent = 'S' + M.stage + ' · 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' 보상×' + sc.reward.toFixed(1);
+      $('stage-info').textContent = 'S' + M.stage + ' · 적 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' · 보상×' + sc.reward.toFixed(1);
     }
-    let n = partySlots().filter(Boolean).length;
-    const warn = $('sortie-warn');
+    const box = $('sortie-party');
+    if (box) {
+      box.className = 'lane-slots-view'; box.innerHTML = '';
+      partySlots().forEach((id, lane) => {
+        const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty');
+        if (id) { const c = leveledDef(id); d.innerHTML = '<b>' + c.name + '</b><span>공 ' + c.atk + ' · 체 ' + c.hp + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>'; }
+        else d.innerHTML = '<span class="lane-empty">비어 있음</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
+        box.append(d);
+      });
+    }
+    const n = partySlots().filter(Boolean).length, warn = $('sortie-warn');
     if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
-    renderIdleCard();
-    idleStart();
   }
 
   // ── 방치(idle) 보상 ──
@@ -223,7 +233,7 @@ const Meta = (function () {
         fireT = 0.22 + Math.random() * 0.12;                       // 사격 간격
         const t = targets[0];                                       // 가장 앞선(먼저 진입) 적 집중 사격
         const ci = Math.floor(Math.random() * Math.max(1, chars.length));
-        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 24, x2: t.x, y2: t.y, t: 0.16 });
+        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 92, x2: t.x, y2: t.y, t: 0.16 });
         t.hp -= 1; t.hit = 0.14;
         if (t.hp <= 0) { D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.32 }); t.dead = true; }
       }
@@ -242,7 +252,7 @@ const Meta = (function () {
       for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * 46, 0, 7); ctx.stroke(); }
       const chars = party.filter(Boolean);
       for (let i = 0; i < chars.length; i++) {
-        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 22;
+        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 92;
         const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
         if (spr) { const s = Math.min(D.w / chars.length * 0.9, 64); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); ctx.imageSmoothingEnabled = sm; }
         else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
@@ -336,10 +346,11 @@ const Meta = (function () {
   }
 
   function renderTab() {
-    for (const t of ['sortie', 'formation', 'shop', 'mission']) $('tab-' + t).hidden = (t !== activeTab);
+    for (const t of ['home', 'sortie', 'formation', 'shop', 'mission']) $('tab-' + t).hidden = (t !== activeTab);
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(x => x.classList.toggle('active', x.dataset.tab === activeTab));
-    if (activeTab !== 'sortie') idleStop();               // 홈이 아니면 연출 정지
-    if (activeTab === 'sortie') renderSortie();
+    if (activeTab !== 'home') idleStop();                  // 홈이 아니면 연출 정지
+    if (activeTab === 'home') renderHome();
+    else if (activeTab === 'sortie') renderSortie();
     else if (activeTab === 'formation') renderFormation();
     else if (activeTab === 'shop') renderShop();
     else if (activeTab === 'mission') renderMissions();

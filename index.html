@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=083">
+  <link rel="stylesheet" href="css/game.css?v=084">
 </head>
 <body>
   <div id="app">
@@ -39,17 +39,20 @@
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
       </header>
       <main id="lobby-main">
-        <div id="tab-sortie" class="lobby-panel home-panel">
-          <div class="home-top">
-            <div id="stage-select"></div>
-            <div class="home-cta">
-              <span id="stage-info" class="muted"></span>
-              <button id="btn-sortie" class="btn primary">출격</button>
-            </div>
-            <p id="sortie-warn" class="muted" hidden></p>
-          </div>
-          <div class="home-scene"><canvas id="idle-canvas"></canvas><span class="home-scene-tag">자동 전투 중…</span></div>
+        <div id="tab-home" class="lobby-panel">
+          <canvas id="idle-canvas"></canvas>
+          <span class="home-scene-tag">⚔ 자동 전투 중…</span>
           <div id="idle-reward" class="idle-card"></div>
+        </div>
+        <div id="tab-sortie" class="lobby-panel" hidden>
+          <h2>🚀 출격</h2>
+          <div class="sns-h">스테이지 선택</div>
+          <div id="stage-select"></div>
+          <p id="stage-info" class="muted"></p>
+          <div class="sns-h">편성 부대 <span class="sns-sub">편성 탭에서 변경</span></div>
+          <div id="sortie-party"></div>
+          <p id="sortie-warn" class="muted" hidden></p>
+          <button id="btn-sortie" class="btn primary home-cta-btn">출격</button>
         </div>
         <div id="tab-formation" class="lobby-panel" hidden>
           <h2>⚔️ 편성</h2>
@@ -70,8 +73,9 @@
         </div>
       </main>
       <nav id="lobby-nav">
-        <button class="tabbtn active" data-tab="sortie"><span class="tb-ic">🏠</span>홈</button>
-        <button class="tabbtn" data-tab="formation"><span class="tb-ic">⚔️</span>편성</button>
+        <button class="tabbtn active" data-tab="home"><span class="tb-ic">🏠</span>홈</button>
+        <button class="tabbtn" data-tab="sortie"><span class="tb-ic">🚀</span>출격</button>
+        <button class="tabbtn" data-tab="formation"><span class="tb-ic">👥</span>편성</button>
         <button class="tabbtn" data-tab="shop"><span class="tb-ic">🛒</span>상점</button>
         <button class="tabbtn" data-tab="mission"><span class="tb-ic">📋</span>미션</button>
       </nav>
@@ -125,9 +129,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=083"></script>
-  <script src="js/content.js?v=083"></script>
-  <script src="js/meta.js?v=083"></script>
-  <script src="js/game.js?v=083"></script>
+  <script src="js/audio.js?v=084"></script>
+  <script src="js/content.js?v=084"></script>
+  <script src="js/meta.js?v=084"></script>
+  <script src="js/game.js?v=084"></script>
 </body>
 </html>

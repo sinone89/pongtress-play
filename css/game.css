@@ -43,20 +43,19 @@ body {
 .tagline { margin: 8px 0 0; color: var(--ink); opacity: .85; text-shadow: 0 1px 4px #000; }
 .version { color: var(--muted); font-size: 12px; margin: 0; }
 
-/* 방치형 홈 */
-.home-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; padding-bottom: 4px; }
-.home-top { flex: 0 0 auto; }
-.home-cta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
-.home-cta #stage-info { flex: 1; font-size: 12px; }
-.home-cta .btn { padding: 12px 28px; font-size: 16px; }
-/* 자동전투 연출 — 과도한 세로 확장 방지(적정 높이 고정) */
-.home-scene { flex: 0 0 auto; height: clamp(200px, 36vh, 360px); position: relative; border-radius: 16px; overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 78%); border: 1px solid #ffffff1e;
-  box-shadow: inset 0 0 40px #0006; }
-.home-scene #idle-canvas { display: block; width: 100%; height: 100%; }
-.home-scene-tag { position: absolute; left: 10px; top: 8px; font-size: 11px; font-weight: 800; color: var(--cyan); opacity: .85;
-  background: #0009; padding: 3px 9px; border-radius: 999px; z-index: 2; }
-.idle-card { flex: 0 0 auto; margin-top: auto; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 14px; padding: 11px 13px; }
+/* 방치형 홈 = 자동전투 연출 풀블리드(빈공간 없이 꽉 채움) */
+#lobby-main { position: relative; }
+#tab-home { position: absolute; inset: 0; padding: 0; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); }
+#tab-home #idle-canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.home-scene-tag { position: absolute; left: 14px; top: 12px; z-index: 2; font-size: 12px; font-weight: 800; color: var(--cyan);
+  background: #0009; padding: 4px 10px; border-radius: 999px; }
+.idle-card { position: absolute; left: 12px; right: 12px; bottom: 12px; z-index: 2;
+  background: rgba(20, 16, 40, .84); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+  border: 1px solid #ffffff26; border-radius: 14px; padding: 11px 13px; box-shadow: 0 6px 20px #0007; }
+/* 출격 탭 */
+#tab-sortie .lane-slots-view { display: flex; gap: 8px; margin: 12px 0; }
+.home-cta-btn { display: block; width: 100%; margin-top: 16px; }
 .idle-card .il-top { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
 .idle-card .il-time { font-size: 11px; font-weight: 700; color: var(--muted); }
 .idle-card .il-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
