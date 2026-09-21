@@ -70,44 +70,58 @@ const CLASS = {
 // 캐릭터 = 장전 후 원거리 사격/포격 컨셉(총·대포). 클래스 3종 × 등급 4종 = 12명(각 칸 1명).
 //   사수(gunner)=단일 화력, 포수(cannon)=광역 화력, 지원(support)=수리·제어·버프
 //   ⚠ 기존 7명 id(knight/archer/guard/rogue/priest/berserker/mage)는 유지 → 구 세이브 호환. 신규 5명만 추가.
+// 전원 "미소녀 + 총·대포" 컨셉(2D 아니메 일러스트). concept = 외형·페르소나(프롬프트·상세표시용).
+//   등급↑ = 화려↑, 레전더리=골드 트림+대형 화기+날개/후광. 팔레트: 사수 레드 / 포수 오렌지·골드 / 지원 민트·시안.
 const ROSTER = [
-  // ── 사수(gunner): 단일 표적 고화력 ── atk↑ hp↓
-  { id: 'knight', cls: 'gunner', name: '레온', weapon: '대구경 리볼버', rarity: 'common', atk: 8, hp: 30, gol: 1,
+  // ── 사수(gunner): 단일 표적 고화력 ── atk↑ hp↓ · 레드 계열
+  { id: 'knight', cls: 'gunner', name: '루비', weapon: '대구경 리볼버', rarity: 'common', atk: 8, hp: 30, gol: 1,
+    concept: '빨간 베레모에 짧은 크림슨 머리, 쌍권총을 든 발랄한 신참 건슬링거 소녀',
     active: { name: '헤드샷', gauge: 12, kind: 'bigHit', mult: 3 },
     passive: { name: '예광탄', kind: 'addPeg', peg: 'mult2', n: 1 } },
-  { id: 'archer', cls: 'gunner', name: '지크', weapon: '기관단총', rarity: 'rare', atk: 10, hp: 26, gol: 2,
+  { id: 'archer', cls: 'gunner', name: '미나', weapon: '기관단총', rarity: 'rare', atk: 10, hp: 26, gol: 2,
+    concept: '크림슨·블랙 전술 재킷에 트윈테일, 기관단총을 난사하는 활발한 소녀',
     active: { name: '풀버스트', gauge: 15, kind: 'extraShots', shots: 4 },
     passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },
-  { id: 'berserker', cls: 'gunner', name: '레이븐', weapon: '중기관총', rarity: 'epic', atk: 14, hp: 34, gol: 1,
+  { id: 'berserker', cls: 'gunner', name: '카린', weapon: '중기관총', rarity: 'epic', atk: 14, hp: 34, gol: 1,
+    concept: '긴 흑발에 크림슨 롱코트, 육중한 중기관총을 든 쿨한 에이스 소녀',
     active: { name: '난사', gauge: 16, kind: 'bigHit', mult: 4 },
     passive: { name: '화력 증강', kind: 'addPeg', peg: 'attack', n: 1 } },
   { id: 'valkyrie', cls: 'gunner', name: '발키리', weapon: '미니건', rarity: 'legendary', atk: 18, hp: 34, gol: 2,
+    concept: '백금·핑크빛 롱헤어에 흑·금 제복과 날개 장식, 거대 미니건을 든 정예 발키리 소녀(골드 트림)',
     active: { name: '풀메탈', gauge: 16, kind: 'extraShots', shots: 6 },
     passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
-  // ── 포수(cannon): 광역 다중 타격 ── aoe
+  // ── 포수(cannon): 광역 다중 타격 ── aoe · 오렌지·골드 계열
   { id: 'grenadier', cls: 'cannon', name: '보라', weapon: '유탄 발사기', rarity: 'common', atk: 7, hp: 34, gol: 2,
+    concept: '주황 단발에 올리브·오렌지 군용 재킷, 유탄발사기를 든 명랑한 포병 신참 소녀',
     active: { name: '유탄 사격', gauge: 15, kind: 'aoe', count: 3, shots: 1, mult: 1.4 },
     passive: { name: '예광탄', kind: 'addPeg', peg: 'mult2', n: 1 } },
-  { id: 'mortar', cls: 'cannon', name: '하울', weapon: '박격포', rarity: 'rare', atk: 9, hp: 36, gol: 2,
+  { id: 'mortar', cls: 'cannon', name: '하나', weapon: '박격포', rarity: 'rare', atk: 9, hp: 36, gol: 2,
+    concept: '만두머리에 오렌지·블랙 복장, 박격포를 짊어진 씩씩한 소녀',
     active: { name: '박격 포격', gauge: 15, kind: 'aoe', count: 3, shots: 1, mult: 1.6 },
     passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },
-  { id: 'mage', cls: 'cannon', name: '타이탄', weapon: '대포', rarity: 'epic', atk: 12, hp: 30, gol: 2,
+  { id: 'mage', cls: 'cannon', name: '티아', weapon: '대포', rarity: 'epic', atk: 12, hp: 30, gol: 2,
+    concept: '앰버빛 롱헤어, 화려한 장식 대포 옆에 선 당당한 포격 에이스 소녀',
     active: { name: '포격', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },
     passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
-  { id: 'behemoth', cls: 'cannon', name: '베히모스', weapon: '자주포', rarity: 'legendary', atk: 15, hp: 40, gol: 2,
+  { id: 'behemoth', cls: 'cannon', name: '레지나', weapon: '자주포', rarity: 'legendary', atk: 15, hp: 40, gol: 2,
+    concept: '흑·핑크 세일러 군복에 백금/핑크 롱헤어, 금장식 거대 대포(자주포)를 다루는 여왕 같은 소녀(골드 트림·플래그십)',
     active: { name: '융단 폭격', gauge: 17, kind: 'aoe', count: 5, shots: 1, mult: 1.8 },
     passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
-  // ── 지원(support): 수리·제어·버프 ── atk↓ hp↑ gol↑
-  { id: 'guard', cls: 'support', name: '바스티온', weapon: '방패 산탄총', rarity: 'common', atk: 3, hp: 52, gol: 3,
+  // ── 지원(support): 수리·제어·버프 ── atk↓ hp↑ gol↑ · 민트·시안 계열
+  { id: 'guard', cls: 'support', name: '코코', weapon: '방패 산탄총', rarity: 'common', atk: 3, hp: 52, gol: 3,
+    concept: '민트빛 짧은 머리, 라이엇 방패와 산탄총을 든 든든하고 귀여운 소녀',
     active: { name: '방벽 전개', gauge: 18, kind: 'heal', amount: 24 },
     passive: { name: '진지 구축', kind: 'closeBlank', n: 1 } },
-  { id: 'rogue', cls: 'support', name: '위습', weapon: '소음 권총', rarity: 'rare', atk: 6, hp: 34, gol: 2,
+  { id: 'rogue', cls: 'support', name: '루미', weapon: '소음 권총', rarity: 'rare', atk: 6, hp: 34, gol: 2,
+    concept: '은민트 단발에 다크 슈트, 소음 권총·섬광탄을 쓰는 조용한 침투 요원 소녀',
     active: { name: '섬광탄', gauge: 14, kind: 'stun', count: 3, turns: 1 },
     passive: { name: '지뢰 설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
   { id: 'priest', cls: 'support', name: '미라', weapon: '수리 드론', rarity: 'epic', atk: 5, hp: 44, gol: 2,
+    concept: '민트 트윈테일에 테크 드레스, 부유 수리 드론을 부리는 정비병 소녀',
     active: { name: '나노 수리', gauge: 16, kind: 'heal', amount: 42 },
     passive: { name: '보급 드론', kind: 'closeBlank', n: 1 } },
-  { id: 'seraph', cls: 'support', name: '세라핌', weapon: '지원 드론', rarity: 'legendary', atk: 7, hp: 50, gol: 3,
+  { id: 'seraph', cls: 'support', name: '세라', weapon: '지원 드론', rarity: 'legendary', atk: 7, hp: 50, gol: 3,
+    concept: '백·민트 롱헤어에 후광·날개, 지원 드론을 거느린 천사 같은 사령관 소녀(골드 트림)',
     active: { name: '대규모 수리', gauge: 17, kind: 'heal', amount: 58 },
     passive: { name: '탄약 투하', kind: 'addBall', n: 2 } }
 ];

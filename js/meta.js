@@ -284,6 +284,7 @@ const Meta = (function () {
     box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
       + (b.cls && CLASS[b.cls] ? '<p class="cd-stat" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + ' · ' + CLASS[b.cls].desc + '</p>' : '')
       + (b.weapon ? '<p class="cd-stat" style="color:var(--cyan)">🔫 ' + b.weapon + '</p>' : '')
+      + (b.concept ? '<p class="muted" style="font-size:12px;margin:4px 0 8px">' + b.concept + '</p>' : '')
       + '<p class="cd-stat">Lv.' + o.level + '/' + cap + ' · ★' + o.star + ' · 🔷' + (M.shards[id] || 0) + '</p>'
       + '<p class="cd-stat">공격 ' + c.atk + ' · 체력 ' + c.hp + ' · 골칸 ' + c.gol + '</p>'
       + '<p class="muted">액티브 ' + b.active.name + ' (게이지 ' + b.active.gauge + ') · 패시브 ' + b.passive.name + '</p>'
