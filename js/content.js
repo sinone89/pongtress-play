@@ -278,3 +278,25 @@ function addPegToBoard(S, type, n) {
     S.pegs.push(makePeg(0.12 + Math.random() * 0.76, 0.15 + Math.random() * 0.6, type));
   }
 }
+
+// ── 캐릭터 아트 로더 ──
+// assets/char/<id>_<state>.png (state: cg | load | fire). 이미지가 있으면 사용, 없으면 게임이 폴백(원형/이모지).
+const CharArt = (function () {
+  const cache = {};   // key '<id>_<state>' → Image
+  function path(id, state) { return 'assets/char/' + id + '_' + state + '.png'; }
+  function load(id, state) {
+    const k = id + '_' + state;
+    if (cache[k]) return cache[k];
+    const img = new Image();
+    img.decoding = 'async';
+    img.__ok = false;
+    img.onload = function () { img.__ok = img.naturalWidth > 0; };
+    img.onerror = function () { img.__ok = false; };
+    img.src = path(id, state);
+    cache[k] = img;
+    return img;
+  }
+  // 캔버스용: 로드 완료+성공이면 Image, 아니면 null
+  function sprite(id, state) { const img = load(id, state); return (img.__ok && img.complete) ? img : null; }
+  return { path: path, load: load, sprite: sprite };
+})();

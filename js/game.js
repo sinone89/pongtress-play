@@ -743,13 +743,27 @@
     ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
     const crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22));
     const cFont = Math.max(11, Math.round(crad * 0.62)), showChar = wr.h > 55;
+    const sprState = (S.phase === 'load') ? 'load' : 'fire';
     for (const c of S.chars) {
       const fire = c.fireT || 0;
       const x = wr.x + (c.lane + 0.5) * cw, y = wr.y + wr.h * 0.34 - fire * 4;
       if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad + fire * 10, 0, 7); ctx.fill(); ctx.restore(); }
-      ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
+      const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
+      if (spr) {                                        // 픽셀 스프라이트(장전/사격) — 있으면 원형 대체
+        const sh = Math.min(cw * 1.02, wr.h * 0.82), sw = sh;
+        const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(spr, x - sw / 2, y - sh * 0.55, sw, sh);
+        ctx.imageSmoothingEnabled = sm;
+      } else {                                          // 폴백: 기존 원형
+        ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
+      }
       if (showChar) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + cFont + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(c.ref.name, x, y + crad + cFont + 1); }
-      if (S.phase === 'load' && c.ammo > 0) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(crad * 1.0) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.ammo, x, y + 1); ctx.textBaseline = 'alphabetic'; }
+      if (S.phase === 'load' && c.ammo > 0) {           // 장전 탄수 배지(스프라이트면 상단, 아니면 중앙)
+        const bx = x, by = spr ? (y - crad * 1.2) : y;
+        if (spr) { ctx.fillStyle = '#1a1020cc'; ctx.beginPath(); ctx.arc(bx, by, crad * 0.72, 0, 7); ctx.fill(); ctx.fillStyle = '#ffcf5c'; }
+        else ctx.fillStyle = '#1a1020';
+        ctx.font = 'bold ' + Math.round(crad * (spr ? 0.8 : 1.0)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.ammo, bx, by + 1); ctx.textBaseline = 'alphabetic';
+      }
     }
     // 성벽 HP 바(두껍게 + 큰 글자)
     const hbH = Math.max(8, Math.round(wr.h * 0.16)), hbY = wr.y + wr.h - hbH - 3, hbW = wr.w - 16;

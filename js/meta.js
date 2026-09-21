@@ -149,6 +149,7 @@ const Meta = (function () {
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
     const owned = !!o;
     return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
+      + '<img class="cc-cg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.remove()">'
       + '<span class="cc-name">' + b.name + '</span>'
       + (b.cls && CLASS[b.cls] ? '<span class="cc-cls" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + '</span>' : '')
       + (b.weapon ? '<span class="cc-wpn">🔫 ' + b.weapon + '</span>' : '')
@@ -281,7 +282,8 @@ const Meta = (function () {
     if (!o) { box.innerHTML = '<h2>' + b.name + '</h2><p>' + rarTag(b.rarity) + '</p><p class="muted">미보유 — 상점 가챠로 획득하세요.</p><button class="btn" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
     const c = leveledDef(id), cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const luCost = GROWTH.levelUpCost(o.level), pr = GROWTH.promoteCost(o.star);
-    box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
+    box.innerHTML = '<img class="cd-cg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'">'
+      + '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
       + (b.cls && CLASS[b.cls] ? '<p class="cd-stat" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + ' · ' + CLASS[b.cls].desc + '</p>' : '')
       + (b.weapon ? '<p class="cd-stat" style="color:var(--cyan)">🔫 ' + b.weapon + '</p>' : '')
       + (b.concept ? '<p class="muted" style="font-size:12px;margin:4px 0 8px">' + b.concept + '</p>' : '')
@@ -301,7 +303,7 @@ const Meta = (function () {
   function showGachaResult(res) {
     const box = $('gacha-modal-box');
     box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res">'
-      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
+      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'cg') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
       + '</div><button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
