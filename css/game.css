@@ -12,9 +12,12 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", system-ui, sans-serif;
   user-select: none;
 }
-/* 세로 모바일 기준 게임 — 데스크톱 등 넓은 화면에선 세로 컬럼으로 레터박스(판이 성겨 보이는 문제 방지) */
-#app { height: 100dvh; width: 100%; max-width: 520px; margin: 0 auto; display: flex; flex-direction: column;
-  background: radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); box-shadow: 0 0 0 1px #ffffff12, 0 0 60px #0006; }
+/* 고정 세로 스테이지(9:16) — 스틸앤샷式: 1080×1920(=540×960 좌표계) 캔버스를 화면에 맞게 scale·레터박스.
+   --fit 은 JS(fitStage)가 min(vw/540, vh/960)로 세팅. 캔버스 좌표·포인터는 getBoundingClientRect 기반이라 scale 아래서도 정상. */
+#app { position: fixed; left: 50%; top: 50%; width: 540px; height: 960px;
+  transform: translate(-50%, -50%) scale(var(--fit, 1)); transform-origin: center center;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); box-shadow: 0 0 0 1px #ffffff14, 0 0 90px #000a; }
 .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 [hidden] { display: none !important; }
 .muted { color: var(--muted); font-size: 13px; line-height: 1.5; }

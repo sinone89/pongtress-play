@@ -204,7 +204,7 @@ const Meta = (function () {
     const ctx = cv.getContext('2d'); const party = partySlots();
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
     const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0 };
-    function fit() { const r = cv.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); D.w = Math.max(1, r.width); D.h = Math.max(1, r.height); cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    function fit() { const dpr = Math.min(2, window.devicePixelRatio || 1); D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260); cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     fit();
     const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
     function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2); return { x: 24 + Math.random() * (D.w - 48), y: y, r: 12 + Math.random() * 4, col: eCol[Math.floor(Math.random() * eCol.length)], hp: hp, mhp: hp, hit: 0 }; }

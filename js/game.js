@@ -57,10 +57,11 @@
   function launcher() { const p = layout().pins; return { x: p.x + p.w / 2, y: p.y + p.h - Math.max(CFG.ballRadius + 4, p.h * 0.12) }; }
 
   function resize() {
-    const rect = $('stage-wrap').getBoundingClientRect();
+    // ⚠ #app이 transform:scale 되므로 온스크린 px(getBoundingClientRect) 대신 디자인 px(clientWidth)로 측정 — 이중 스케일 방지
+    const el = $('stage-wrap');
     dpr = Math.min(window.devicePixelRatio || 1, 2);
-    W = Math.max(240, Math.floor(rect.width));
-    H = Math.max(360, Math.floor(rect.height));
+    W = Math.max(240, el.clientWidth || 360);
+    H = Math.max(360, el.clientHeight || 640);
     canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -900,7 +901,11 @@
   }
 
   // ============ 입력 ============
-  function canvasPoint(e) { const rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+  function canvasPoint(e) {   // 클라이언트 좌표 → 디자인 px(스테이지 scale 역보정)
+    const rect = canvas.getBoundingClientRect();
+    const sx = rect.width ? canvas.clientWidth / rect.width : 1, sy = rect.height ? canvas.clientHeight / rect.height : 1;
+    return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
+  }
   function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); Sound.resume(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
@@ -919,7 +924,17 @@
   canvas.addEventListener('pointermove', aimMove);
   canvas.addEventListener('pointerup', aimUp);
   canvas.addEventListener('pointercancel', () => { aimActive = false; });
-  window.addEventListener('resize', () => { if (!$('combat').hidden) resize(); });
+  // 고정 세로 스테이지(540×960)를 화면에 맞게 scale(스틸앤샷式 레터박스)
+  function fitStage() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    if (vw < 2 || vh < 2) return;                 // 숨김/미측정(0) 시 scale 0 붕괴 방지
+    const s = Math.min(vw / 540, vh / 960);
+    document.documentElement.style.setProperty('--fit', s > 0 ? s : 1);
+    if (!$('combat').hidden) resize();
+  }
+  window.addEventListener('resize', fitStage);
+  window.addEventListener('orientationchange', fitStage);
+  fitStage();
 
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
