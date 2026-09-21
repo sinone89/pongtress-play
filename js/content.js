@@ -61,28 +61,29 @@ function expToNext(level) { return 16 + level * 11; }
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
 const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' } };
 
+// 캐릭터 = 장전 후 원거리 사격/포격 컨셉(총·대포). id·스탯·스킬종류는 유지(세이브 호환), 이름·연출만 총기 테마.
 const ROSTER = [
-  { id: 'knight', name: '검사', rarity: 'common', atk: 8, hp: 34, gol: 1,
-    active: { name: '강타', gauge: 12, kind: 'bigHit', mult: 3 },   // 맨 앞 적에게 atk*3
-    passive: { name: '예광', kind: 'addPeg', peg: 'mult2', n: 1 } },
-  { id: 'archer', name: '궁수', rarity: 'common', atk: 5, hp: 20, gol: 2,
-    active: { name: '연사', gauge: 15, kind: 'extraShots', shots: 4 }, // 이번 턴 추가 4발
-    passive: { name: '보급', kind: 'addBall', n: 1 } },               // 시작 볼 +1
-  { id: 'guard', name: '방패병', rarity: 'common', atk: 3, hp: 52, gol: 3,
-    active: { name: '방벽', gauge: 18, kind: 'heal', amount: 24 },     // 성벽 HP 회복
-    passive: { name: '정리', kind: 'closeBlank', n: 1 } },            // 시작 시 꽝 1칸 닫힘(→충전)
-  { id: 'rogue', name: '도적', rarity: 'common', atk: 6, hp: 22, gol: 1,
-    active: { name: '교란', gauge: 14, kind: 'stun', count: 3, turns: 1 },   // 앞 3명 기절(전진 스킵)
-    passive: { name: '설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
-  { id: 'priest', name: '사제', rarity: 'rare', atk: 4, hp: 30, gol: 2,
-    active: { name: '치유', gauge: 16, kind: 'heal', amount: 36 },
-    passive: { name: '축복', kind: 'closeBlank', n: 1 } },
-  { id: 'berserker', name: '광전사', rarity: 'rare', atk: 11, hp: 40, gol: 1,
-    active: { name: '광란', gauge: 16, kind: 'bigHit', mult: 3 },
-    passive: { name: '분노', kind: 'addPeg', peg: 'attack', n: 1 } },
-  { id: 'mage', name: '마법사', rarity: 'epic', atk: 12, hp: 18, gol: 2,
-    active: { name: '폭발', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },   // 앞 4명 광역
-    passive: { name: '증폭', kind: 'addPeg', peg: 'mult5', n: 1 } }
+  { id: 'knight', name: '레온', weapon: '대구경 리볼버', rarity: 'common', atk: 8, hp: 34, gol: 1,
+    active: { name: '헤드샷', gauge: 12, kind: 'bigHit', mult: 3 },   // 맨 앞 적에게 강력 단발(atk*3)
+    passive: { name: '예광탄', kind: 'addPeg', peg: 'mult2', n: 1 } },
+  { id: 'archer', name: '지크', weapon: '기관단총', rarity: 'common', atk: 5, hp: 20, gol: 2,
+    active: { name: '풀버스트', gauge: 15, kind: 'extraShots', shots: 4 }, // 이번 턴 추가 4발 난사
+    passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },              // 시작 볼 +1
+  { id: 'guard', name: '바스티온', weapon: '방패 산탄총', rarity: 'common', atk: 3, hp: 52, gol: 3,
+    active: { name: '방벽 전개', gauge: 18, kind: 'heal', amount: 24 },    // 성벽 HP 회복
+    passive: { name: '진지 구축', kind: 'closeBlank', n: 1 } },           // 시작 시 꽝 1칸 닫힘(→충전)
+  { id: 'rogue', name: '위습', weapon: '소음 권총', rarity: 'common', atk: 6, hp: 22, gol: 1,
+    active: { name: '섬광탄', gauge: 14, kind: 'stun', count: 3, turns: 1 },   // 앞 3명 기절(전진 스킵)
+    passive: { name: '지뢰 설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
+  { id: 'priest', name: '미라', weapon: '수리 드론', rarity: 'rare', atk: 4, hp: 30, gol: 2,
+    active: { name: '나노 수리', gauge: 16, kind: 'heal', amount: 36 },
+    passive: { name: '보급 드론', kind: 'closeBlank', n: 1 } },
+  { id: 'berserker', name: '레이븐', weapon: '중기관총', rarity: 'rare', atk: 11, hp: 40, gol: 1,
+    active: { name: '난사', gauge: 16, kind: 'bigHit', mult: 3 },
+    passive: { name: '화력 증강', kind: 'addPeg', peg: 'attack', n: 1 } },
+  { id: 'mage', name: '타이탄', weapon: '대포', rarity: 'epic', atk: 12, hp: 18, gol: 2,
+    active: { name: '포격', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },   // 앞 4명 광역 포격
+    passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } }
 ];
 
 // ── 메타(로비, 런 밖) 설정 ──

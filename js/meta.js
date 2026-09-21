@@ -148,6 +148,7 @@ const Meta = (function () {
     const owned = !!o;
     return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
       + '<span class="cc-name">' + b.name + '</span>'
+      + (b.weapon ? '<span class="cc-wpn">🔫 ' + b.weapon + '</span>' : '')
       + (owned ? '<span class="cc-sub">Lv.' + o.level + ' ★' + o.star + '</span>' : '<span class="cc-sub">미보유</span>')
       + '<span class="cc-rar" style="color:' + R.color + '">' + R.name + '</span>'
       + (opts.inParty ? '<span class="cc-badge">편성</span>' : '')
@@ -278,6 +279,7 @@ const Meta = (function () {
     const c = leveledDef(id), cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const luCost = GROWTH.levelUpCost(o.level), pr = GROWTH.promoteCost(o.star);
     box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
+      + (b.weapon ? '<p class="cd-stat" style="color:var(--cyan)">🔫 ' + b.weapon + '</p>' : '')
       + '<p class="cd-stat">Lv.' + o.level + '/' + cap + ' · ★' + o.star + ' · 🔷' + (M.shards[id] || 0) + '</p>'
       + '<p class="cd-stat">공격 ' + c.atk + ' · 체력 ' + c.hp + ' · 골칸 ' + c.gol + '</p>'
       + '<p class="muted">액티브 ' + b.active.name + ' (게이지 ' + b.active.gauge + ') · 패시브 ' + b.passive.name + '</p>'
