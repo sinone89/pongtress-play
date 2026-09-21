@@ -750,11 +750,10 @@
       const x = wr.x + (c.lane + 0.5) * cw, y = wr.y + wr.h * 0.34 - fire * 4;
       if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad + fire * 10, 0, 7); ctx.fill(); ctx.restore(); }
       const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
-      if (spr) {                                        // 픽셀 스프라이트(장전/사격) — 있으면 원형 대체
-        const sh = Math.min(cw * 1.02, wr.h * 0.82), sw = sh;
-        const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(spr, x - sw / 2, y - sh * 0.55, sw, sh);
-        ctx.imageSmoothingEnabled = sm;
+      if (spr) {                                        // 캐릭터 스프라이트(장전/사격) — 있으면 원형 대체. 고해상 원본을 부드럽게 축소
+        const sh = Math.min(cw * 1.25, wr.h * 0.95), sw = sh;
+        ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(spr, x - sw / 2, y - sh * 0.58, sw, sh);
       } else {                                          // 폴백: 기존 원형
         ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
       }

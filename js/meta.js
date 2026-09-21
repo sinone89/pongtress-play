@@ -261,7 +261,7 @@ const Meta = (function () {
       for (let i = 0; i < chars.length; i++) {
         const id = chars[i], cx = charX(i, chars.length), cy = D.h - 132;
         const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
-        if (spr) { const s = Math.min(D.w / chars.length * 0.9, 64); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); ctx.imageSmoothingEnabled = sm; }
+        if (spr) { const s = Math.min(D.w / chars.length * 0.86, 168); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); }
         else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
       }
     }
