@@ -59,31 +59,57 @@ function expToNext(level) { return 16 + level * 11; }
 // ── 캐릭터 (프로토타입: 처음부터 3명 배치. 편성/가챠는 다음 패스) ──
 // atk 공격력(발당 피해) · hp 체력(성벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
-const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' } };
+const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' }, legendary: { name: '레전더리', color: '#ffce54' } };
+// 클래스 3종: 화력을 단일/광역으로 나누고, 힐·제어·버프를 지원으로 묶음
+const CLASS = {
+  gunner:  { name: '사수', icon: '🎯', color: '#ff6b6b', desc: '단일 표적 고화력' },
+  cannon:  { name: '포수', icon: '💥', color: '#ffb057', desc: '광역 다중 타격' },
+  support: { name: '지원', icon: '🛠️', color: '#5ce0a0', desc: '수리·제어·버프' }
+};
 
-// 캐릭터 = 장전 후 원거리 사격/포격 컨셉(총·대포). id·스탯·스킬종류는 유지(세이브 호환), 이름·연출만 총기 테마.
+// 캐릭터 = 장전 후 원거리 사격/포격 컨셉(총·대포). 클래스 3종 × 등급 4종 = 12명(각 칸 1명).
+//   사수(gunner)=단일 화력, 포수(cannon)=광역 화력, 지원(support)=수리·제어·버프
+//   ⚠ 기존 7명 id(knight/archer/guard/rogue/priest/berserker/mage)는 유지 → 구 세이브 호환. 신규 5명만 추가.
 const ROSTER = [
-  { id: 'knight', name: '레온', weapon: '대구경 리볼버', rarity: 'common', atk: 8, hp: 34, gol: 1,
-    active: { name: '헤드샷', gauge: 12, kind: 'bigHit', mult: 3 },   // 맨 앞 적에게 강력 단발(atk*3)
+  // ── 사수(gunner): 단일 표적 고화력 ── atk↑ hp↓
+  { id: 'knight', cls: 'gunner', name: '레온', weapon: '대구경 리볼버', rarity: 'common', atk: 8, hp: 30, gol: 1,
+    active: { name: '헤드샷', gauge: 12, kind: 'bigHit', mult: 3 },
     passive: { name: '예광탄', kind: 'addPeg', peg: 'mult2', n: 1 } },
-  { id: 'archer', name: '지크', weapon: '기관단총', rarity: 'common', atk: 5, hp: 20, gol: 2,
-    active: { name: '풀버스트', gauge: 15, kind: 'extraShots', shots: 4 }, // 이번 턴 추가 4발 난사
-    passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },              // 시작 볼 +1
-  { id: 'guard', name: '바스티온', weapon: '방패 산탄총', rarity: 'common', atk: 3, hp: 52, gol: 3,
-    active: { name: '방벽 전개', gauge: 18, kind: 'heal', amount: 24 },    // 성벽 HP 회복
-    passive: { name: '진지 구축', kind: 'closeBlank', n: 1 } },           // 시작 시 꽝 1칸 닫힘(→충전)
-  { id: 'rogue', name: '위습', weapon: '소음 권총', rarity: 'common', atk: 6, hp: 22, gol: 1,
-    active: { name: '섬광탄', gauge: 14, kind: 'stun', count: 3, turns: 1 },   // 앞 3명 기절(전진 스킵)
-    passive: { name: '지뢰 설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
-  { id: 'priest', name: '미라', weapon: '수리 드론', rarity: 'rare', atk: 4, hp: 30, gol: 2,
-    active: { name: '나노 수리', gauge: 16, kind: 'heal', amount: 36 },
-    passive: { name: '보급 드론', kind: 'closeBlank', n: 1 } },
-  { id: 'berserker', name: '레이븐', weapon: '중기관총', rarity: 'rare', atk: 11, hp: 40, gol: 1,
-    active: { name: '난사', gauge: 16, kind: 'bigHit', mult: 3 },
+  { id: 'archer', cls: 'gunner', name: '지크', weapon: '기관단총', rarity: 'rare', atk: 10, hp: 26, gol: 2,
+    active: { name: '풀버스트', gauge: 15, kind: 'extraShots', shots: 4 },
+    passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },
+  { id: 'berserker', cls: 'gunner', name: '레이븐', weapon: '중기관총', rarity: 'epic', atk: 14, hp: 34, gol: 1,
+    active: { name: '난사', gauge: 16, kind: 'bigHit', mult: 4 },
     passive: { name: '화력 증강', kind: 'addPeg', peg: 'attack', n: 1 } },
-  { id: 'mage', name: '타이탄', weapon: '대포', rarity: 'epic', atk: 12, hp: 18, gol: 2,
-    active: { name: '포격', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },   // 앞 4명 광역 포격
-    passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } }
+  { id: 'valkyrie', cls: 'gunner', name: '발키리', weapon: '미니건', rarity: 'legendary', atk: 18, hp: 34, gol: 2,
+    active: { name: '풀메탈', gauge: 16, kind: 'extraShots', shots: 6 },
+    passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
+  // ── 포수(cannon): 광역 다중 타격 ── aoe
+  { id: 'grenadier', cls: 'cannon', name: '보라', weapon: '유탄 발사기', rarity: 'common', atk: 7, hp: 34, gol: 2,
+    active: { name: '유탄 사격', gauge: 15, kind: 'aoe', count: 3, shots: 1, mult: 1.4 },
+    passive: { name: '예광탄', kind: 'addPeg', peg: 'mult2', n: 1 } },
+  { id: 'mortar', cls: 'cannon', name: '하울', weapon: '박격포', rarity: 'rare', atk: 9, hp: 36, gol: 2,
+    active: { name: '박격 포격', gauge: 15, kind: 'aoe', count: 3, shots: 1, mult: 1.6 },
+    passive: { name: '탄창 보급', kind: 'addBall', n: 1 } },
+  { id: 'mage', cls: 'cannon', name: '타이탄', weapon: '대포', rarity: 'epic', atk: 12, hp: 30, gol: 2,
+    active: { name: '포격', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },
+    passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
+  { id: 'behemoth', cls: 'cannon', name: '베히모스', weapon: '자주포', rarity: 'legendary', atk: 15, hp: 40, gol: 2,
+    active: { name: '융단 폭격', gauge: 17, kind: 'aoe', count: 5, shots: 1, mult: 1.8 },
+    passive: { name: '고폭탄', kind: 'addPeg', peg: 'mult5', n: 1 } },
+  // ── 지원(support): 수리·제어·버프 ── atk↓ hp↑ gol↑
+  { id: 'guard', cls: 'support', name: '바스티온', weapon: '방패 산탄총', rarity: 'common', atk: 3, hp: 52, gol: 3,
+    active: { name: '방벽 전개', gauge: 18, kind: 'heal', amount: 24 },
+    passive: { name: '진지 구축', kind: 'closeBlank', n: 1 } },
+  { id: 'rogue', cls: 'support', name: '위습', weapon: '소음 권총', rarity: 'rare', atk: 6, hp: 34, gol: 2,
+    active: { name: '섬광탄', gauge: 14, kind: 'stun', count: 3, turns: 1 },
+    passive: { name: '지뢰 설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
+  { id: 'priest', cls: 'support', name: '미라', weapon: '수리 드론', rarity: 'epic', atk: 5, hp: 44, gol: 2,
+    active: { name: '나노 수리', gauge: 16, kind: 'heal', amount: 42 },
+    passive: { name: '보급 드론', kind: 'closeBlank', n: 1 } },
+  { id: 'seraph', cls: 'support', name: '세라핌', weapon: '지원 드론', rarity: 'legendary', atk: 7, hp: 50, gol: 3,
+    active: { name: '대규모 수리', gauge: 17, kind: 'heal', amount: 58 },
+    passive: { name: '탄약 투하', kind: 'addBall', n: 2 } }
 ];
 
 // ── 메타(로비, 런 밖) 설정 ──
@@ -98,7 +124,7 @@ const GROWTH = {
 };
 const GACHA = {
   cost1: 100, cost10: 900, dupShards: 15,        // 보석 비용, 중복→조각
-  rates: [{ rarity: 'common', w: 68 }, { rarity: 'rare', w: 27 }, { rarity: 'epic', w: 5 }]
+  rates: [{ rarity: 'common', w: 60 }, { rarity: 'rare', w: 28 }, { rarity: 'epic', w: 9 }, { rarity: 'legendary', w: 3 }]
 };
 const DOC_SHOP = { shardsPer: 10, docCost: 20 }; // 문서 20 → 조각 10
 const MISSIONS = [
@@ -123,8 +149,8 @@ function stageScale(s) {
 const META_START = {
   currencies: { gold: 200, mats: 120, gems: 320, docs: 0 },
   shards: {},
-  owned: { knight: { level: 1, star: 1 }, archer: { level: 1, star: 1 }, guard: { level: 1, star: 1 } },
-  party: ['knight', 'archer', 'guard'],
+  owned: { knight: { level: 1, star: 1 }, grenadier: { level: 1, star: 1 }, guard: { level: 1, star: 1 } },
+  party: ['knight', 'grenadier', 'guard'],   // 사수·포수·지원 커먼 1명씩
   stage: 1, maxStage: 1,
   stats: { runsWon: 0, kills: 0, floors: 0 },
   claimed: {},

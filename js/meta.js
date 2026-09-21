@@ -17,7 +17,9 @@ const Meta = (function () {
     M.claimed = M.claimed || {}; M.daily = M.daily || { freeGachaDate: '' };
     M.maxStage = Math.min(STAGE_MAX, Math.max(1, M.maxStage || 1));
     M.stage = Math.min(M.maxStage, Math.max(1, M.stage || 1));
-    if (!Array.isArray(M.party)) M.party = ['knight', 'archer', 'guard'];
+    if (!Array.isArray(M.party)) M.party = ['knight', 'grenadier', 'guard'];
+    // 알 수 없는(구버전) id 정리 → 크래시 방지
+    Object.keys(M.owned).forEach(id => { if (!ROSTER.some(c => c.id === id)) delete M.owned[id]; });
     while (M.party.length < 3) M.party.push(null);
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
     save();
@@ -148,6 +150,7 @@ const Meta = (function () {
     const owned = !!o;
     return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
       + '<span class="cc-name">' + b.name + '</span>'
+      + (b.cls && CLASS[b.cls] ? '<span class="cc-cls" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + '</span>' : '')
       + (b.weapon ? '<span class="cc-wpn">🔫 ' + b.weapon + '</span>' : '')
       + (owned ? '<span class="cc-sub">Lv.' + o.level + ' ★' + o.star + '</span>' : '<span class="cc-sub">미보유</span>')
       + '<span class="cc-rar" style="color:' + R.color + '">' + R.name + '</span>'
@@ -198,7 +201,7 @@ const Meta = (function () {
     const g = $('gacha-box');
     g.innerHTML = '<div class="sns-card">'
       + '<div class="sns-title">🎲 요원 가챠</div>'
-      + '<div class="sns-cap">에픽 5% · 레어 27% · 커먼 68% · 중복 시 조각 ' + GACHA.dupShards + '</div>'
+      + '<div class="sns-cap">' + GACHA.rates.slice().reverse().map(r => (RARITY[r.rarity] || {}).name + ' ' + r.w + '%').join(' · ') + ' · 중복 시 조각 ' + GACHA.dupShards + '</div>'
       + '<button class="sns-btn full" data-gacha="1" style="margin-bottom:8px">단일 뽑기 💎' + GACHA.cost1 + '</button>'
       + '<button class="sns-btn full" data-gacha="10" style="margin-bottom:8px">10연 뽑기 💎' + GACHA.cost10 + '</button>'
       + '<button class="sns-btn full ' + (freeAvailable() ? '' : 'sub') + '" data-gacha="free"' + (freeAvailable() ? '' : ' disabled') + '>' + (freeAvailable() ? '🎁 오늘의 무료 뽑기' : '무료 뽑기 (내일)') + '</button>'
@@ -279,6 +282,7 @@ const Meta = (function () {
     const c = leveledDef(id), cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const luCost = GROWTH.levelUpCost(o.level), pr = GROWTH.promoteCost(o.star);
     box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
+      + (b.cls && CLASS[b.cls] ? '<p class="cd-stat" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + ' · ' + CLASS[b.cls].desc + '</p>' : '')
       + (b.weapon ? '<p class="cd-stat" style="color:var(--cyan)">🔫 ' + b.weapon + '</p>' : '')
       + '<p class="cd-stat">Lv.' + o.level + '/' + cap + ' · ★' + o.star + ' · 🔷' + (M.shards[id] || 0) + '</p>'
       + '<p class="cd-stat">공격 ' + c.atk + ' · 체력 ' + c.hp + ' · 골칸 ' + c.gol + '</p>'
