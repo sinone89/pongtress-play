@@ -111,6 +111,13 @@ const Meta = (function () {
     else { const slot = M.party.indexOf(null); if (slot >= 0) M.party[slot] = id; else return false; }
     save(); return true;
   }
+  // 드래그 배치: 지정 레인에 캐릭터 할당(다른 레인에 있으면 제거=상호배타). 비어있는 슬롯이면 그 자리에.
+  function assignPartySlot(lane, id) {
+    if (lane < 0 || lane > 2 || !M.owned[id]) return false;
+    const prev = M.party.indexOf(id); if (prev >= 0) M.party[prev] = null;
+    M.party[lane] = id; save(); return true;
+  }
+  function clearPartySlot(lane) { if (lane >= 0 && lane <= 2) { M.party[lane] = null; save(); } }
 
   // ── 런 종료 정산 ──
   function onRunEnd(r) {
@@ -148,7 +155,7 @@ const Meta = (function () {
     opts = opts || {};
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
     const owned = !!o;
-    return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
+    return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
       + '<img class="cc-cg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.remove()">'
       + '<span class="cc-name">' + b.name + '</span>'
       + (b.cls && CLASS[b.cls] ? '<span class="cc-cls" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + '</span>' : '')
@@ -269,12 +276,19 @@ const Meta = (function () {
   function renderFormation() {
     const slots = $('lane-slots'); slots.innerHTML = '';
     partySlots().forEach((id, lane) => {
-      const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty'); d.dataset.lane = lane;
-      if (id) { const c = leveledDef(id); d.innerHTML = '<b>' + c.name + '</b><span>Lv.' + c.level + ' ★' + c.star + '</span><span class="lane-lbl">' + (lane + 1) + '레인 · 탭하여 해제</span>'; d.dataset.char = id; }
-      else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
+      const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty'); d.dataset.slot = lane; d.dataset.lane = lane;
+      if (id) {
+        const c = leveledDef(id), cl = CLASS[c.cls] || {};
+        d.dataset.char = id;
+        d.innerHTML = '<button class="ls-x" data-un="' + lane + '">✕</button>'
+          + '<b>' + c.name + '</b>'
+          + '<span class="ls-cls" style="color:' + (cl.color || 'var(--cyan)') + '">' + (cl.icon || '') + '</span>'
+          + '<span>Lv.' + c.level + ' ★' + c.star + '</span>'
+          + '<span class="lane-lbl">' + (lane + 1) + '레인</span>';
+      } else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인 · 드래그 배치</span>';
       slots.append(d);
     });
-    const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id) })).join('');
+    const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
     const oc = $('owned-count'); if (oc) oc.textContent = ROSTER.filter(c => M.owned[c.id]).length + '/' + ROSTER.length;
   }
 
@@ -435,9 +449,32 @@ const Meta = (function () {
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
-    // 편성 탭: 캐릭터 칩/레인 슬롯
-    $('owned-list').onclick = (e) => { const el = e.target.closest('[data-char]'); if (el) openChar(el.dataset.char); };
-    $('lane-slots').onclick = (e) => { const el = e.target.closest('[data-char]'); if (el) { toggleParty(el.dataset.char); renderTab(); } };
+    // 편성 탭: 드래그하여 레인 배치(스틸앤샷式) — 임계 넘으면 고스트, 드롭한 레인에 할당 / 탭=상세
+    $('lane-slots').onclick = (e) => {
+      const x = e.target.closest('[data-un]'); if (x) { clearPartySlot(+x.dataset.un); renderFormation(); return; }
+    };
+    let fDrag = null;
+    const fmtSlotAt = (x, y) => { const els = document.querySelectorAll('#lane-slots [data-slot]'); for (const el of els) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return +el.dataset.slot; } return -1; };
+    const fmtGhost = () => { let g = $('drag-ghost'); if (!g) { g = document.createElement('div'); g.id = 'drag-ghost'; document.body.appendChild(g); } return g; };
+    const fmtHi = (x, y) => { const s = fmtSlotAt(x, y); document.querySelectorAll('#lane-slots [data-slot]').forEach(el => el.classList.toggle('drop-hi', +el.dataset.slot === s)); };
+    const fmtClearHi = () => document.querySelectorAll('#lane-slots .drop-hi').forEach(el => el.classList.remove('drop-hi'));
+    $('owned-list').addEventListener('pointerdown', (e) => {
+      const el = e.target.closest('[data-char]'); if (!el || el.classList.contains('locked')) return;
+      fDrag = { id: el.dataset.char, pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
+    });
+    window.addEventListener('pointermove', (e) => {
+      if (!fDrag || e.pointerId !== fDrag.pid) return;
+      if (!fDrag.moved) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) < 12) return; fDrag.moved = true; const g = fmtGhost(); const b = base(fDrag.id), cl = CLASS[b.cls] || {}; g.innerHTML = (cl.icon || '🔫') + ' ' + b.name; g.style.display = 'block'; }
+      const g = fmtGhost(); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; fmtHi(e.clientX, e.clientY);
+    });
+    window.addEventListener('pointerup', (e) => {
+      if (!fDrag || e.pointerId !== fDrag.pid) return; const d = fDrag; fDrag = null;
+      const g = fmtGhost(); g.style.display = 'none'; fmtClearHi();
+      if (!d.moved) { openChar(d.id); return; }              // 탭 = 상세
+      const s = fmtSlotAt(e.clientX, e.clientY);              // 드래그 = 드롭한 레인에 배치
+      if (s >= 0 && M.owned[d.id]) { assignPartySlot(s, d.id); renderFormation(); if (typeof Sound !== 'undefined') Sound.play('click'); }
+    });
+    window.addEventListener('pointercancel', (e) => { if (fDrag && e.pointerId === fDrag.pid) { fDrag = null; fmtGhost().style.display = 'none'; fmtClearHi(); } });
     // 상점 탭
     $('gacha-box').onclick = (e) => {
       const el = e.target.closest('[data-gacha]'); if (!el || el.disabled) return;

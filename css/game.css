@@ -137,7 +137,14 @@ body {
 
 /* 편성/출격 레인 슬롯 */
 #sortie-party, #lane-slots { display: flex; gap: 8px; margin: 14px 0; }
-.lane-slot { flex: 1; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 12px; padding: 12px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; min-height: 82px; justify-content: center; cursor: pointer; }
+.lane-slot { flex: 1; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 12px; padding: 12px 6px; text-align: center; display: flex; flex-direction: column; gap: 3px; min-height: 82px; justify-content: center; cursor: pointer; position: relative; touch-action: none; }
+.lane-slot.drop-hi { border-color: var(--cyan); box-shadow: 0 0 0 3px #46e6d055; background: #46e6d01a; }
+.lane-slot .ls-x { position: absolute; top: 3px; right: 4px; width: 20px; height: 20px; border: 0; border-radius: 6px; background: #ff5db133; color: #ff9ecb; font-size: 12px; font-weight: 800; cursor: pointer; line-height: 1; padding: 0; }
+.lane-slot .ls-cls { font-size: 13px; font-weight: 800; }
+/* 드래그 고스트 */
+#drag-ghost { position: fixed; z-index: 200; display: none; transform: translate(-50%, -120%); pointer-events: none;
+  background: linear-gradient(180deg, var(--cyan), var(--magenta)); color: var(--bg); font-weight: 800; font-size: 13px;
+  padding: 8px 14px; border-radius: 999px; box-shadow: 0 8px 20px #000a; white-space: nowrap; }
 .lane-slot.empty { border-style: dashed; color: var(--muted); }
 .lane-slot b { font-size: 15px; }
 .lane-slot span { font-size: 11px; color: var(--muted); }
@@ -146,7 +153,9 @@ body {
 
 /* 보유 캐릭터 칩 */
 #owned-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.char-chip { appearance: none; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 12px; padding: 10px 4px; color: var(--ink); cursor: pointer; display: flex; flex-direction: column; gap: 2px; align-items: center; position: relative; font: inherit; }
+.char-chip { appearance: none; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 12px; padding: 10px 4px; color: var(--ink); cursor: grab; display: flex; flex-direction: column; gap: 2px; align-items: center; position: relative; font: inherit; touch-action: none; }
+.char-chip.placed { opacity: .55; }
+.char-chip .cc-cg { -webkit-user-drag: none; user-select: none; pointer-events: none; }
 .char-chip.locked { opacity: .5; }
 .cc-name { font-weight: 800; font-size: 14px; }
 .cc-sub { font-size: 11px; color: var(--muted); }
