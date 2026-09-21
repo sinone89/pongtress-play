@@ -40,6 +40,57 @@ body {
 .lobby-mute { margin-left: auto; }
 #lobby-main { flex: 1; overflow: auto; padding: 8px 18px; }
 .lobby-panel h2 { margin: 6px 0 10px; }
+
+/* ══ 스틸앤샷式 배치·크기 (편성·상점·미션 전용, 출격 제외) ══
+   스틸앤샷 1080폭 디자인px → PONGTRESS 컨테이너(520) 비율 ×0.48 환산.
+   섹션헤더(액센트 좌측보더) → 카드 → 행(아이콘+이름+설명) → 청키버튼 · 탭 필 · 미션행+진행바 */
+#tab-formation, #tab-shop, #tab-mission { padding-bottom: 8px; }
+/* 패널 제목 = 화면 상단 큰 섹션헤더 */
+#tab-formation > h2, #tab-shop > h2, #tab-mission > h2 {
+  font-size: 17px; font-weight: 800; color: var(--gold, var(--amber));
+  margin: 4px 2px 12px; padding: 10px 14px;
+  background: linear-gradient(180deg, #ffffff12, #ffffff06);
+  border: 1px solid #ffffff22; border-left: 4px solid var(--amber); border-radius: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+/* 하위 섹션헤더 */
+.sns-h {
+  font-size: 14px; font-weight: 800; color: var(--cyan);
+  margin: 16px 2px 8px; padding: 8px 12px;
+  background: linear-gradient(180deg, #ffffff10, #ffffff05);
+  border: 1px solid #ffffff1e; border-left: 3px solid var(--cyan); border-radius: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.sns-h .sns-sub { color: var(--muted); font-weight: 700; font-size: 11px; margin-left: auto; }
+/* 카드 컨테이너 */
+.sns-card { background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 14px; padding: 13px; margin-bottom: 10px; }
+.sns-card .sns-title { font-size: 15px; font-weight: 800; margin-bottom: 4px; display: flex; align-items: center; gap: 6px; }
+.sns-card .sns-cap { font-size: 12px; color: var(--muted); line-height: 1.5; margin-bottom: 10px; }
+/* 행: 아이콘 + 이름/설명 + 우측 액션 */
+.sns-row { display: flex; align-items: center; gap: 10px; }
+.sns-ico { font-size: 26px; width: 42px; text-align: center; flex: 0 0 auto; }
+.sns-grow { flex: 1; min-width: 0; }
+.sns-nm { font-size: 15px; font-weight: 800; }
+.sns-ds { font-size: 12px; color: var(--muted); margin-top: 3px; line-height: 1.4; }
+/* 청키 버튼(스틸앤샷 0 6px 0 → ×0.48 ≈ 0 4px 0) */
+.sns-btn { appearance: none; border: 0; cursor: pointer; font: inherit; font-weight: 800;
+  font-size: 15px; padding: 11px 18px; border-radius: 12px; color: var(--bg);
+  background: linear-gradient(180deg, var(--cyan), var(--magenta));
+  box-shadow: 0 4px 0 #00000055; text-shadow: 0 1px 0 #ffffff40; }
+.sns-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #00000055; }
+.sns-btn:disabled { opacity: .45; filter: grayscale(.4); box-shadow: none; transform: none; cursor: default; }
+.sns-btn.sub { background: linear-gradient(180deg, #3a325c, #2a2447); color: var(--ink); box-shadow: 0 4px 0 #17112b; text-shadow: 0 1px 2px #000; }
+.sns-btn.sub:active { box-shadow: 0 1px 0 #17112b; }
+.sns-btn.sm { font-size: 13px; padding: 8px 14px; border-radius: 10px; box-shadow: 0 3px 0 #00000055; }
+.sns-btn.sm:active { transform: translateY(2px); box-shadow: 0 1px 0 #00000055; }
+.sns-btn.full { width: 100%; }
+/* 탭 필(패널 내부 서브탭) */
+.sns-tabs { display: flex; gap: 8px; margin-bottom: 12px; }
+.sns-tab { flex: 1; appearance: none; font: inherit; font-weight: 800; font-size: 13px; padding: 10px 0;
+  border-radius: 10px; border: 2px solid #ffffff1e; background: #ffffff0d; color: var(--muted); cursor: pointer; }
+.sns-tab.on { background: #46e6d01a; color: var(--cyan); border-color: var(--cyan); }
+/* 우측 액션(교환/버튼 정렬) */
+.sns-act { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; }
 #party-preview { display: flex; gap: 10px; margin: 16px 0 24px; flex-wrap: wrap; }
 .party-card { flex: 1 1 90px; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 12px; padding: 12px; text-align: center; }
 .party-card .pc-name { font-weight: 800; margin-bottom: 6px; }
@@ -84,7 +135,7 @@ body {
 .mi-top { display: flex; justify-content: space-between; font-weight: 800; }
 .mi-reward { color: var(--amber); font-size: 13px; }
 .mi-desc { font-size: 12px; margin: 4px 0; }
-.mi-bar { height: 6px; background: #ffffff14; border-radius: 999px; overflow: hidden; margin: 6px 0 10px; }
+.mi-bar { height: 7px; background: #ffffff14; border-radius: 999px; overflow: hidden; margin: 8px 0 0; }
 .mi-bar div { height: 100%; background: linear-gradient(90deg, var(--cyan), #6cf); }
 .mi-claim { appearance: none; border: 0; width: 100%; padding: 9px; border-radius: 10px; font: inherit; font-weight: 800; cursor: pointer; background: var(--amber); color: #3a2a05; }
 .mi-claim:disabled { background: #ffffff14; color: var(--muted); cursor: default; }

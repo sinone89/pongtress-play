@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=069">
+  <link rel="stylesheet" href="css/game.css?v=070">
 </head>
 <body>
   <div id="app">
@@ -45,19 +45,20 @@
           <p id="sortie-warn" class="muted" hidden></p>
         </div>
         <div id="tab-formation" class="lobby-panel" hidden>
-          <h2>편성</h2>
+          <h2>⚔️ 편성</h2>
+          <div class="sns-h">부대 배치 <span class="sns-sub">3레인 · 탭하여 해제</span></div>
           <div id="lane-slots"></div>
-          <p class="muted">보유 캐릭터 — 탭하여 상세/편성</p>
+          <div class="sns-h">보유 캐릭터 <span class="sns-sub" id="owned-count"></span></div>
           <div id="owned-list"></div>
         </div>
         <div id="tab-shop" class="lobby-panel" hidden>
-          <h2>상점 · 가챠</h2>
+          <h2>🛒 상점 · 가챠</h2>
           <div id="gacha-box"></div>
-          <h3>문서 교환소</h3>
+          <div class="sns-h">📜 문서 교환소</div>
           <div id="doc-shop"></div>
         </div>
         <div id="tab-mission" class="lobby-panel" hidden>
-          <h2>미션</h2>
+          <h2>📋 미션</h2>
           <div id="mission-list"></div>
         </div>
       </main>
@@ -117,9 +118,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=069"></script>
-  <script src="js/content.js?v=069"></script>
-  <script src="js/meta.js?v=069"></script>
-  <script src="js/game.js?v=069"></script>
+  <script src="js/audio.js?v=070"></script>
+  <script src="js/content.js?v=070"></script>
+  <script src="js/meta.js?v=070"></script>
+  <script src="js/game.js?v=070"></script>
 </body>
 </html>

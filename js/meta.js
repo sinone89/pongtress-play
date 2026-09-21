@@ -190,31 +190,43 @@ const Meta = (function () {
       slots.append(d);
     });
     const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id) })).join('');
+    const oc = $('owned-count'); if (oc) oc.textContent = ROSTER.filter(c => M.owned[c.id]).length + '/' + ROSTER.length;
   }
 
   function renderShop() {
     const g = $('gacha-box');
-    g.innerHTML = '<div class="gacha-info">에픽 5% · 레어 27% · 커먼 68% · 중복 시 조각 ' + GACHA.dupShards + '</div>'
-      + '<div class="gacha-btns">'
-      + '<button class="btn gacha-btn" data-gacha="1">단일 뽑기 💎' + GACHA.cost1 + '</button>'
-      + '<button class="btn gacha-btn" data-gacha="10">10연 뽑기 💎' + GACHA.cost10 + '</button>'
-      + '<button class="btn ' + (freeAvailable() ? 'primary' : '') + '" data-gacha="free"' + (freeAvailable() ? '' : ' disabled') + '>' + (freeAvailable() ? '오늘의 무료 뽑기' : '무료 뽑기(내일)') + '</button>'
+    g.innerHTML = '<div class="sns-card">'
+      + '<div class="sns-title">🎲 요원 가챠</div>'
+      + '<div class="sns-cap">에픽 5% · 레어 27% · 커먼 68% · 중복 시 조각 ' + GACHA.dupShards + '</div>'
+      + '<button class="sns-btn full" data-gacha="1" style="margin-bottom:8px">단일 뽑기 💎' + GACHA.cost1 + '</button>'
+      + '<button class="sns-btn full" data-gacha="10" style="margin-bottom:8px">10연 뽑기 💎' + GACHA.cost10 + '</button>'
+      + '<button class="sns-btn full ' + (freeAvailable() ? '' : 'sub') + '" data-gacha="free"' + (freeAvailable() ? '' : ' disabled') + '>' + (freeAvailable() ? '🎁 오늘의 무료 뽑기' : '무료 뽑기 (내일)') + '</button>'
       + '</div>';
     const d = $('doc-shop');
-    d.innerHTML = '<p class="muted">문서 ' + DOC_SHOP.docCost + ' → 조각 ' + DOC_SHOP.shardsPer + ' (보유 문서 ' + M.currencies.docs + ')</p>'
-      + ROSTER.filter(c => M.owned[c.id]).map(c => '<button class="doc-row" data-doc="' + c.id + '"><span>' + c.name + ' 조각</span><span class="muted">보유 🔷' + (M.shards[c.id] || 0) + '</span><span class="doc-buy">교환</span></button>').join('');
+    d.innerHTML = '<div class="sns-cap" style="margin:2px 2px 8px">문서 ' + DOC_SHOP.docCost + ' → 조각 ' + DOC_SHOP.shardsPer + ' · 보유 문서 📜' + M.currencies.docs + '</div>'
+      + ROSTER.filter(c => M.owned[c.id]).map(c =>
+          '<div class="sns-card"><div class="sns-row">'
+          + '<div class="sns-ico">🧩</div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + c.name + ' 조각</div><div class="sns-ds">보유 🔷' + (M.shards[c.id] || 0) + '</div></div>'
+          + '<div class="sns-act"><button class="sns-btn sm" data-doc="' + c.id + '">교환</button></div>'
+          + '</div></div>').join('');
   }
 
   function renderMissions() {
     const list = $('mission-list');
     list.innerHTML = MISSIONS.map(m => {
       const p = missionProgress(m), done = p >= m.goal, claimed = !!M.claimed[m.id];
-      return '<div class="mission-row">'
-        + '<div class="mi-top"><b>' + m.name + '</b><span class="mi-reward">' + fmtCost(m.reward) + '</span></div>'
-        + '<div class="mi-desc muted">' + m.desc + ' (' + p + '/' + m.goal + ')</div>'
-        + '<div class="mi-bar"><div style="width:' + (100 * p / m.goal) + '%"></div></div>'
-        + '<button class="mi-claim" data-mission="' + m.id + '"' + (done && !claimed ? '' : ' disabled') + '>' + (claimed ? '수령 완료' : done ? '수령' : '진행 중') + '</button>'
-        + '</div>';
+      const pct = Math.min(100, 100 * p / m.goal);
+      const label = claimed ? '수령 완료' : done ? '🎁 수령' : '진행 중';
+      return '<div class="sns-card"><div class="sns-row" style="align-items:flex-start">'
+        + '<div class="sns-ico">🎯</div>'
+        + '<div class="sns-grow">'
+        +   '<div class="sns-nm">' + m.name + ' <span class="mi-reward">' + fmtCost(m.reward) + '</span></div>'
+        +   '<div class="sns-ds">' + m.desc + ' (' + p + '/' + m.goal + ')</div>'
+        +   '<div class="mi-bar"><div style="width:' + pct + '%"></div></div>'
+        + '</div>'
+        + '<div class="sns-act"><button class="sns-btn sm ' + (done && !claimed ? '' : 'sub') + '" data-mission="' + m.id + '"' + (done && !claimed ? '' : ' disabled') + '>' + label + '</button></div>'
+        + '</div></div>';
     }).join('');
   }
 
