@@ -160,7 +160,7 @@ const Meta = (function () {
   }
 
   function renderSortie() {
-    // 스테이지 선택
+    // 스테이지 선택(상단)
     const ss = $('stage-select');
     if (ss) {
       let h = '<div class="ss-btns">';
@@ -170,20 +170,80 @@ const Meta = (function () {
       }
       ss.innerHTML = h + '</div>';
       const sc = stageScale(M.stage);
-      $('stage-info').textContent = '스테이지 ' + M.stage + ' / 해금 ' + M.maxStage + ' · 적 체력 ×' + sc.hp.toFixed(1) + ' 공격 ×' + sc.dmg.toFixed(1) + ' · 보상 ×' + sc.reward.toFixed(1);
+      $('stage-info').textContent = 'S' + M.stage + ' · 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' 보상×' + sc.reward.toFixed(1);
     }
-    const box = $('sortie-party'); box.innerHTML = '';
-    let hp = 0, n = 0;
-    partySlots().forEach((id, lane) => {
-      const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty');
-      if (id) { const c = leveledDef(id); hp += c.hp; n++; d.innerHTML = '<b>' + c.name + '</b><span>공 ' + c.atk + ' · 체 ' + c.hp + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>'; }
-      else d.innerHTML = '<span class="lane-empty">비어 있음</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
-      box.append(d);
-    });
+    let n = partySlots().filter(Boolean).length;
     const warn = $('sortie-warn');
     if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
-    $('sortie-info').textContent = '성벽 HP ' + hp + ' · 편성 ' + n + '/3';
+    renderIdleCard();
+    idleStart();
+  }
+
+  // ── 방치(idle) 보상 ──
+  function idleEnsure() { if (!M.idle) M.idle = { last: 0 }; if (!M.idle.last) { M.idle.last = Date.now(); save(); } }
+  function idlePending() {
+    idleEnsure();
+    const cap = IDLE.capHours * 60, mins = Math.min(cap, (Date.now() - M.idle.last) / 60000), mul = IDLE.mul(M.maxStage);
+    return { mins: mins, gold: Math.floor(mins * IDLE.goldPerMin * mul), mats: Math.floor(mins * IDLE.matsPerMin * mul), capped: mins >= cap };
+  }
+  function claimIdle() { const p = idlePending(); if (p.gold <= 0 && p.mats <= 0) return null; M.currencies.gold += p.gold; M.currencies.mats += p.mats; M.idle.last = Date.now(); save(); return p; }
+  function renderIdleCard() {
+    const el = $('idle-reward'); if (!el) return;
+    const p = idlePending(), hh = Math.floor(p.mins / 60), mm = Math.floor(p.mins % 60), has = (p.gold + p.mats) > 0;
+    el.innerHTML = '<div class="il-top"><b>⏳ 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분 · S' + M.maxStage + ' ×' + IDLE.mul(M.maxStage).toFixed(1) + '</span></div>'
+      + '<div class="il-row"><span class="il-amt">🪙 ' + p.gold + '  🔩 ' + p.mats + '</span>'
+      + '<button class="sns-btn sm" data-idle="claim"' + (has ? '' : ' disabled') + '>받기</button></div>';
+  }
+
+  // ── 방치 홈 자동전투 연출(코스메틱) ──
+  let _idleRAF = 0;
+  function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }
+  function idleStart() {
+    const cv = $('idle-canvas'); if (!cv) return; idleStop();
+    const ctx = cv.getContext('2d'); const party = partySlots();
+    const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
+    const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0 };
+    function fit() { const r = cv.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); D.w = Math.max(1, r.width); D.h = Math.max(1, r.height); cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
+    fit();
+    const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
+    function spawn() { D.en.push({ x: 20 + Math.random() * (D.w - 40), y: -8, r: 8 + Math.random() * 4, col: eCol[Math.floor(Math.random() * eCol.length)] }); }
+    for (let i = 0; i < 5; i++) D.en.push({ x: 20 + Math.random() * (D.w - 40), y: Math.random() * D.h * 0.45, r: 10, col: eCol[i % eCol.length] });
+    function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
+    let last = performance.now();
+    function step(dt) {
+      if (Math.random() < dt * 1.6) spawn();
+      for (const e of D.en) e.y += dt * 20;
+      const chars = party.filter(Boolean);
+      if (D.en.length && Math.random() < dt * 5) {
+        const t = D.en[Math.floor(Math.random() * D.en.length)], ci = Math.floor(Math.random() * Math.max(1, chars.length));
+        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 22, x2: t.x, y2: t.y, t: 0.18 });
+        D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.3 }); t.dead = true;
+      }
+      D.en = D.en.filter(e => !e.dead && e.y < D.h - 26);
+      for (const b of D.bm) b.t -= dt; D.bm = D.bm.filter(b => b.t > 0);
+      for (const p of D.pop) p.t -= dt; D.pop = D.pop.filter(p => p.t > 0);
+      D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
+    }
+    function render() {
+      ctx.clearRect(0, 0, D.w, D.h);
+      for (const e of D.en) { ctx.fillStyle = e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); }
+      for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
+      for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * 46, 0, 7); ctx.stroke(); }
+      const chars = party.filter(Boolean);
+      for (let i = 0; i < chars.length; i++) {
+        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 22;
+        const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
+        if (spr) { const s = Math.min(D.w / chars.length * 0.9, 64); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); ctx.imageSmoothingEnabled = sm; }
+        else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
+      }
+    }
+    function frame(now) {
+      if (cv.offsetParent === null) { idleStop(); return; }   // 홈이 숨겨지면 자동 정지
+      const dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); render();
+      _idleRAF = requestAnimationFrame(frame);
+    }
+    _idleRAF = requestAnimationFrame(frame);
   }
 
   function renderFormation() {
@@ -268,6 +328,7 @@ const Meta = (function () {
   function renderTab() {
     for (const t of ['sortie', 'formation', 'shop', 'mission']) $('tab-' + t).hidden = (t !== activeTab);
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(x => x.classList.toggle('active', x.dataset.tab === activeTab));
+    if (activeTab !== 'sortie') idleStop();               // 홈이 아니면 연출 정지
     if (activeTab === 'sortie') renderSortie();
     else if (activeTab === 'formation') renderFormation();
     else if (activeTab === 'shop') renderShop();
@@ -327,6 +388,8 @@ const Meta = (function () {
     $('doc-shop').onclick = (e) => { const el = e.target.closest('[data-doc]'); if (el) { buyShards(el.dataset.doc); renderShop(); renderBar(); } };
     // 미션
     $('mission-list').onclick = (e) => { const el = e.target.closest('[data-mission]'); if (el && !el.disabled) { claimMission(el.dataset.mission); renderMissions(); renderBar(); } };
+    // 방치 보상 받기
+    const ir = $('idle-reward'); if (ir) ir.onclick = (e) => { const b = e.target.closest('[data-idle]'); if (b && !b.disabled) { const p = claimIdle(); if (p && typeof Sound !== 'undefined') Sound.play('charge'); renderIdleCard(); renderBar(); } };
     // 캐릭터 모달
     $('char-modal').onclick = (e) => {
       if (e.target.dataset.close || e.target === $('char-modal')) { $('char-modal').hidden = true; return; }

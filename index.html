@@ -12,16 +12,21 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=077">
+  <link rel="stylesheet" href="css/game.css?v=078">
 </head>
 <body>
   <div id="app">
-    <!-- 타이틀 -->
+    <!-- 타이틀(풀스크린 키아트 + 터치하여 시작) -->
     <section id="title" class="screen">
-      <h1 class="logo">PONGTRESS</h1>
-      <p class="tagline">튕겨서 충전하는 로그라이크 핀볼</p>
-      <button id="btn-start" class="btn primary">시작</button>
-      <p class="version">prototype 0.2 · 전투 코어</p>
+      <img id="title-art" src="assets/char/behemoth_cg.png" alt="" onerror="this.style.display='none'">
+      <div class="title-top">
+        <h1 class="logo">PONGTRESS</h1>
+        <p class="tagline">튕겨서 충전하는 로그라이크 핀볼</p>
+      </div>
+      <div class="title-btm">
+        <button id="btn-start" class="btn primary">터치하여 시작</button>
+        <p class="version">prototype 0.2 · 전투 코어</p>
+      </div>
     </section>
 
     <!-- 로비 -->
@@ -34,15 +39,17 @@
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
       </header>
       <main id="lobby-main">
-        <div id="tab-sortie" class="lobby-panel">
-          <h2>출격</h2>
-          <p class="muted">런 = 3전투 + 보스. 스테이지가 높을수록 어렵고 보상도 큽니다.</p>
-          <div id="stage-select"></div>
-          <p id="stage-info" class="muted"></p>
-          <div id="sortie-party"></div>
-          <p id="sortie-info" class="muted"></p>
-          <button id="btn-sortie" class="btn primary">출격</button>
-          <p id="sortie-warn" class="muted" hidden></p>
+        <div id="tab-sortie" class="lobby-panel home-panel">
+          <div class="home-top">
+            <div id="stage-select"></div>
+            <div class="home-cta">
+              <span id="stage-info" class="muted"></span>
+              <button id="btn-sortie" class="btn primary">출격</button>
+            </div>
+            <p id="sortie-warn" class="muted" hidden></p>
+          </div>
+          <div class="home-scene"><canvas id="idle-canvas"></canvas><span class="home-scene-tag">자동 전투 중…</span></div>
+          <div id="idle-reward" class="idle-card"></div>
         </div>
         <div id="tab-formation" class="lobby-panel" hidden>
           <h2>⚔️ 편성</h2>
@@ -118,9 +125,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=077"></script>
-  <script src="js/content.js?v=077"></script>
-  <script src="js/meta.js?v=077"></script>
-  <script src="js/game.js?v=077"></script>
+  <script src="js/audio.js?v=078"></script>
+  <script src="js/content.js?v=078"></script>
+  <script src="js/meta.js?v=078"></script>
+  <script src="js/game.js?v=078"></script>
 </body>
 </html>

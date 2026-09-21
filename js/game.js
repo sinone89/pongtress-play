@@ -910,7 +910,9 @@
   Meta.init({ onSortie: startRun });
   Sound.syncIcons();
   document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
-  $('btn-start').onclick = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
+  const enterLobby = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
+  $('title').onclick = enterLobby;        // 타이틀 아무 곳이나 탭 → 시작
+  $('btn-start').onclick = (e) => { e.stopPropagation(); enterLobby(); };
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('btn-auto').onclick = () => { S.autoSkill = !S.autoSkill; $('btn-auto').textContent = '자동 ' + (S.autoSkill ? 'ON' : 'OFF'); $('btn-auto').classList.toggle('on', S.autoSkill); };
   canvas.addEventListener('pointerdown', aimDown);

@@ -168,7 +168,13 @@ const META_START = {
   stage: 1, maxStage: 1,
   stats: { runsWon: 0, kills: 0, floors: 0 },
   claimed: {},
-  daily: { freeGachaDate: '' }
+  daily: { freeGachaDate: '' },
+  idle: { last: 0 }               // 방치 보상 마지막 정산 시각(ms). 0이면 최초 진입 시 now로 초기화
+};
+// 방치(idle) 보상: 홈에서 시간 경과에 따라 골드·재료 누적, 상한 있음. 해금 스테이지가 높을수록 배율↑.
+const IDLE = {
+  goldPerMin: 5, matsPerMin: 0.35, capHours: 8,
+  mul: (maxStage) => 1 + (Math.max(1, maxStage) - 1) * 0.5     // S1 ×1 … S5 ×3
 };
 
 // ── 적 ──
