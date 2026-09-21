@@ -156,7 +156,7 @@ const Meta = (function () {
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
     const owned = !!o;
     return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
-      + '<img class="cc-cg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.remove()">'
+      + '<img class="cc-cg" src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()">'
       + '<span class="cc-name">' + b.name + '</span>'
       + (b.cls && CLASS[b.cls] ? '<span class="cc-cls" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + '</span>' : '')
       + (b.weapon ? '<span class="cc-wpn">🔫 ' + b.weapon + '</span>' : '')
@@ -438,7 +438,7 @@ const Meta = (function () {
   function showGachaResult(res) {
     const box = $('gacha-modal-box');
     box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res">'
-      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'cg') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
+      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'load') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
       + '</div><button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
