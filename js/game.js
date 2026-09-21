@@ -923,14 +923,8 @@
   canvas.addEventListener('pointermove', aimMove);
   canvas.addEventListener('pointerup', aimUp);
   canvas.addEventListener('pointercancel', () => { aimActive = false; });
-  // 고정 세로 스테이지(540×960)를 화면에 맞게 scale(스틸앤샷式 레터박스)
-  function fitStage() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    if (vw < 2 || vh < 2) return;                 // 숨김/미측정(0) 시 scale 0 붕괴 방지
-    const s = Math.min(vw / 540, vh / 960);
-    document.documentElement.style.setProperty('--fit', s > 0 ? s : 1);
-    if (!$('combat').hidden) resize();
-  }
+  // 9:16 프레임 크기 변경 시 전투 캔버스 재계산(프레임은 CSS가 실제 px로 처리 — transform 없음)
+  function fitStage() { if (!$('combat').hidden) resize(); }
   window.addEventListener('resize', fitStage);
   window.addEventListener('orientationchange', fitStage);
   fitStage();
