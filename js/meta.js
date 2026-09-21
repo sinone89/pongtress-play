@@ -207,27 +207,37 @@ const Meta = (function () {
     function fit() { const r = cv.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); D.w = Math.max(1, r.width); D.h = Math.max(1, r.height); cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
     fit();
     const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
-    function spawn() { D.en.push({ x: 20 + Math.random() * (D.w - 40), y: -8, r: 8 + Math.random() * 4, col: eCol[Math.floor(Math.random() * eCol.length)] }); }
-    for (let i = 0; i < 5; i++) D.en.push({ x: 20 + Math.random() * (D.w - 40), y: Math.random() * D.h * 0.45, r: 10, col: eCol[i % eCol.length] });
+    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2); return { x: 24 + Math.random() * (D.w - 48), y: y, r: 12 + Math.random() * 4, col: eCol[Math.floor(Math.random() * eCol.length)], hp: hp, mhp: hp, hit: 0 }; }
+    function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-12)); }
+    for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.h * 0.5));
     function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
-    let last = performance.now();
+    const fireLine = () => D.h * 0.55;      // 적이 파티 근처(하단)까지 내려온 뒤 격파 — 연출이 꽉 차 보이게
+    let last = performance.now(), fireT = 0;
     function step(dt) {
-      if (Math.random() < dt * 1.6) spawn();
-      for (const e of D.en) e.y += dt * 20;
+      if (Math.random() < dt * 1.3) spawn();
+      for (const e of D.en) { e.y += dt * 30; if (e.hit > 0) e.hit -= dt; }
       const chars = party.filter(Boolean);
-      if (D.en.length && Math.random() < dt * 5) {
-        const t = D.en[Math.floor(Math.random() * D.en.length)], ci = Math.floor(Math.random() * Math.max(1, chars.length));
-        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 22, x2: t.x, y2: t.y, t: 0.18 });
-        D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.3 }); t.dead = true;
+      fireT -= dt;
+      const targets = D.en.filter(e => e.y > fireLine());
+      if (targets.length && fireT <= 0) {
+        fireT = 0.22 + Math.random() * 0.12;                       // 사격 간격
+        const t = targets[0];                                       // 가장 앞선(먼저 진입) 적 집중 사격
+        const ci = Math.floor(Math.random() * Math.max(1, chars.length));
+        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 24, x2: t.x, y2: t.y, t: 0.16 });
+        t.hp -= 1; t.hit = 0.14;
+        if (t.hp <= 0) { D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.32 }); t.dead = true; }
       }
-      D.en = D.en.filter(e => !e.dead && e.y < D.h - 26);
+      D.en = D.en.filter(e => !e.dead && e.y < D.h - 20);
       for (const b of D.bm) b.t -= dt; D.bm = D.bm.filter(b => b.t > 0);
       for (const p of D.pop) p.t -= dt; D.pop = D.pop.filter(p => p.t > 0);
       D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
     }
     function render() {
       ctx.clearRect(0, 0, D.w, D.h);
-      for (const e of D.en) { ctx.fillStyle = e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); }
+      for (const e of D.en) {
+        ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill();
+        if (e.hp < e.mhp) { const bw = e.r * 1.8; ctx.fillStyle = '#0008'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 6, bw, 3); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 6, bw * e.hp / e.mhp, 3); }
+      }
       for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
       for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * 46, 0, 7); ctx.stroke(); }
       const chars = party.filter(Boolean);

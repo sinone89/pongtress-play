@@ -41,25 +41,28 @@ body {
 .version { color: var(--muted); font-size: 12px; margin: 0; }
 
 /* 방치형 홈 */
-.home-panel { display: flex; flex-direction: column; gap: 10px; height: 100%; min-height: 0; padding-bottom: 4px; }
+.home-panel { display: flex; flex-direction: column; gap: 12px; height: 100%; min-height: 0; padding-bottom: 4px; }
 .home-top { flex: 0 0 auto; }
-.home-cta { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.home-cta { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
 .home-cta #stage-info { flex: 1; font-size: 12px; }
-.home-cta .btn { padding: 12px 26px; font-size: 16px; }
-.home-scene { flex: 1 1 auto; min-height: 120px; position: relative; border-radius: 14px; overflow: hidden;
-  background: radial-gradient(120% 80% at 50% 0%, #1a1440, #0f0c24); border: 1px solid #ffffff18; }
+.home-cta .btn { padding: 12px 28px; font-size: 16px; }
+/* 자동전투 연출 — 과도한 세로 확장 방지(적정 높이 고정) */
+.home-scene { flex: 0 0 auto; height: clamp(200px, 36vh, 360px); position: relative; border-radius: 16px; overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 78%); border: 1px solid #ffffff1e;
+  box-shadow: inset 0 0 40px #0006; }
 .home-scene #idle-canvas { display: block; width: 100%; height: 100%; }
-.home-scene-tag { position: absolute; left: 10px; top: 8px; font-size: 11px; font-weight: 800; color: var(--cyan); opacity: .8;
-  background: #0009; padding: 3px 8px; border-radius: 999px; }
-.idle-card { flex: 0 0 auto; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 14px; padding: 11px 13px; }
+.home-scene-tag { position: absolute; left: 10px; top: 8px; font-size: 11px; font-weight: 800; color: var(--cyan); opacity: .85;
+  background: #0009; padding: 3px 9px; border-radius: 999px; z-index: 2; }
+.idle-card { flex: 0 0 auto; margin-top: auto; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 14px; padding: 11px 13px; }
 .idle-card .il-top { display: flex; justify-content: space-between; align-items: baseline; font-weight: 800; }
 .idle-card .il-time { font-size: 11px; font-weight: 700; color: var(--muted); }
 .idle-card .il-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
 .idle-card .il-amt { flex: 1; font-size: 15px; font-weight: 800; color: var(--amber); }
 
 /* 로비 */
-#lobby-top { display: flex; gap: 10px; justify-content: space-between; padding: 12px 16px; padding-top: max(12px, env(safe-area-inset-top)); font-size: 14px; }
-#lobby-top .cur { display: flex; align-items: center; gap: 3px; }
+/* 상단 통화 = 스틸앤샷式 알약칩 */
+#lobby-top { display: flex; gap: 7px; align-items: center; padding: 12px 14px; padding-top: max(12px, env(safe-area-inset-top)); font-size: 13px; }
+#lobby-top .cur { display: flex; align-items: center; gap: 4px; background: #ffffff0f; border: 1px solid #ffffff22; border-radius: 999px; padding: 6px 10px; font-weight: 800; }
 #lobby-top .cur b { color: var(--amber); }
 .mute-btn { appearance: none; border: 0; background: transparent; cursor: pointer; font-size: 18px; padding: 0 4px; line-height: 1; }
 .lobby-mute { margin-left: auto; }
@@ -183,9 +186,12 @@ body {
 .gr-item span { font-size: 10px; color: var(--muted); }
 .gr-tag { font-size: 9px !important; font-weight: 800; color: var(--cyan) !important; }
 
-#lobby-nav { display: flex; border-top: 1px solid #ffffff1a; padding-bottom: env(safe-area-inset-bottom); }
-.tabbtn { flex: 1; appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; padding: 14px; cursor: pointer; }
-.tabbtn.active { color: var(--ink); box-shadow: inset 0 3px 0 var(--cyan); }
+/* 하단 내비 = 스틸앤샷式 아이콘+라벨 */
+#lobby-nav { display: flex; border-top: 1px solid #ffffff1a; padding-bottom: env(safe-area-inset-bottom); background: linear-gradient(180deg, #ffffff08, #ffffff02); }
+.tabbtn { flex: 1; appearance: none; border: 0; background: transparent; color: var(--muted); font: inherit; font-weight: 700; font-size: 12px; padding: 9px 4px 11px; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tabbtn .tb-ic { font-size: 19px; line-height: 1; filter: grayscale(.4); opacity: .7; }
+.tabbtn.active { color: var(--cyan); box-shadow: inset 0 3px 0 var(--cyan); }
+.tabbtn.active .tb-ic { filter: none; opacity: 1; }
 
 /* 전투 */
 #combat { padding: 0; }
