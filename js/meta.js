@@ -5,7 +5,7 @@
 const Meta = (function () {
   const KEY = 'pongtress_meta_v1';
   const $ = (id) => document.getElementById(id);
-  let M = null, activeTab = 'home', onSortie = null;
+  let M = null, activeTab = 'home', onSortie = null, cdTab = 'lvup', cdId = null;
 
   // ── 저장/로드 ──
   function load() {
@@ -233,11 +233,11 @@ const Meta = (function () {
         fireT = 0.22 + Math.random() * 0.12;                       // 사격 간격
         const t = targets[0];                                       // 가장 앞선(먼저 진입) 적 집중 사격
         const ci = Math.floor(Math.random() * Math.max(1, chars.length));
-        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 92, x2: t.x, y2: t.y, t: 0.16 });
+        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 132, x2: t.x, y2: t.y, t: 0.16 });
         t.hp -= 1; t.hit = 0.14;
         if (t.hp <= 0) { D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.32 }); t.dead = true; }
       }
-      D.en = D.en.filter(e => !e.dead && e.y < D.h - 20);
+      D.en = D.en.filter(e => !e.dead && e.y < D.h - 124);   // 방치보상 카드 위에서 소멸(겹침 방지)
       for (const b of D.bm) b.t -= dt; D.bm = D.bm.filter(b => b.t > 0);
       for (const p of D.pop) p.t -= dt; D.pop = D.pop.filter(p => p.t > 0);
       D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
@@ -252,7 +252,7 @@ const Meta = (function () {
       for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * 46, 0, 7); ctx.stroke(); }
       const chars = party.filter(Boolean);
       for (let i = 0; i < chars.length; i++) {
-        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 92;
+        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 132;
         const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
         if (spr) { const s = Math.min(D.w / chars.length * 0.9, 64); const sm = ctx.imageSmoothingEnabled; ctx.imageSmoothingEnabled = false; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); ctx.imageSmoothingEnabled = sm; }
         else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
@@ -357,27 +357,66 @@ const Meta = (function () {
   }
   function renderLobby() { renderBar(); renderTab(); }
 
-  // ── 캐릭터 상세 모달 ──
+  // ── 캐릭터 상세 모달 (스틸앤샷式: 프레임 초상화 + 정보 + 스킬 + 레벨업/승급 탭) ──
+  const PEG_NM = { mult2: '×2 증식', mult5: '×5 증식', bumper: '범퍼', attack: '공격', gold: '골드' };
+  function skillText(sk) {
+    switch (sk.kind) {
+      case 'bigHit': return '맨 앞 적에게 공격력 ×' + sk.mult + ' 강타';
+      case 'extraShots': return '이번 턴 추가 ' + sk.shots + '발 사격';
+      case 'aoe': return '앞 ' + sk.count + '명에게 광역 포격 (공격 ×' + (sk.mult || 1) + ')';
+      case 'heal': return '성벽 HP +' + sk.amount + ' 회복';
+      case 'stun': return '앞 ' + sk.count + '명 ' + (sk.turns || 1) + '턴 기절';
+      case 'addPeg': return '핀볼판에 ' + (PEG_NM[sk.peg] || sk.peg) + ' 페그 +' + sk.n;
+      case 'addBall': return '전투 시작 장전 볼 +' + sk.n;
+      case 'closeBlank': return '전투 시작 시 꽝 포켓 ' + sk.n + '칸 개방';
+      default: return '';
+    }
+  }
+  function cycleChar(dir) {
+    const owned = ROSTER.filter(c => M.owned[c.id]).map(c => c.id);
+    if (owned.length < 2) return;
+    const i = owned.indexOf(cdId);
+    openChar(owned[(i + dir + owned.length) % owned.length]);
+  }
   function openChar(id) {
+    cdId = id;
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
-    const box = $('char-modal-box');
-    if (!o) { box.innerHTML = '<h2>' + b.name + '</h2><p>' + rarTag(b.rarity) + '</p><p class="muted">미보유 — 상점 가챠로 획득하세요.</p><button class="btn" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
+    const box = $('char-modal-box'); box.classList.add('cd-modal');
+    if (!o) { box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2><p class="muted">미보유 — 상점 가챠로 획득하세요.</p><button class="sns-btn sub" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
     const c = leveledDef(id), cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
-    const luCost = GROWTH.levelUpCost(o.level), pr = GROWTH.promoteCost(o.star);
-    box.innerHTML = '<img class="cd-cg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'">'
-      + '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2>'
-      + (b.cls && CLASS[b.cls] ? '<p class="cd-stat" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + ' · ' + CLASS[b.cls].desc + '</p>' : '')
-      + (b.weapon ? '<p class="cd-stat" style="color:var(--cyan)">🔫 ' + b.weapon + '</p>' : '')
-      + (b.concept ? '<p class="muted" style="font-size:12px;margin:4px 0 8px">' + b.concept + '</p>' : '')
-      + '<p class="cd-stat">Lv.' + o.level + '/' + cap + ' · ★' + o.star + ' · 🔷' + (M.shards[id] || 0) + '</p>'
-      + '<p class="cd-stat">공격 ' + c.atk + ' · 체력 ' + c.hp + ' · 골칸 ' + c.gol + '</p>'
-      + '<p class="muted">액티브 ' + b.active.name + ' (게이지 ' + b.active.gauge + ') · 패시브 ' + b.passive.name + '</p>'
-      + '<div class="cd-btns">'
-      + '<button class="btn" data-lvup="' + id + '"' + (maxLv || M.currencies.gold < luCost ? ' disabled' : '') + '>' + (maxLv ? '레벨 최대' : '레벨업 🪙' + luCost) + '</button>'
-      + '<button class="btn" data-promote="' + id + '"' + (maxStar || (M.shards[id] || 0) < pr.shards || M.currencies.mats < pr.mats ? ' disabled' : '') + '>' + (maxStar ? '성급 최대' : '승급 🔷' + pr.shards + ' 🔩' + pr.mats) + '</button>'
-      + '<button class="btn ' + (inParty(id) ? '' : 'primary') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : '편성') + '</button>'
+    const cl = CLASS[b.cls] || { icon: '', name: '', color: 'var(--cyan)' };
+    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += (s <= o.star ? '★' : '☆');
+    // 성장 탭 내용
+    let growth = '';
+    if (cdTab === 'lvup') {
+      const cost = GROWTH.levelUpCost(o.level), can = !maxLv && M.currencies.gold >= cost;
+      growth = '<div class="cd-grow-row"><span>Lv.' + o.level + ' → ' + (maxLv ? '최대' : o.level + 1) + '</span><span class="muted">보유 🪙' + M.currencies.gold + '</span></div>'
+        + '<button class="sns-btn full" data-lvup="' + id + '"' + (can ? '' : ' disabled') + '>' + (maxLv ? '레벨 최대' : '레벨업 · 🪙' + cost) + '</button>';
+    } else {
+      const pr = GROWTH.promoteCost(o.star), can = !maxStar && (M.shards[id] || 0) >= pr.shards && M.currencies.mats >= pr.mats;
+      growth = '<div class="cd-grow-row"><span>★' + o.star + ' → ' + (maxStar ? '최대' : '★' + (o.star + 1)) + '</span><span class="muted">보유 🔷' + (M.shards[id] || 0) + ' 🔩' + M.currencies.mats + '</span></div>'
+        + '<button class="sns-btn full" data-promote="' + id + '"' + (can ? '' : ' disabled') + '>' + (maxStar ? '성급 최대' : '승급 · 🔷' + pr.shards + ' 🔩' + pr.mats) + '</button>';
+    }
+    box.innerHTML =
+      '<div class="cd-head"><button class="cd-nav" data-cnav="-1">‹</button>'
+      + '<div class="cd-title"><b>' + b.name + '</b> ' + rarTag(b.rarity) + '<div class="cd-stars">' + stars + '</div></div>'
+      + '<button class="cd-nav" data-cnav="1">›</button></div>'
+      + '<div class="cd-body">'
+      + '<div class="cd-portrait" style="border-color:' + R.color + '"><span class="cd-ph">' + (cl.icon || '🔫') + '</span><img class="cd-pimg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'"></div>'
+      + '<div class="cd-info">'
+      + '<div class="cd-cls" style="color:' + cl.color + '">' + cl.icon + ' ' + cl.name + '</div>'
+      + '<div class="cd-wpn">🔫 ' + (b.weapon || '') + '</div>'
+      + '<div class="cd-lv">Lv.<b>' + o.level + '</b>/' + cap + '</div>'
+      + '<div class="cd-statgrid"><span>⚔ <b>' + c.atk + '</b></span><span>🛡 <b>' + c.hp + '</b></span><span>🎯 <b>' + c.gol + '</b></span></div>'
+      + '</div></div>'
+      + (b.concept ? '<p class="cd-concept">' + b.concept + '</p>' : '')
+      + '<div class="cd-skills">'
+      + '<div class="cd-skill"><div class="cd-sk-h"><b>' + b.active.name + '</b><span class="cd-sk-tag">액티브 · 게이지 ' + b.active.gauge + '</span></div><div class="cd-sk-d">' + skillText(b.active) + '</div></div>'
+      + '<div class="cd-skill"><div class="cd-sk-h"><b>' + b.passive.name + '</b><span class="cd-sk-tag pas">패시브</span></div><div class="cd-sk-d">' + skillText(b.passive) + '</div></div>'
       + '</div>'
-      + '<button class="btn cd-close" data-close="1">닫기</button>';
+      + '<div class="sns-tabs cd-gtabs"><button class="sns-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">레벨업</button><button class="sns-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">승급</button></div>'
+      + '<div class="cd-growth">' + growth + '</div>'
+      + '<div class="cd-actions"><button class="sns-btn ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : '편성') + '</button><button class="sns-btn sub" data-close="1">닫기</button></div>';
     $('char-modal').hidden = false;
   }
 
@@ -414,9 +453,12 @@ const Meta = (function () {
     // 캐릭터 모달
     $('char-modal').onclick = (e) => {
       if (e.target.dataset.close || e.target === $('char-modal')) { $('char-modal').hidden = true; return; }
+      const gt = e.target.closest('[data-cdtab]'), nv = e.target.closest('[data-cnav]');
       const lv = e.target.closest('[data-lvup]'), pr = e.target.closest('[data-promote]'), pt = e.target.closest('[data-party]');
-      if (lv) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderBar(); }
-      else if (pr) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderBar(); }
+      if (gt) { cdTab = gt.dataset.cdtab; openChar(cdId); }
+      else if (nv && !nv.disabled) { cycleChar(+nv.dataset.cnav); }
+      else if (lv && !lv.disabled) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderBar(); if (typeof Sound !== 'undefined') Sound.play('level'); }
+      else if (pr && !pr.disabled) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderBar(); if (typeof Sound !== 'undefined') Sound.play('level'); }
       else if (pt) { toggleParty(pt.dataset.party); openChar(pt.dataset.party); }
     };
     $('gacha-modal').onclick = (e) => { if (e.target.dataset.close || e.target === $('gacha-modal')) $('gacha-modal').hidden = true; };
