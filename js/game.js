@@ -23,7 +23,8 @@
 
   // ── 전역 상태 ──
   let S = null;          // 런/전투 상태
-  let anim = { floats: [], flashes: [], shots: [] };
+  let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null };
+  const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
   let lastTs = 0;
 
@@ -113,7 +114,7 @@
     S.chars = [];
     S.party.forEach((id, lane) => { if (id) S.chars.push({ ref: Meta.leveledDef(id), lane, ammo: 0, gauge: 0, armed: false }); });
     S.passiveBalls = 0;
-    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = [];
+    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null;
     buildBoard();
     // 패시브(보드 효과) 적용 — 페그 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
     { const _r = Math.random; Math.random = makeRng((S.stage || 1) * 100003 + (S.combatIndex + 1) * 619 + 31);
@@ -286,6 +287,7 @@
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = [];
     $('c-phase').textContent = '장전';
+    const side = $('battle-side'); if (side) side.style.display = '';   // 장전 중 사이드바 표시
     renderSkills(); syncAutoBtns();
   }
 
@@ -485,13 +487,15 @@
     S.phase = 'battle';
     S.layoutTarget = 1;                             // 전투 화면으로 부드럽게 확장(핀볼 페이드아웃)
     $('c-phase').textContent = '전투';
+    const side = $('battle-side'); if (side) side.style.display = 'none';   // 전투 중 사이드바 숨김
+    anim.skillCuts = []; anim.cut = null;
     // 액티브 스킬 발동(자동 또는 armed) 결정 → 샷 큐 구성
     S.shotQueue = [];
     for (const c of S.chars) {
       const sk = c.ref.active;
       const eligible = c.gauge >= sk.gauge;
       const use = eligible && (S.autoSkill || c.armed);
-      if (use) { applyActive(c, sk); c.gauge = 0; }
+      if (use) { anim.skillCuts.push({ id: c.ref.id, name: c.ref.name, skill: sk.name, color: (CLASS[c.ref.cls] || {}).color || '#ffcf5c' }); applyActive(c, sk); c.gauge = 0; }
       c.armed = false;
       // 일반 공격: 탄환 수만큼
       for (let k = 0; k < c.ammo; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) });
@@ -522,9 +526,13 @@
 
   function stepBattle(dt) {
     if (S.battleStage === 'done') return;   // 전투 종료(보상 대기/전진 처리 중)엔 정지 → 보상 선택지 재추첨 방지
+    // 스킬 컷인 연출 진행(큐에서 하나씩) — 루프·헤드리스 sim 공통
+    if (!anim.cut && anim.skillCuts.length) { anim.cut = anim.skillCuts.shift(); anim.cut.t = 0; if (typeof Sound !== 'undefined') Sound.play('level'); }
+    if (anim.cut) { anim.cut.t += dt; if (anim.cut.t >= CUT_DUR) anim.cut = null; }
     S.battleTimer += dt * 1000;
     // 도입: 필드가 커진 걸 잠깐 보여준 뒤 공격 시작
     if (S.battleStage === 'intro') {
+      if (anim.cut || anim.skillCuts.length) return;       // 스킬 컷인 연출 중엔 대기
       if (S.battleTimer < CFG.battleStartDelay) return;
       S.battleTimer = 0; S.battleStage = 'shooting'; return;
     }
@@ -953,6 +961,25 @@
       ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30, W, 2); ctx.fillRect(0, cy + 28, W, 2);
       ctx.fillStyle = '#ffcf5c'; ctx.textAlign = 'center'; ctx.font = 'bold 34px system-ui';
       ctx.fillText('전투!', W / 2, cy + 12);
+      ctx.restore();
+    }
+    // 스킬 발동 컷인 연출
+    if (anim.cut) {
+      const c = anim.cut, tt = Math.min(1, c.t / CUT_DUR);
+      const a = tt < 0.15 ? tt / 0.15 : tt > 0.82 ? Math.max(0, (1 - tt) / 0.18) : 1;   // 페이드 인/아웃
+      const bandH = H * 0.30, bandY = H * 0.34;
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.fillStyle = '#0b0812f0'; ctx.fillRect(0, bandY, W, bandH);
+      ctx.fillStyle = c.color; ctx.globalAlpha = a * 0.22; ctx.fillRect(0, bandY, W, bandH); ctx.globalAlpha = a;
+      ctx.fillStyle = c.color; ctx.fillRect(0, bandY, W, 4); ctx.fillRect(0, bandY + bandH - 4, W, 4);
+      const cg = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.id, 'cg') : null;   // CG 좌측 슬라이드 인
+      const slide = Math.min(1, tt / 0.32);
+      if (cg) { const ih = bandH * 1.35, iw = ih * (832 / 1216), ix = -iw * 0.35 + slide * (iw * 0.35 + W * 0.04); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(cg, ix, bandY + bandH - ih, iw, ih); }
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(H * 0.055) + 'px system-ui';
+      ctx.fillText(c.skill, W - 22 - slide * 0 - (1 - slide) * -20, bandY + bandH * 0.46);
+      ctx.fillStyle = c.color; ctx.font = 'bold ' + Math.round(H * 0.03) + 'px system-ui';
+      ctx.fillText(c.name, W - 22, bandY + bandH * 0.72);
       ctx.restore();
     }
   }
