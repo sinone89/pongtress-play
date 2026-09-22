@@ -37,6 +37,7 @@
   // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
   const LOAD_FRAC = { field: .15, wall: .13, goal: .09, pins: .63 };
   const BATTLE_FRAC = { field: .72, wall: .24, goal: .02, pins: .02 };
+  const SIDE_FR = 0.24;   // 우측 스킬 사이드바 폭(보드/포켓 영역 기준)
   const lerp = (a, b, t) => a + (b - a) * t;
   function layout() {
     const t = S ? (S.layoutT || 0) : 0;
@@ -47,10 +48,11 @@
       pins: lerp(LOAD_FRAC.pins, BATTLE_FRAC.pins, t)
     };
     let y = 0; const r = {};
-    r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;
-    r.wall = { x: 0, y, w: W, h: H * f.wall }; y += r.wall.h;
-    r.goal = { x: 0, y, w: W, h: H * f.goal }; y += r.goal.h;
-    r.pins = { x: 0, y, w: W, h: H * f.pins };
+    const boardW = W * (1 - SIDE_FR);   // 포켓·핀볼판은 우측 사이드바 폭만큼 좁힘(스킬 버튼 공간)
+    r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;   // 적 필드는 풀폭
+    r.wall = { x: 0, y, w: boardW, h: H * f.wall }; y += r.wall.h;  // 캐릭터·성벽은 보드 폭(포켓과 정렬, 사이드바와 안 겹침)
+    r.goal = { x: 0, y, w: boardW, h: H * f.goal }; y += r.goal.h;
+    r.pins = { x: 0, y, w: boardW, h: H * f.pins };
     return r;
   }
   // 발사대 위치(핀볼 영역 하단 중앙, 바닥에서 살짝 띄워 바닥 뱅크샷 여지를 둠)
@@ -762,8 +764,8 @@
       const fire = c.fireT || 0;
       const x = wr.x + (c.lane + 0.5) * cw;
       const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
-      if (spr) {                                        // 캐릭터 스프라이트 — 크게, 발치를 성벽 하단에 정렬(위로 확장)
-        const sh = Math.min(cw * 1.7, wr.h * 3.2), sw = sh;
+      if (spr) {                                        // 캐릭터 스프라이트 — 발치를 성벽 하단에 정렬(위로 확장). 크기 ~70%
+        const sh = Math.min(cw * 1.15, wr.h * 2.3), sw = sh;
         const feetY = wr.y + wr.h * 0.98 - fire * 4;
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(spr, x - sw / 2, feetY - sh, sw, sh);

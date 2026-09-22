@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=091">
+  <link rel="stylesheet" href="css/game.css?v=093">
 </head>
 <body>
   <div id="app">
@@ -97,14 +97,16 @@
         <div id="exp-bar"><div id="exp-fill"></div></div>
       </header>
       <div id="battle-main">
-        <div id="stage-wrap"><canvas id="stage"></canvas></div>
-        <aside id="battle-side">
-          <div class="side-toggles">
-            <button id="auto-skill-btn" class="side-tgl"><b>스킬</b>자동 OFF</button>
-            <button id="btn-auto" class="side-tgl"><b>전투</b>자동 OFF</button>
-          </div>
-          <div id="skill-col"></div>
-        </aside>
+        <div id="stage-wrap">
+          <canvas id="stage"></canvas>
+          <aside id="battle-side">
+            <div class="side-toggles">
+              <button id="auto-skill-btn" class="side-tgl"><b>스킬</b>자동 OFF</button>
+              <button id="btn-auto" class="side-tgl"><b>전투</b>자동 OFF</button>
+            </div>
+            <div id="skill-col"></div>
+          </aside>
+        </div>
       </div>
       <footer id="combat-dock">
         <span id="aim-hint" class="aim-hint">핀볼판을 드래그해 조준 · 떼면 발사</span>
@@ -134,9 +136,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=091"></script>
-  <script src="js/content.js?v=091"></script>
-  <script src="js/meta.js?v=091"></script>
-  <script src="js/game.js?v=091"></script>
+  <script src="js/audio.js?v=093"></script>
+  <script src="js/content.js?v=093"></script>
+  <script src="js/meta.js?v=093"></script>
+  <script src="js/game.js?v=093"></script>
 </body>
 </html>
