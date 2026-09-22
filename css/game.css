@@ -243,20 +243,34 @@ body {
 .c-level { color: var(--cyan); font-weight: 800; font-size: 17px; }
 #exp-bar { grid-column: 1 / -1; height: 10px; background: #ffffff14; border-radius: 999px; overflow: hidden; }
 #exp-fill { height: 100%; width: 0%; background: linear-gradient(90deg, var(--cyan), #6cf); transition: width .15s; }
-#stage-wrap { position: relative; flex: 1; min-height: 0; }
+/* 전투 본체: 페그판(좌) + 스킬 사이드바(우) */
+#battle-main { flex: 1; display: flex; min-height: 0; }
+#stage-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; }
 #stage { display: block; width: 100%; height: 100%; touch-action: none; }
-
-#combat-dock { padding: 10px 12px max(10px, env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; }
-#skill-row { display: flex; gap: 10px; justify-content: center; min-height: 0; flex-wrap: wrap; }
-.skillbtn { appearance: none; border: 1px solid #ffffff22; background: #ffffff12; color: var(--ink);
-  border-radius: 12px; padding: 10px 14px; font: inherit; font-size: 14px; font-weight: 700; cursor: pointer; }
-.skillbtn.ready { color: var(--ink); border-color: var(--amber); box-shadow: 0 0 12px #ffcf5c55; background: #ffcf5c1a; }
+#battle-side { flex: 0 0 24%; max-width: 116px; display: flex; flex-direction: column; gap: 6px; padding: 6px 6px 6px 4px; }
+.side-toggles { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
+.side-tgl { appearance: none; border: 1px solid #ffffff22; background: #ffffff10; color: var(--muted); font: inherit; font-weight: 800; font-size: 11px; border-radius: 10px; padding: 6px 2px; cursor: pointer; line-height: 1.3; text-align: center; }
+.side-tgl b { display: block; font-size: 12px; color: var(--ink); margin-bottom: 1px; }
+#auto-skill-btn.on { border-color: var(--ok); background: #7fe0a022; color: var(--ok); }
+#auto-skill-btn.on b { color: var(--ok); }
+#btn-auto.on { border-color: var(--amber); background: #ffcf5c22; color: var(--amber); }
+#btn-auto.on b { color: var(--amber); }
+#skill-col { flex: 1; display: flex; flex-direction: column; gap: 6px; min-height: 0; }
+.skillbtn { appearance: none; border: 1px solid #ffffff22; background: #ffffff10; color: var(--ink); cursor: pointer;
+  flex: 1; min-height: 0; border-radius: 12px; padding: 4px 3px; font: inherit;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-align: center; }
+.skillbtn .sb-nm { font-weight: 800; font-size: 12px; }
+.skillbtn .sb-sk { font-size: 11px; line-height: 1.15; }
+.skillbtn .sb-g { font-size: 10px; color: var(--muted); }
+.skillbtn.ready { border-color: var(--amber); box-shadow: 0 0 12px #ffcf5c55; background: #ffcf5c1a; }
 .skillbtn.armed { background: var(--amber); color: #3a2a05; }
-#control-row { display: flex; gap: 12px; align-items: center; }
-.aim-hint { flex: 1; font-size: 13px; color: var(--muted); }
-.ctl { appearance: none; border: 0; font: inherit; font-weight: 800; font-size: 15px; border-radius: 14px; padding: 13px 20px; cursor: pointer;
+.skillbtn.armed .sb-g, .skillbtn.armed .sb-sk { color: #3a2a05; }
+.skillbtn.empty { border-style: dashed; color: var(--muted); opacity: .45; font-size: 11px; }
+
+#combat-dock { padding: 8px 12px max(8px, env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center; }
+.aim-hint { flex: 1; font-size: 12px; color: var(--muted); }
+.ctl { appearance: none; border: 0; font: inherit; font-weight: 800; font-size: 15px; border-radius: 14px; padding: 11px 16px; cursor: pointer;
   background: #ffffff16; color: var(--ink); }
-#btn-auto.on { background: var(--cyan); color: #062a26; }
 
 /* 모달 */
 .modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; padding: 24px;

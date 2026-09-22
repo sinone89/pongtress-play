@@ -280,8 +280,18 @@ function openBlankTemp(S) {
   if (cand.length) cand[0].type = 'charge';
 }
 function addPegToBoard(S, type, n) {
+  // 기존 살아있는 페그와 최소 간격 확보(겹침 방지). 후보를 여러 번 뽑아 가장 먼 자리를 채택.
+  const gap = (CFG.pegMinGap || 0.06), g2 = gap * gap, asp = 1.4;
   for (let i = 0; i < n; i++) {
-    S.pegs.push(makePeg(0.12 + Math.random() * 0.76, 0.15 + Math.random() * 0.6, type));
+    let best = null, bestD = -1;
+    for (let t = 0; t < 28; t++) {
+      const fx = 0.10 + Math.random() * 0.80, fy = 0.08 + Math.random() * 0.56;
+      let md = 9;
+      for (const p of S.pegs) { if (!p.alive) continue; const dx = fx - p.fx, dy = (fy - p.fy) * asp; const d = dx * dx + dy * dy; if (d < md) md = d; }
+      if (md > bestD) { bestD = md; best = { fx, fy }; }
+      if (md > g2 * 2.2) break;               // 충분히 떨어진 자리면 즉시 채택
+    }
+    S.pegs.push(makePeg(best.fx, best.fy, type));
   }
 }
 

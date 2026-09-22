@@ -81,7 +81,7 @@
       // 아래는 전투마다 초기화
       phase: 'load', layoutT: 0, layoutTarget: 0, chars: [], pegs: [], pockets: [], balls: [],
       enemies: [], waves: [], waveIdx: 0, launchesLeft: 0, passiveBalls: 0,
-      shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false,
+      shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false, autoLoad: false,
       combat: null, over: false
     };
     show('combat'); resize();
@@ -238,6 +238,8 @@
     }
     S._layoutName = key;
     let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
+    // 페그를 상단 ~72%로 압축 → 하단에 발사 부채꼴 공간 확보(발사대와 밀착 방지)
+    for (const p of pts) p.fy = 0.05 + p.fy * 0.74;
     return dedupePts(pts, asp, CFG.pegMinGap);
   }
 
@@ -280,7 +282,7 @@
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = [];
     $('c-phase').textContent = '장전';
-    renderSkills();
+    renderSkills(); syncAutoBtns();
   }
 
   // 조준 방향: 위/아래 모두 허용(아래로 쏘면 바닥 벽에 튕겨 위로 감 = 뱅크샷). 거의 수평이면 최소 기울기만 준다.
@@ -336,6 +338,11 @@
   }
 
   function stepBalls(dt) {
+    // 자동 전투: 장전 페이즈를 자동 진행(볼이 없을 때 잠깐 뒤 자동 발사)
+    if (S.autoLoad && S.phase === 'load' && S.launchesLeft > 0 && S.balls.length === 0 && S.layoutT < 0.05) {
+      S._autoT = (S._autoT || 0) + dt;
+      if (S._autoT > 0.45) { S._autoT = 0; launchBall(); }
+    } else S._autoT = 0;
     const r = layout().pins; const topY = r.y, botY = r.y + r.h;
     const pegR = CFG.pegRadius;
     for (let i = S.balls.length - 1; i >= 0; i--) {
@@ -496,8 +503,9 @@
     let beam = null;
     for (const t of targets) { const p = enemyPos(t); if (!beam) beam = p; hitEnemy(t, shot); }
     if (beam) {
-      const from = c ? charPos(c) : { x: beam.x, y: layout().wall.y + layout().wall.h };
-      anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: shot.big ? '#ffcf5c' : '#bff0ff', big: shot.big });
+      const from = c ? muzzlePos(c) : { x: beam.x, y: layout().wall.y + layout().wall.h };
+      const col = (c && CLASS[c.ref.cls]) ? CLASS[c.ref.cls].color : (shot.big ? '#ffcf5c' : '#bff0ff');
+      anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: col, big: shot.big, flash: true });
     }
     if (c) c.fireT = 1;
     Sound.play('shot');
@@ -668,6 +676,11 @@
     const r = layout().wall; const laneW = r.w / CFG.lanes;
     return { x: r.x + (c.lane + 0.5) * laneW, y: r.y + r.h / 2 - 4 };
   }
+  // 캐논 총구 위치(스프라이트 상단·전방) — 빔 발사 시작점
+  function muzzlePos(c) {
+    const r = layout().wall, laneW = r.w / CFG.lanes;
+    return { x: r.x + (c.lane + 0.5) * laneW + laneW * 0.18, y: r.y + r.h * 0.18 };
+  }
 
   // ── 페그 모양 그리기 ──
   function polyPath(cx, cy, rad, n, rot) {
@@ -747,22 +760,22 @@
     const sprState = (S.phase === 'load') ? 'load' : 'fire';
     for (const c of S.chars) {
       const fire = c.fireT || 0;
-      const x = wr.x + (c.lane + 0.5) * cw, y = wr.y + wr.h * 0.34 - fire * 4;
-      if (fire > 0) { ctx.save(); ctx.globalAlpha = fire * 0.6; ctx.fillStyle = laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad + fire * 10, 0, 7); ctx.fill(); ctx.restore(); }
+      const x = wr.x + (c.lane + 0.5) * cw;
       const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
-      if (spr) {                                        // 캐릭터 스프라이트(장전/사격) — 있으면 원형 대체. 고해상 원본을 부드럽게 축소
-        const sh = Math.min(cw * 1.25, wr.h * 0.95), sw = sh;
+      if (spr) {                                        // 캐릭터 스프라이트 — 크게, 발치를 성벽 하단에 정렬(위로 확장)
+        const sh = Math.min(cw * 1.7, wr.h * 3.2), sw = sh;
+        const feetY = wr.y + wr.h * 0.98 - fire * 4;
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(spr, x - sw / 2, y - sh * 0.58, sw, sh);
-      } else {                                          // 폴백: 기존 원형
+        ctx.drawImage(spr, x - sw / 2, feetY - sh, sw, sh);
+      } else {                                          // 폴백: 원형(뒤 글로우 제거)
+        const y = wr.y + wr.h * 0.5;
         ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
       }
-      if (showChar) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + cFont + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(c.ref.name, x, y + crad + cFont + 1); }
-      if (S.phase === 'load' && c.ammo > 0) {           // 장전 탄수 배지(스프라이트면 상단, 아니면 중앙)
-        const bx = x, by = spr ? (y - crad * 1.2) : y;
-        if (spr) { ctx.fillStyle = '#1a1020cc'; ctx.beginPath(); ctx.arc(bx, by, crad * 0.72, 0, 7); ctx.fill(); ctx.fillStyle = '#ffcf5c'; }
-        else ctx.fillStyle = '#1a1020';
-        ctx.font = 'bold ' + Math.round(crad * (spr ? 0.8 : 1.0)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(c.ammo, bx, by + 1); ctx.textBaseline = 'alphabetic';
+      if (showChar) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + cFont + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(c.ref.name, x, wr.y + wr.h * 0.98 + cFont + 1); }
+      if (S.phase === 'load' && c.ammo > 0) {           // 장전 탄수 = 좌상단 작은 알약(얼굴 안 가림)
+        const bw = Math.max(20, crad * 1.5), bh = Math.max(15, crad * 0.95), bx = x - cw / 2 + 3, by = wr.y + 3;
+        ctx.fillStyle = '#1a1020dd'; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
+        ctx.fillStyle = '#ffcf5c'; ctx.font = 'bold ' + Math.round(bh * 0.72) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×' + c.ammo, bx + bw / 2, by + bh / 2 + 1); ctx.textBaseline = 'alphabetic';
       }
     }
     // 성벽 HP 바(두껍게 + 큰 글자)
@@ -849,6 +862,10 @@
       ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(cx, cy); ctx.stroke();
       ctx.globalAlpha = Math.min(1, (1.15 - s.t) / 0.4);
       ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(cx, cy, s.big ? 6 : 4, 0, 7); ctx.fill();
+      if (s.flash && s.t < 0.4) {                     // 총구 발사 플래시
+        ctx.globalAlpha = (0.4 - s.t) / 0.4; ctx.fillStyle = '#fff';
+        ctx.beginPath(); ctx.arc(s.sx, s.sy, (s.big ? 10 : 7) * (1 - s.t), 0, 7); ctx.fill();
+      }
       ctx.restore();
     }
     // 전투 시작 배너(가로 띠 + 글자)
@@ -888,15 +905,22 @@
     $('exp-fill').style.width = (100 * S.exp / S.expNext) + '%';
   }
   function renderSkills() {
-    const row = $('skill-row'); row.replaceChildren();
-    for (const c of S.chars) {
-      const sk = c.ref.active; const ready = c.gauge >= sk.gauge;
+    const col = $('skill-col'); if (!col) return; col.replaceChildren();
+    for (let lane = 0; lane < CFG.lanes; lane++) {
+      const c = S.chars.find(ch => ch.lane === lane);
       const b = document.createElement('button');
+      if (!c) { b.className = 'skillbtn empty'; b.disabled = true; b.textContent = '빈 슬롯'; col.append(b); continue; }
+      const sk = c.ref.active, ready = c.gauge >= sk.gauge;
       b.className = 'skillbtn' + (ready ? ' ready' : '') + (c.armed ? ' armed' : '');
-      b.textContent = c.ref.name + ' ' + sk.name + ' ' + Math.min(c.gauge, sk.gauge) + '/' + sk.gauge;
+      b.innerHTML = '<span class="sb-nm">' + c.ref.name + '</span><span class="sb-sk">' + sk.name + '</span><span class="sb-g">' + Math.min(c.gauge, sk.gauge) + '/' + sk.gauge + '</span>';
       b.onclick = () => { if (c.gauge >= sk.gauge) { c.armed = !c.armed; renderSkills(); } };
-      row.append(b);
+      col.append(b);
     }
+  }
+  function syncAutoBtns() {
+    const a = $('auto-skill-btn'), l = $('btn-auto');
+    if (a) { const on = !!(S && S.autoSkill); a.classList.toggle('on', on); a.innerHTML = '<b>스킬</b>자동 ' + (on ? 'ON' : 'OFF'); }
+    if (l) { const on = !!(S && S.autoLoad); l.classList.toggle('on', on); l.innerHTML = '<b>전투</b>자동 ' + (on ? 'ON' : 'OFF'); }
   }
 
   // ============ 입력 ============
@@ -918,7 +942,8 @@
   $('title').onclick = enterLobby;        // 타이틀 아무 곳이나 탭 → 시작
   $('btn-start').onclick = (e) => { e.stopPropagation(); enterLobby(); };
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
-  $('btn-auto').onclick = () => { S.autoSkill = !S.autoSkill; $('btn-auto').textContent = '자동 ' + (S.autoSkill ? 'ON' : 'OFF'); $('btn-auto').classList.toggle('on', S.autoSkill); };
+  $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
+  $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
   canvas.addEventListener('pointerdown', aimDown);
   canvas.addEventListener('pointermove', aimMove);
   canvas.addEventListener('pointerup', aimUp);
