@@ -49,9 +49,9 @@
     };
     let y = 0; const r = {};
     const boardW = W * (1 - SIDE_FR);   // 포켓·핀볼판은 우측 사이드바 폭만큼 좁힘(스킬 버튼 공간)
-    r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;   // 적 필드는 풀폭
-    r.wall = { x: 0, y, w: boardW, h: H * f.wall }; y += r.wall.h;  // 캐릭터·성벽은 보드 폭(포켓과 정렬, 사이드바와 안 겹침)
-    r.goal = { x: 0, y, w: boardW, h: H * f.goal }; y += r.goal.h;
+    r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;   // 적 필드=풀폭
+    r.wall = { x: 0, y, w: W, h: H * f.wall }; y += r.wall.h;      // 캐릭터·성벽=풀폭(우측 빈공간 없음)
+    r.goal = { x: 0, y, w: boardW, h: H * f.goal }; y += r.goal.h;  // 포켓=보드폭(우측=자동버튼)
     r.pins = { x: 0, y, w: boardW, h: H * f.pins };
     return r;
   }
@@ -810,8 +810,8 @@
       const fire = c.fireT || 0;
       const x = wr.x + (c.lane + 0.5) * cw;
       const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
-      if (spr) {                                        // 캐릭터 스프라이트 — 발치를 성벽 하단에 정렬(위로 확장). 크기 ~70%
-        const sh = Math.min(cw * 1.15, wr.h * 2.3), sw = sh;
+      if (spr) {                                        // 캐릭터 스프라이트 — 발치를 성벽 하단에 정렬(위로 확장). 풀폭 레인에 맞춰 셀 내 배치
+        const sh = Math.min(cw * 0.92, wr.h * 2.3), sw = sh;
         const feetY = wr.y + wr.h * 0.98 - fire * 4;
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(spr, x - sw / 2, feetY - sh, sw, sh);
