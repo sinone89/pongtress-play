@@ -23,7 +23,7 @@
 
   // ── 전역 상태 ──
   let S = null;          // 런/전투 상태
-  let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null };
+  let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null, fx: [], shake: 0 };
   const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
   let lastTs = 0;
@@ -114,7 +114,7 @@
     S.chars = [];
     S.party.forEach((id, lane) => { if (id) S.chars.push({ ref: Meta.leveledDef(id), lane, ammo: 0, gauge: 0, armed: false }); });
     S.passiveBalls = 0;
-    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null;
+    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null; anim.fx = []; anim.shake = 0;
     buildBoard();
     // 패시브(보드 효과) 적용 — 페그 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
     { const _r = Math.random; Math.random = makeRng((S.stage || 1) * 100003 + (S.combatIndex + 1) * 619 + 31);
@@ -511,11 +511,19 @@
   }
 
   function applyActive(c, sk) {
-    if (sk.kind === 'bigHit') S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) * sk.mult, big: true });
-    else if (sk.kind === 'extraShots') { for (let k = 0; k < sk.shots; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) }); }
-    else if (sk.kind === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + sk.amount); anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + sk.amount, color: '#6cf', t: 1.2 }); }
-    else if (sk.kind === 'aoe') { for (let k = 0; k < (sk.shots || 3); k++) S.shotQueue.push({ lane: c.lane, dmg: Math.round(charDmg(c) * (sk.mult || 1.3)), aoe: sk.count || 4, big: true }); }   // 광역: 앞 N명 동시 타격
-    else if (sk.kind === 'stun') { frontmostN(sk.count || 3).forEach(e => { e.stun = (e.stun || 0) + (sk.turns || 1); anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 16, text: '기절', color: '#8cf', t: 1.1 }); }); }   // 앞 N명 기절(전진 스킵)
+    if (sk.kind === 'bigHit') S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) * sk.mult, big: true, fx: 'bigHit' });
+    else if (sk.kind === 'extraShots') { for (let k = 0; k < sk.shots; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c), fx: 'rapid' }); }
+    else if (sk.kind === 'heal') {
+      S.wallHp = Math.min(S.wallHpMax, S.wallHp + sk.amount);
+      const wr = layout().wall; anim.fx.push({ type: 'heal', x: wr.x + wr.w / 2, y: wr.y + wr.h * 0.6, w: wr.w, t: 1, color: '#6cf' });
+      anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + sk.amount, color: '#6cf', t: 1.2, big: true });
+      Sound.play('charge');
+    }
+    else if (sk.kind === 'aoe') { for (let k = 0; k < (sk.shots || 3); k++) S.shotQueue.push({ lane: c.lane, dmg: Math.round(charDmg(c) * (sk.mult || 1.3)), aoe: sk.count || 4, big: true, fx: 'aoe' }); }   // 광역: 앞 N명 동시 타격
+    else if (sk.kind === 'stun') {
+      frontmostN(sk.count || 3).forEach(e => { e.stun = (e.stun || 0) + (sk.turns || 1); const p = enemyPos(e); anim.fx.push({ type: 'shock', x: p.x, y: p.y, t: 1 }); anim.floats.push({ x: p.x, y: p.y - 16, text: '기절', color: '#8cf', t: 1.1 }); });
+      anim.shake = Math.max(anim.shake, 5); Sound.play('wall');
+    }
   }
 
   function frontmostEnemy() {
@@ -529,6 +537,8 @@
     // 스킬 컷인 연출 진행(큐에서 하나씩) — 루프·헤드리스 sim 공통
     if (!anim.cut && anim.skillCuts.length) { anim.cut = anim.skillCuts.shift(); anim.cut.t = 0; if (typeof Sound !== 'undefined') Sound.play('level'); }
     if (anim.cut) { anim.cut.t += dt; if (anim.cut.t >= CUT_DUR) anim.cut = null; }
+    for (let i = anim.fx.length - 1; i >= 0; i--) { anim.fx[i].t -= dt * 2.2; if (anim.fx[i].t <= 0) anim.fx.splice(i, 1); }
+    if (anim.shake > 0) anim.shake = Math.max(0, anim.shake - dt * 40);
     S.battleTimer += dt * 1000;
     // 도입: 필드가 커진 걸 잠깐 보여준 뒤 공격 시작
     if (S.battleStage === 'intro') {
@@ -556,12 +566,18 @@
   function fireShot(shot, e) {
     const c = S.chars.find(ch => ch.lane === shot.lane);
     const targets = shot.aoe ? frontmostN(shot.aoe) : [e];
-    let beam = null;
-    for (const t of targets) { const p = enemyPos(t); if (!beam) beam = p; hitEnemy(t, shot); }
+    let beam = null, cx = 0, cy = 0;
+    for (const t of targets) { const p = enemyPos(t); if (!beam) beam = p; cx += p.x; cy += p.y; hitEnemy(t, shot); }
+    cx /= targets.length; cy /= targets.length;
     if (beam) {
       const from = c ? muzzlePos(c) : { x: beam.x, y: layout().wall.y + layout().wall.h };
-      const col = (c && CLASS[c.ref.cls]) ? CLASS[c.ref.cls].color : (shot.big ? '#ffcf5c' : '#bff0ff');
-      anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: col, big: shot.big, flash: true });
+      // 스킬 종류별 빔 색/굵기
+      let col = (c && CLASS[c.ref.cls]) ? CLASS[c.ref.cls].color : (shot.big ? '#ffcf5c' : '#bff0ff');
+      if (shot.fx === 'bigHit') col = '#ff8a3a';
+      else if (shot.fx === 'aoe') col = '#ffb057';
+      else if (shot.fx === 'rapid') col = '#bff0ff';
+      anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: col, big: shot.big || shot.fx === 'bigHit', flash: true, thick: shot.fx === 'bigHit' ? 3 : 1 });
+      if (shot.fx === 'aoe') anim.fx.push({ type: 'ring', x: cx, y: cy, t: 1, r: layout().field.w / CFG.fieldLanes * 1.6, color: '#ffb057' });   // 광역 충격링
     }
     if (c) c.fireT = 1;
     Sound.play('shot');
@@ -577,7 +593,11 @@
     const pos = enemyPos(e);
     e.hitT = 1;
     anim.floats.push({ x: pos.x, y: pos.y, text: String(Math.round(dmg)), color: shot.big ? '#ffcf5c' : '#fff', t: .9, big: shot.big });
-    anim.flashes.push({ x: pos.x, y: pos.y, t: 1, big: true });
+    // 스킬 종류별 임팩트
+    if (shot.fx === 'bigHit') { anim.fx.push({ type: 'boom', x: pos.x, y: pos.y, t: 1, color: '#ff8a3a' }); anim.shake = Math.max(anim.shake, 9); }
+    else if (shot.fx === 'aoe') { anim.fx.push({ type: 'boom', x: pos.x, y: pos.y, t: 1, color: '#ffb057', sm: true }); anim.shake = Math.max(anim.shake, 4); }
+    else if (shot.fx === 'rapid') { anim.fx.push({ type: 'spark', x: pos.x, y: pos.y, t: 1, color: '#bff0ff' }); }
+    else anim.flashes.push({ x: pos.x, y: pos.y, t: 1, big: true });
     if (e.hp <= 0) killEnemy(e);
   }
 
@@ -775,6 +795,8 @@
 
   function draw() {
     ctx.clearRect(0, 0, W, H);
+    const shk = anim.shake > 0.3;
+    if (shk) { ctx.save(); ctx.translate((Math.random() - 0.5) * anim.shake, (Math.random() - 0.5) * anim.shake); }
     const r = layout();
     const fr = r.field, cellW = fr.w / CFG.fieldLanes, cellH = fr.h / CFG.fieldRows;
     // 필드 배경
@@ -935,6 +957,28 @@
       ctx.globalAlpha = fl.t * 0.5; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(fl.x, fl.y, (fl.big ? 16 : 10) * (1.4 - fl.t), 0, 7); ctx.stroke(); ctx.globalAlpha = 1;
     }
+    // 스킬 임팩트 이펙트(종류별)
+    for (const f of anim.fx) {
+      const t = Math.max(0, Math.min(1, f.t));
+      if (f.type === 'boom') {
+        const R0 = f.sm ? 26 : 44;
+        ctx.globalAlpha = t * 0.55; ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (1.3 - t), 0, 7); ctx.fill();
+        ctx.globalAlpha = t; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (1.7 - t * 1.3), 0, 7); ctx.stroke();
+      } else if (f.type === 'ring') {
+        ctx.globalAlpha = t * 0.85; ctx.strokeStyle = f.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, (f.r || 60) * (1.35 - t), 0, 7); ctx.stroke();
+      } else if (f.type === 'shock') {
+        ctx.globalAlpha = t; ctx.strokeStyle = '#dffbff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, 32 * (1.5 - t), 0, 7); ctx.stroke();
+        ctx.globalAlpha = t * 0.4; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(f.x, f.y, 18 * (1.3 - t), 0, 7); ctx.fill();
+      } else if (f.type === 'spark') {
+        ctx.globalAlpha = t; ctx.strokeStyle = f.color; ctx.lineWidth = 2;
+        for (let i = 0; i < 4; i++) { const a = i * 1.57 + (1 - t) * 2, rr = 15 * (1.4 - t); ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr); ctx.stroke(); }
+      } else if (f.type === 'heal') {
+        const yy = f.y - (1 - t) * 44;
+        ctx.globalAlpha = t * 0.8; ctx.strokeStyle = f.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(f.x - f.w / 2, yy); ctx.lineTo(f.x + f.w / 2, yy); ctx.stroke();
+        ctx.globalAlpha = t * 0.25; ctx.fillStyle = f.color; ctx.fillRect(f.x - f.w / 2, yy, f.w, (1 - t) * 44);
+      }
+      ctx.globalAlpha = 1;
+    }
     // 전투 발사체(빔): 쏜 캐릭터 → 적
     for (const s of anim.shots) {
       const tt = Math.min(1, s.t);
@@ -963,6 +1007,7 @@
       ctx.fillText('전투!', W / 2, cy + 12);
       ctx.restore();
     }
+    if (shk) ctx.restore();   // 화면 흔들림 종료(컷인 UI는 안 흔들림)
     // 스킬 발동 컷인 연출
     if (anim.cut) {
       const c = anim.cut, tt = Math.min(1, c.t / CUT_DUR);
