@@ -236,8 +236,9 @@ body {
 
 /* 전투 */
 #combat { padding: 0; }
-#combat-top { display: grid; grid-template-columns: 1fr auto auto; gap: 8px 14px; align-items: center;
+#combat-top { display: grid; grid-template-columns: 1fr auto auto auto; gap: 8px 12px; align-items: center;
   padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); font-size: 16px; }
+.combat-mute { font-size: 18px; padding: 0 2px; }
 .c-name { font-weight: 800; font-size: 18px; }
 .c-phase { color: var(--amber); font-weight: 800; font-size: 16px; padding: 3px 12px; border-radius: 999px; background: #ffcf5c1e; }
 .c-level { color: var(--cyan); font-weight: 800; font-size: 17px; }
