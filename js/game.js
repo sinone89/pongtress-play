@@ -35,9 +35,9 @@
   // ============ 레이아웃(phase별 영역 비율) ============
   // 위→아래: 적 필드 / 성벽(캐릭터) / 골 포켓(성벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
   // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
-  const LOAD_FRAC = { field: .15, wall: .13, goal: .09, pins: .63 };
+  const LOAD_FRAC = { field: .15, wall: .13, goal: .13, pins: .59 };   // 골칸 영역 확대(캐릭터 이름 라벨 공간)
   const BATTLE_FRAC = { field: .72, wall: .24, goal: .02, pins: .02 };
-  const SIDE_FR = 0.24;   // 우측 스킬 사이드바 폭(보드/포켓 영역 기준)
+  const SIDE_FR = 0.17;   // 우측 스킬 사이드바 폭(보드/포켓 영역 기준) — 좁혀서 보드를 넓힘
   const lerp = (a, b, t) => a + (b - a) * t;
   function layout() {
     const t = S ? (S.layoutT || 0) : 0;
@@ -809,17 +809,18 @@
     for (const c of S.chars) {
       const fire = c.fireT || 0;
       const x = wr.x + (c.lane + 0.5) * cw;
+      const feetY = wr.y + wr.h * 0.72 - fire * 4;      // 발치를 성벽 HP바 위로(겹침 방지)
+      // 레인색 발판(캐릭터↔같은색 골칸 매칭 인지용)
+      ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = laneHex(c.lane);
+      ctx.beginPath(); ctx.ellipse(x, feetY, cw * 0.34, Math.max(4, wr.h * 0.06), 0, 0, 7); ctx.fill(); ctx.restore();
       const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.ref.id, sprState) : null;
-      if (spr) {                                        // 캐릭터 스프라이트 — 발치를 성벽 하단에 정렬(위로 확장). 풀폭 레인에 맞춰 셀 내 배치
+      if (spr) {                                        // 캐릭터 스프라이트 — 발판 기준, 셀 내 배치
         const sh = Math.min(cw * 0.92, wr.h * 2.3), sw = sh;
-        const feetY = wr.y + wr.h * 0.98 - fire * 4;
         ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(spr, x - sw / 2, feetY - sh, sw, sh);
-      } else {                                          // 폴백: 원형(뒤 글로우 제거)
-        const y = wr.y + wr.h * 0.5;
-        ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, y, crad, 0, 7); ctx.fill();
+        ctx.drawImage(spr, x - sw / 2, feetY - sh * 0.94, sw, sh);
+      } else {                                          // 폴백: 원형
+        ctx.fillStyle = fire > 0.4 ? '#ffffff' : laneHex(c.lane); ctx.beginPath(); ctx.arc(x, feetY - wr.h * 0.4, crad, 0, 7); ctx.fill();
       }
-      if (showChar) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + cFont + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(c.ref.name, x, wr.y + wr.h * 0.98 + cFont + 1); }
       if (S.phase === 'load' && c.ammo > 0) {           // 장전 탄수 = 좌상단 작은 알약(얼굴 안 가림)
         const bw = Math.max(20, crad * 1.5), bh = Math.max(15, crad * 0.95), bx = x - cw / 2 + 3, by = wr.y + 3;
         ctx.fillStyle = '#1a1020dd'; ctx.beginPath(); ctx.roundRect(bx, by, bw, bh, bh / 2); ctx.fill();
@@ -893,17 +894,25 @@
       }
     }
 
-    // 골 포켓
+    // 골 포켓 — 상단은 레인별 캐릭터 이름 라벨, 하단은 포켓 셀
     const g = r.goal, pw = g.w / 9;
+    const lblH = Math.min(g.h * 0.4, 20), cellY = g.y + lblH, cellH = g.h - lblH;
+    for (let l = 0; l < CFG.lanes; l++) {                 // 레인 그룹 라벨(골칸↔캐릭터 매칭)
+      const c = S.chars.find(ch => ch.lane === l); if (!c) continue;
+      const gx = g.x + (l * 3 + 1.5) * pw;
+      ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, 3 * pw - 2, lblH - 1);
+      ctx.fillStyle = laneHex(l); ctx.font = 'bold ' + Math.max(11, Math.round(lblH * 0.72)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(c.ref.name, gx, g.y + lblH / 2 + 1); ctx.textBaseline = 'alphabetic';
+    }
     for (let i = 0; i < 9; i++) {
       const pk = S.pockets[i]; const x = g.x + i * pw;
       const isC = pk.type === 'charge', isB = pk.type === 'buff';
       ctx.fillStyle = isC ? laneHex(pk.lane) + '55' : isB ? '#66ccff33' : '#ffffff08';
-      ctx.fillRect(x + 1, g.y + 2, pw - 2, g.h - 4);
-      ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, g.y + 2, pw - 2, g.h - 4);
+      ctx.fillRect(x + 1, cellY + 1, pw - 2, cellH - 3);
+      ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, cellY + 1, pw - 2, cellH - 3);
       ctx.fillStyle = isC ? laneHex(pk.lane) : isB ? '#6cf' : '#4a4570';
-      ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, g.h * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(isC ? '◆' : isB ? '♥' : '×', x + pw / 2, g.y + g.h / 2 + Math.min(pw * 0.18, g.h * 0.18));
+      ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, cellH * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText(isC ? '◆' : isB ? '♥' : '×', x + pw / 2, cellY + cellH / 2 + Math.min(pw * 0.18, cellH * 0.18));
     }
     ctx.restore();
     }  // /pinAlpha
