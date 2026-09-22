@@ -254,8 +254,26 @@
     const _rand = Math.random; Math.random = makeRng(seed);
     try { for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType())); }
     finally { Math.random = _rand; }
-    // 스테이지별 고정 장애물(범퍼/기둥/바) — 실제 핀볼판처럼
+    // 스테이지별 고정 장애물(범퍼/기둥) — 실제 핀볼판처럼
     S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
+    // 장애물과 겹치는 페그 제거(겹침 방지) — px 공간에서 판정
+    if (S.obstacles.length) {
+      const rp = layout().pins, mg = CFG.ballRadius + 3;
+      S.pegs = S.pegs.filter(p => {
+        const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius);
+        for (const o of S.obstacles) {
+          if (o.t === 'bar') {
+            const ox = o.fx * rp.w, oy = o.fy * rp.h, ow = o.fw * rp.w, oh = o.fh * rp.h;
+            const cx = Math.max(ox, Math.min(px, ox + ow)), cy = Math.max(oy, Math.min(py, oy + oh));
+            if ((px - cx) ** 2 + (py - cy) ** 2 < (pr + mg) ** 2) return false;
+          } else {
+            const ox = o.fx * rp.w, oy = o.fy * rp.h, rr = o.r * rp.w + pr + mg;
+            if ((px - ox) ** 2 + (py - oy) ** 2 < rr * rr) return false;
+          }
+        }
+        return true;
+      });
+    }
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
@@ -396,11 +414,15 @@
     for (let i = S.balls.length - 1; i >= 0; i--) {
       const b = S.balls[i];
       b.age = (b.age || 0) + dt;
+      // 축(수직) 갇힘 방지: 오래 튕기는데 좌우 속도가 거의 0이면(정면 반사 무한루프)
+      // 바깥쪽으로 살짝 밀어 축을 벗어나게 함 → 영구 장애물/범퍼페그 정면충돌 무한반사 해제
+      if (b.age > 1.2 && Math.abs(b.vx) < 60) {
+        b.vx += (b.x < r.x + r.w * 0.5 ? -1 : 1) * 340 * dt;   // 가까운 벽(바깥) 방향으로 이탈
+      }
       // 소멸 금지: 오래된 볼은 상단으로 점점 강하게 유도(상단 포켓에 실제로 도달해 충전될 때까지 사라지지 않음)
       if (b.age > CFG.ballLifetime) {
         const over = b.age - CFG.ballLifetime;
         b.vy -= Math.min(2400, 400 + over * 800) * dt;   // 위로 가속(오래될수록 강하게)
-        if (over > 4) b.vx *= 0.92;                       // 아주 오래되면 수직에 가깝게 몰아 확실히 상단 도달
       }
       const speed = Math.hypot(b.vx, b.vy);
       const sub = Math.min(8, 1 + Math.floor(speed * dt / pegR));
