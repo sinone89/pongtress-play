@@ -754,8 +754,13 @@
   }
   // 캐논 총구 위치(스프라이트 상단·전방) — 빔 발사 시작점
   function muzzlePos(c) {
-    const r = layout().wall, laneW = r.w / CFG.lanes;
-    return { x: r.x + (c.lane + 0.5) * laneW + laneW * 0.18, y: r.y + r.h * 0.18 };
+    // drawChar와 동일한 스프라이트 지표로 캐논 총구 끝을 계산(스프라이트 상단부·중앙 살짝 우측)
+    const wr = layout().wall, cw = wr.w / CFG.lanes;
+    const x = wr.x + (c.lane + 0.5) * cw;
+    const fire = c.fireT || 0;
+    const feetY = wr.y + wr.h * 0.72 - fire * 4;
+    const sh = Math.min(cw * 0.92, wr.h * 2.3);
+    return { x: x + cw * 0.12, y: feetY - sh * 0.60 };
   }
 
   // ── 페그 모양 그리기 ──
@@ -961,17 +966,37 @@
     for (const f of anim.fx) {
       const t = Math.max(0, Math.min(1, f.t));
       if (f.type === 'boom') {
-        const R0 = f.sm ? 26 : 44;
-        ctx.globalAlpha = t * 0.55; ctx.fillStyle = f.color; ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (1.3 - t), 0, 7); ctx.fill();
-        ctx.globalAlpha = t; ctx.strokeStyle = '#fff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (1.7 - t * 1.3), 0, 7); ctx.stroke();
+        const R0 = f.sm ? 26 : 44, fr = 1 - t;                 // fr: 0→1 진행
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        // 화염구(방사형)
+        const rr = R0 * (0.4 + fr * 0.9), fg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        fg.addColorStop(0, '#ffffff'); fg.addColorStop(0.35, f.color); fg.addColorStop(0.7, f.color + '66'); fg.addColorStop(1, f.color + '00');
+        ctx.globalAlpha = t; ctx.fillStyle = fg; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
+        // 충격 링
+        ctx.globalAlpha = t * 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = f.sm ? 2 : 3.5;
+        ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (0.6 + fr * 1.1), 0, 7); ctx.stroke();
+        // 파편 스파크(방사)
+        const n = f.sm ? 6 : 9;
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        for (let i = 0; i < n; i++) {
+          const a = i * (6.283 / n) + f.x * 0.01, d0 = R0 * (0.3 + fr * 1.3), d1 = d0 + R0 * 0.4;
+          ctx.globalAlpha = t;
+          ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * d0, f.y + Math.sin(a) * d0); ctx.lineTo(f.x + Math.cos(a) * d1, f.y + Math.sin(a) * d1); ctx.stroke();
+        }
+        ctx.restore();
       } else if (f.type === 'ring') {
         ctx.globalAlpha = t * 0.85; ctx.strokeStyle = f.color; ctx.lineWidth = 5; ctx.beginPath(); ctx.arc(f.x, f.y, (f.r || 60) * (1.35 - t), 0, 7); ctx.stroke();
       } else if (f.type === 'shock') {
         ctx.globalAlpha = t; ctx.strokeStyle = '#dffbff'; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(f.x, f.y, 32 * (1.5 - t), 0, 7); ctx.stroke();
         ctx.globalAlpha = t * 0.4; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(f.x, f.y, 18 * (1.3 - t), 0, 7); ctx.fill();
       } else if (f.type === 'spark') {
-        ctx.globalAlpha = t; ctx.strokeStyle = f.color; ctx.lineWidth = 2;
-        for (let i = 0; i < 4; i++) { const a = i * 1.57 + (1 - t) * 2, rr = 15 * (1.4 - t); ctx.beginPath(); ctx.moveTo(f.x, f.y); ctx.lineTo(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr); ctx.stroke(); }
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const sg = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, 12);
+        sg.addColorStop(0, '#ffffff'); sg.addColorStop(0.5, f.color); sg.addColorStop(1, f.color + '00');
+        ctx.globalAlpha = t; ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(f.x, f.y, 12 * (0.6 + (1 - t) * 0.8), 0, 7); ctx.fill();
+        ctx.strokeStyle = f.color; ctx.lineWidth = 2; ctx.lineCap = 'round';
+        for (let i = 0; i < 6; i++) { const a = i * 1.047 + (1 - t) * 2.5, r0 = 6 + (1 - t) * 10, rr = r0 + 8; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * r0, f.y + Math.sin(a) * r0); ctx.lineTo(f.x + Math.cos(a) * rr, f.y + Math.sin(a) * rr); ctx.stroke(); }
+        ctx.restore();
       } else if (f.type === 'heal') {
         const yy = f.y - (1 - t) * 44;
         ctx.globalAlpha = t * 0.8; ctx.strokeStyle = f.color; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(f.x - f.w / 2, yy); ctx.lineTo(f.x + f.w / 2, yy); ctx.stroke();
@@ -979,24 +1004,54 @@
       }
       ctx.globalAlpha = 1;
     }
-    // 전투 발사체(빔): 쏜 캐릭터 → 적
+    // 전투 발사체(포탄): 쏜 캐릭터 캐논 총구 → 적. 글로우 포탄 + 잔광 궤적 + 총구 플래시
     for (const s of anim.shots) {
       const tt = Math.min(1, s.t);
       const cx = s.sx + (s.ex - s.sx) * tt, cy = s.sy + (s.ey - s.sy) * tt;
-      const tailT = Math.max(0, tt - 0.3);
-      const bx = s.sx + (s.ex - s.sx) * tailT, by = s.sy + (s.ey - s.sy) * tailT;
+      const ang = Math.atan2(s.ey - s.sy, s.ex - s.sx);
+      const life = Math.min(1, (1.15 - s.t) / 0.5);      // 꼬리 페이드
+      const hr = s.big ? 13 : 8;                          // 포탄 헤드 반경
       ctx.save();
-      ctx.globalAlpha = 0.9 * Math.min(1, (1.15 - s.t) / 0.5);
-      ctx.strokeStyle = s.color; ctx.lineWidth = s.big ? 4 : 2.5; ctx.lineCap = 'round';
+      ctx.globalCompositeOperation = 'lighter';           // 가산 합성 = 발광
+      // ① 잔광 궤적(뒤로 갈수록 투명)
+      const tailT = Math.max(0, tt - (s.big ? 0.32 : 0.24));
+      const bx = s.sx + (s.ex - s.sx) * tailT, by = s.sy + (s.ey - s.sy) * tailT;
+      const grd = ctx.createLinearGradient(bx, by, cx, cy);
+      grd.addColorStop(0, s.color + '00'); grd.addColorStop(1, s.color);
+      ctx.globalAlpha = life * 0.7; ctx.strokeStyle = grd; ctx.lineWidth = s.big ? 7 : 3.5; ctx.lineCap = 'round';
       ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(cx, cy); ctx.stroke();
-      ctx.globalAlpha = Math.min(1, (1.15 - s.t) / 0.4);
-      ctx.fillStyle = s.color; ctx.beginPath(); ctx.arc(cx, cy, s.big ? 6 : 4, 0, 7); ctx.fill();
-      if (s.flash && s.t < 0.4) {                     // 총구 발사 플래시
-        ctx.globalAlpha = (0.4 - s.t) / 0.4; ctx.fillStyle = '#fff';
-        ctx.beginPath(); ctx.arc(s.sx, s.sy, (s.big ? 10 : 7) * (1 - s.t), 0, 7); ctx.fill();
+      // ② 포탄 헤드 — 이미지(assets/fx/shell.png) 있으면 사용, 없으면 글로우 오브
+      const shell = (typeof FxArt !== 'undefined') ? FxArt.ready('shell') : null;
+      if (shell) {
+        ctx.globalAlpha = life; ctx.translate(cx, cy); ctx.rotate(ang + Math.PI / 2);
+        const d = hr * 2.6; ctx.drawImage(shell, -d / 2, -d / 2, d, d);
+      } else {
+        const rg = ctx.createRadialGradient(cx, cy, 0, cx, cy, hr);
+        rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.35, s.color); rg.addColorStop(1, s.color + '00');
+        ctx.globalAlpha = life; ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(cx, cy, hr, 0, 7); ctx.fill();
+        ctx.globalAlpha = life; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(cx, cy, hr * 0.34, 0, 7); ctx.fill();
       }
       ctx.restore();
+      // ③ 총구 플래시(발사 직후) — 방사형 버스트
+      if (s.flash && s.t < 0.42) {
+        const mf = (0.42 - s.t) / 0.42, mr = (s.big ? 22 : 14) * (0.5 + mf * 0.7);
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        const muz = (typeof FxArt !== 'undefined') ? FxArt.ready('muzzle') : null;
+        if (muz) {
+          ctx.globalAlpha = mf; ctx.translate(s.sx, s.sy); ctx.rotate(ang + Math.PI / 2);
+          const d = mr * 2.4; ctx.drawImage(muz, -d / 2, -d / 2, d, d);
+        } else {
+          const mg = ctx.createRadialGradient(s.sx, s.sy, 0, s.sx, s.sy, mr);
+          mg.addColorStop(0, '#ffffff'); mg.addColorStop(0.45, s.color); mg.addColorStop(1, s.color + '00');
+          ctx.globalAlpha = mf; ctx.fillStyle = mg; ctx.beginPath(); ctx.arc(s.sx, s.sy, mr, 0, 7); ctx.fill();
+          ctx.translate(s.sx, s.sy); ctx.rotate(ang);              // 앞쪽 스파이크 2줄
+          ctx.strokeStyle = '#fff'; ctx.globalAlpha = mf * 0.9; ctx.lineWidth = s.big ? 3 : 2; ctx.lineCap = 'round';
+          ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(mr * 1.5, 0); ctx.stroke();
+        }
+        ctx.restore();
+      }
     }
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     // 전투 시작 배너(가로 띠 + 글자)
     if (S.phase === 'battle' && S.battleStage === 'intro') {
       const cy = r.field.y + r.field.h * 0.5;

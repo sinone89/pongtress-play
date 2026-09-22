@@ -327,3 +327,14 @@ const CharArt = (function () {
   function sprite(id, state) { const img = load(id, state); return (img.__ok && img.complete) ? img : null; }
   return { path: path, load: load, sprite: sprite };
 })();
+
+// ── FX 이미지 로더 ── assets/fx/<name>.png (muzzle/shell/boom 등). 있으면 사용, 없으면 절차적 렌더로 폴백.
+const FxArt = (function () {
+  const cache = {};
+  function ready(name) {
+    let img = cache[name];
+    if (!img) { img = new Image(); img.__ok = false; img.onload = function () { img.__ok = img.naturalWidth > 0; }; img.onerror = function () { img.__ok = false; }; img.src = 'assets/fx/' + name + '.png'; cache[name] = img; }
+    return (img.__ok && img.complete) ? img : null;
+  }
+  return { ready: ready };
+})();
