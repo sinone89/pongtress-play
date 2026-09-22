@@ -760,7 +760,8 @@
     const fire = c.fireT || 0;
     const feetY = wr.y + wr.h * 0.72 - fire * 4;
     const sh = Math.min(cw * 0.92, wr.h * 2.3);
-    return { x: x + cw * 0.12, y: feetY - sh * 0.60 };
+    // 스프라이트 캐논 총구는 로컬좌표 (0.82, 0.24) 부근(우측 수평 캐논). sw==sh.
+    return { x: x + sh * 0.32, y: feetY - sh * 0.70 };
   }
 
   // ── 페그 모양 그리기 ──
@@ -954,9 +955,15 @@
 
     // 플로팅 텍스트
     for (const f of anim.floats) {
-      ctx.globalAlpha = Math.max(0, f.t); ctx.fillStyle = f.color; ctx.textAlign = 'center';
-      ctx.font = 'bold ' + (f.big ? 18 : 13) + 'px system-ui';
-      ctx.fillText(f.text, f.x, f.y - (1 - f.t) * 24); ctx.globalAlpha = 1;
+      ctx.save();
+      const pop = f.t > 0.75 ? 1 + (f.t - 0.75) * 1.2 : 1;    // 등장 순간 살짝 커짐
+      ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.9)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.font = 'bold ' + Math.round((f.big ? 30 : 21) * pop) + 'px system-ui';
+      const yy = f.y - (1 - f.t) * 30;
+      ctx.lineJoin = 'round'; ctx.lineWidth = f.big ? 6 : 4.5; ctx.strokeStyle = 'rgba(8,4,16,0.92)';
+      ctx.strokeText(f.text, f.x, yy);
+      ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, yy);
+      ctx.restore();
     }
     for (const fl of anim.flashes) {
       ctx.globalAlpha = fl.t * 0.5; ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
