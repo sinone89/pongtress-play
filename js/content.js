@@ -37,7 +37,7 @@ const PEG_TYPES = {
   normal: { name: '일반',   color: '#8f86d6', shape: 'circle',   size: 1.0,  weight: 52, oneShot: false },
   mult2:  { name: '증식×2', color: '#ffcf5c', shape: 'diamond',  size: 1.05, weight: 15, oneShot: true,  split: 1, label: '×2' },
   mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
-  bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 10, oneShot: false, boost: 1.28 },
+  bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 0,  oneShot: false, boost: 1.28 },  // weight0=랜덤 스폰 제외(범퍼는 고정 장애물로 이전, 패시브/보상 설치만)
   gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
   attack: { name: '공격',   color: '#ff6b6b', shape: 'triangle', size: 1.1,  weight: 6,  oneShot: true,  atk: 2,  label: '＋' }
 };
@@ -223,6 +223,17 @@ const STAGE_BOARDS = {
   3: ['zigzag', 'diamonds', 'heart', 'cross'],
   4: ['cross', 'chevrons', 'star', 'rings'],
   5: ['grid', 'zigzag', 'star', 'heart']
+};
+
+// ── 스테이지별 고정 장애물(실제 핀볼판 느낌) ──
+// 좌표=핀볼판(pins) 비율. t: bumper(강한 반사·발광) / pillar(단단한 반사) / bar(사각 벽).
+// 원형: {t,fx,fy,r(폭 비율)}  사각: {t:'bar',fx,fy,fw,fh}(좌상단+크기, fx/fy/fw/fh 비율)
+const STAGE_OBST = {
+  1: [{ t: 'bumper', fx: 0.30, fy: 0.50, r: 0.07 }, { t: 'bumper', fx: 0.66, fy: 0.58, r: 0.07 }],
+  2: [{ t: 'bumper', fx: 0.26, fy: 0.46, r: 0.07 }, { t: 'bumper', fx: 0.72, fy: 0.50, r: 0.07 }, { t: 'bar', fx: 0.36, fy: 0.74, fw: 0.28, fh: 0.03 }],
+  3: [{ t: 'bumper', fx: 0.22, fy: 0.40, r: 0.07 }, { t: 'bumper', fx: 0.52, fy: 0.60, r: 0.08 }, { t: 'bumper', fx: 0.80, fy: 0.44, r: 0.07 }, { t: 'bar', fx: 0.12, fy: 0.76, fw: 0.30, fh: 0.03 }],
+  4: [{ t: 'pillar', fx: 0.50, fy: 0.34, r: 0.09 }, { t: 'bumper', fx: 0.24, fy: 0.60, r: 0.07 }, { t: 'bumper', fx: 0.76, fy: 0.60, r: 0.07 }, { t: 'bar', fx: 0.08, fy: 0.78, fw: 0.26, fh: 0.03 }, { t: 'bar', fx: 0.62, fy: 0.78, fw: 0.26, fh: 0.03 }],
+  5: [{ t: 'pillar', fx: 0.34, fy: 0.32, r: 0.08 }, { t: 'pillar', fx: 0.68, fy: 0.40, r: 0.08 }, { t: 'bumper', fx: 0.50, fy: 0.60, r: 0.09 }, { t: 'bumper', fx: 0.20, fy: 0.72, r: 0.07 }, { t: 'bar', fx: 0.55, fy: 0.80, fw: 0.30, fh: 0.035 }]
 };
 
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──

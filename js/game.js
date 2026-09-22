@@ -253,6 +253,8 @@
     const _rand = Math.random; Math.random = makeRng(seed);
     try { for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType())); }
     finally { Math.random = _rand; }
+    // 스테이지별 고정 장애물(범퍼/기둥/바) — 실제 핀볼판처럼
+    S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
@@ -318,6 +320,20 @@
       if (x < r.x + br) { x = r.x + br; vx = Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (x > r.x + r.w - br) { x = r.x + r.w - br; vx = -Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
       if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사
+      if (S.obstacles) for (const o of S.obstacles) {      // 고정 장애물 반사(예측선)
+        if (o.t === 'bar') {
+          const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, ow = o.fw * r.w, oh = o.fh * r.h;
+          const cx = Math.max(ox, Math.min(x, ox + ow)), cy = Math.max(oy, Math.min(y, oy + oh)), dx = x - cx, dy = y - cy;
+          if (dx * dx + dy * dy < br * br) {
+            if (Math.abs(dx) > Math.abs(dy)) { vx = (dx < 0 ? -1 : 1) * Math.abs(vx); x = cx + (dx < 0 ? -1 : 1) * (br + 0.5); }
+            else { vy = (dy < 0 ? -1 : 1) * Math.abs(vy); y = cy + (dy < 0 ? -1 : 1) * (br + 0.5); }
+            pts.push({ x, y }); if (++nHit >= 3) return pts;
+          }
+        } else {
+          const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, rr = o.r * r.w + br, dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy);
+          if (d > 0 && d < rr) { const nx = dx / d, ny = dy / d; x = ox + nx * rr; y = oy + ny * rr; const dot = vx * nx + vy * ny; vx -= 2 * dot * nx; vy -= 2 * dot * ny; if (o.t === 'bumper') { vx *= 1.25; vy *= 1.25; } pts.push({ x, y }); if (++nHit >= 3) return pts; }
+        }
+      }
       for (let pi = 0; pi < S.pegs.length; pi++) {
         const p = S.pegs[pi]; if (!p.alive || hit.has(pi)) continue;
         const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h, pr = p.pr || pegR;
@@ -337,6 +353,34 @@
       if (i % 2 === 0) pts.push({ x, y });
     }
     pts.push({ x, y }); return pts;
+  }
+
+  // 고정 장애물 충돌(범퍼=강한 반사, 기둥=반사, 바=사각 반사). 반환: 맞은 타입|false
+  function hitObstacles(b, r) {
+    for (const o of S.obstacles) {
+      if (o.t === 'bar') {
+        const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, ow = o.fw * r.w, oh = o.fh * r.h;
+        const cx = Math.max(ox, Math.min(b.x, ox + ow)), cy = Math.max(oy, Math.min(b.y, oy + oh));
+        const dx = b.x - cx, dy = b.y - cy;
+        if (dx * dx + dy * dy < b.r * b.r) {
+          if (Math.abs(dx) > Math.abs(dy)) { b.vx = (dx < 0 ? -1 : 1) * Math.abs(b.vx) * CFG.wallRestitution; b.x = cx + (dx < 0 ? -1 : 1) * (b.r + 0.5); }
+          else { b.vy = (dy < 0 ? -1 : 1) * Math.abs(b.vy) * CFG.wallRestitution; b.y = cy + (dy < 0 ? -1 : 1) * (b.r + 0.5); }
+          Sound.play('peg'); return 'bar';
+        }
+      } else {
+        const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, rr = o.r * r.w + b.r;
+        const dx = b.x - ox, dy = b.y - oy, d = Math.hypot(dx, dy);
+        if (d > 0 && d < rr) {
+          const nx = dx / d, ny = dy / d; b.x = ox + nx * rr; b.y = oy + ny * rr;
+          const dot = b.vx * nx + b.vy * ny; b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny;
+          const boost = (o.t === 'bumper') ? 1.25 : CFG.restitution;
+          b.vx *= boost; b.vy *= boost;
+          if (o.t === 'bumper') { o.flash = 1; anim.flashes.push({ x: ox, y: oy, t: 1, color: '#46e6d0' }); }
+          Sound.play('peg'); return o.t;
+        }
+      }
+    }
+    return false;
   }
 
   function stepBalls(dt) {
@@ -383,6 +427,8 @@
             applyPegHit(b, p, def, px, py);
           }
         }
+        // 고정 장애물(범퍼/기둥/바) 충돌 — 수확 볼 제외
+        if (!b.harvest && S.obstacles && S.obstacles.length) hitObstacles(b, r);
         // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
         if (b.y > botY - b.r) { b.y = botY - b.r; b.vy = -Math.abs(b.vy) * CFG.wallRestitution; }
         if (b.y <= topY) { landBall(b); S.balls.splice(i, 1); gone = true; }          // 상단 포켓 도달 → 충전
@@ -802,6 +848,26 @@
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
       ctx.restore();
       if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
+    }
+    // 고정 장애물(범퍼/기둥/바)
+    for (const o of S.obstacles || []) {
+      if (o.t === 'bar') {
+        const ox = r.pins.x + o.fx * r.pins.w, oy = r.pins.y + o.fy * r.pins.h, ow = o.fw * r.pins.w, oh = o.fh * r.pins.h;
+        ctx.fillStyle = '#8a8f9a'; ctx.beginPath(); ctx.roundRect(ox, oy, ow, oh, oh / 2); ctx.fill();
+        ctx.fillStyle = '#c9cfda'; ctx.beginPath(); ctx.roundRect(ox, oy, ow, oh * 0.5, oh / 2); ctx.fill();
+      } else {
+        const ox = r.pins.x + o.fx * r.pins.w, oy = r.pins.y + o.fy * r.pins.h, rr = o.r * r.pins.w, fl = o.flash || 0;
+        if (o.t === 'bumper') {
+          ctx.fillStyle = '#0b2b28'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill();
+          ctx.strokeStyle = '#46e6d0'; ctx.lineWidth = Math.max(3, rr * 0.22); ctx.beginPath(); ctx.arc(ox, oy, rr * 0.82, 0, 7); ctx.stroke();
+          ctx.fillStyle = fl > 0 ? '#eafffb' : '#46e6d0'; ctx.beginPath(); ctx.arc(ox, oy, rr * (0.42 + fl * 0.3), 0, 7); ctx.fill();
+          if (fl > 0) o.flash = Math.max(0, fl - 0.08);
+        } else {
+          ctx.fillStyle = '#6b7180'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill();
+          ctx.strokeStyle = '#3a3f4a'; ctx.lineWidth = Math.max(2, rr * 0.15); ctx.stroke();
+          ctx.fillStyle = '#9aa0ad'; ctx.beginPath(); ctx.arc(ox - rr * 0.25, oy - rr * 0.25, rr * 0.3, 0, 7); ctx.fill();
+        }
+      }
     }
     // 볼(발사볼=흰색, 페그에서 변환된 볼=페그 색)
     for (const b of S.balls) {
