@@ -257,19 +257,29 @@ const Meta = (function () {
     const cv = $('idle-canvas'); if (!cv) return; idleStop();
     const ctx = cv.getContext('2d'); const party = partySlots();
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
-    const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0 };
-    function fit() { const dpr = Math.min(2, window.devicePixelRatio || 1); D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260); cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); }
-    fit();
     const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
-    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2); return { x: 24 + Math.random() * (D.w - 48), y: y, r: 12 + Math.random() * 4, col: eCol[Math.floor(Math.random() * eCol.length)], hp: hp, mhp: hp, hit: 0 }; }
-    function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-12)); }
-    for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.h * 0.5));
+    // 모든 치수를 캔버스 크기(D.w/D.h) 비례로 — 현재 UI(프레임 폭) 확대에 맞춰 자동 스케일
+    const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, n: 1 };
+    function fit() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260);
+      cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const card = $('idle-reward'); D.cardH = (card && card.offsetHeight) ? card.offsetHeight : D.h * 0.18;
+      D.n = Math.max(1, party.filter(Boolean).length);
+      D.groundY = D.h - D.cardH - D.h * 0.05;                                  // 캐릭터 발치(방치보상 카드 위)
+      D.charS = Math.min(D.w / D.n * 0.84, D.groundY * 0.66, D.w * 0.34);      // 캐릭터 크기(폭·높이 비례)
+    }
+    fit();
+    const enemyR = () => D.w * 0.028 + Math.random() * D.w * 0.014;           // 적 반경(폭 비례)
+    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2); return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y: y, r: enemyR(), col: eCol[Math.floor(Math.random() * eCol.length)], hp: hp, mhp: hp, hit: 0 }; }
+    function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
+    for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
     function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
-    const fireLine = () => D.h * 0.55;      // 적이 파티 근처(하단)까지 내려온 뒤 격파 — 연출이 꽉 차 보이게
+    const fireLine = () => D.groundY - D.h * 0.14;      // 이 선 아래로 내려오면 사격
     let last = performance.now(), fireT = 0;
     function step(dt) {
       if (Math.random() < dt * 1.3) spawn();
-      for (const e of D.en) { e.y += dt * 30; if (e.hit > 0) e.hit -= dt; }
+      for (const e of D.en) { e.y += dt * D.h * 0.07; if (e.hit > 0) e.hit -= dt; }   // 낙하 속도(높이 비례)
       const chars = party.filter(Boolean);
       fireT -= dt;
       const targets = D.en.filter(e => e.y > fireLine());
@@ -277,33 +287,37 @@ const Meta = (function () {
         fireT = 0.22 + Math.random() * 0.12;                       // 사격 간격
         const t = targets[0];                                       // 가장 앞선(먼저 진입) 적 집중 사격
         const ci = Math.floor(Math.random() * Math.max(1, chars.length));
-        D.bm.push({ x1: charX(ci, chars.length), y1: D.h - 132, x2: t.x, y2: t.y, t: 0.16 });
+        D.bm.push({ x1: charX(ci, chars.length), y1: D.groundY - D.charS * 0.5, x2: t.x, y2: t.y, t: 0.16 });
         t.hp -= 1; t.hit = 0.14;
         if (t.hp <= 0) { D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.32 }); t.dead = true; }
       }
-      D.en = D.en.filter(e => !e.dead && e.y < D.h - 124);   // 방치보상 카드 위에서 소멸(겹침 방지)
+      D.en = D.en.filter(e => !e.dead && e.y < D.groundY - D.charS * 0.2);   // 캐릭터/카드 위에서 소멸(겹침 방지)
       for (const b of D.bm) b.t -= dt; D.bm = D.bm.filter(b => b.t > 0);
       for (const p of D.pop) p.t -= dt; D.pop = D.pop.filter(p => p.t > 0);
       D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
     }
     function render() {
       ctx.clearRect(0, 0, D.w, D.h);
+      const hbH = Math.max(2, D.h * 0.006), hbGap = D.h * 0.014;
       for (const e of D.en) {
         ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill();
-        if (e.hp < e.mhp) { const bw = e.r * 1.8; ctx.fillStyle = '#0008'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 6, bw, 3); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(e.x - bw / 2, e.y - e.r - 6, bw * e.hp / e.mhp, 3); }
+        if (e.hp < e.mhp) { const bw = e.r * 1.8; ctx.fillStyle = '#0008'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw, hbH); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw * e.hp / e.mhp, hbH); }
       }
-      for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
-      for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * 46, 0, 7); ctx.stroke(); }
+      for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = Math.max(2, D.w * 0.008); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
+      for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = Math.max(2, D.w * 0.006); ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * D.w * 0.12, 0, 7); ctx.stroke(); }
       const chars = party.filter(Boolean);
       for (let i = 0; i < chars.length; i++) {
-        const id = chars[i], cx = charX(i, chars.length), cy = D.h - 132;
+        const id = chars[i], cx = charX(i, chars.length), cy = D.groundY, s = D.charS;
+        ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = laneCol[i % 3];   // 레인색 발판
+        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, Math.max(3, s * 0.08), 0, 0, 7); ctx.fill(); ctx.restore();
         const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
-        if (spr) { const s = Math.min(D.w / chars.length * 0.86, 168); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(spr, cx - s / 2, cy - s * 0.72, s, s); }
-        else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy, 15, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
+        if (spr) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(spr, cx - s / 2, cy - s * 0.9, s, s); }
+        else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.12, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
       }
     }
     function frame(now) {
       if (cv.offsetParent === null) { idleStop(); return; }   // 홈이 숨겨지면 자동 정지
+      if (Math.abs(cv.clientWidth - D.w) > 1 || Math.abs(cv.clientHeight - D.h) > 1) fit();   // 리사이즈 대응
       const dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); render();
       _idleRAF = requestAnimationFrame(frame);
     }
