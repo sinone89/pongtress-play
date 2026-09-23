@@ -6,7 +6,7 @@ const Meta = (function () {
   const KEY = 'pongtress_meta_v1';                         // 레거시(익명) 세이브 키
   const ACCTS_KEY = 'pongtress_accts', CUR_KEY = 'pongtress_cur';
   const $ = (id) => document.getElementById(id);
-  let M = null, activeTab = 'home', onSortie = null, cdTab = 'lvup', cdId = null;
+  let M = null, activeTab = 'home', onSortie = null, cdTab = 'lvup', cdId = null, shopTab = 'gacha';
 
   // ── 로컬 계정(다중 프로필): 아이디/비번 → 계정별 세이브 (스틸앤샷式) ──
   let curAcct = null; try { curAcct = localStorage.getItem(CUR_KEY) || null; } catch (e) {}
@@ -328,23 +328,61 @@ const Meta = (function () {
     const oc = $('owned-count'); if (oc) oc.textContent = ROSTER.filter(c => M.owned[c.id]).length + '/' + ROSTER.length;
   }
 
+  // ── 상점(스틸앤샷式): 서브탭(가챠/문서/패키지) → 배너·카드 ──
+  function shopGachaBody() {
+    const free = freeAvailable();
+    const rateLine = GACHA.rates.slice().reverse().map(r => (RARITY[r.rarity] || {}).name + ' ' + r.w + '%').join(' · ');
+    return '<div class="gbanner">'
+      + '<button class="gb-info" data-gachainfo="1">❔</button>'
+      + '<div class="gb-t">🎫 상시 배너</div>'
+      + '<div class="gb-d">모든 요원 등장' + (free ? ' · <b>오늘 무료 1회!</b>' : '') + '</div>'
+      + '<div class="gb-rates">' + rateLine + '</div>'
+      + '<div class="gb-btns">'
+      +   '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '">단일 ' + (free ? '무료' : '💎' + GACHA.cost1) + '</button>'
+      +   '<button class="sns-btn" data-gacha="10">10연 💎' + GACHA.cost10 + '</button>'
+      + '</div></div>';
+  }
+  function shopDocBody() {
+    let h = '<div class="mkt-info">📜 문서 ' + DOC_SHOP.docCost + ' → 🔷 조각 ' + DOC_SHOP.shardsPer + ' · 보유 문서 📜' + M.currencies.docs + '</div>';
+    const rars = ['legendary', 'epic', 'rare', 'common'];
+    rars.forEach(rar => {
+      const list = ROSTER.filter(c => c.rarity === rar && M.owned[c.id]); if (!list.length) return;
+      const R = RARITY[rar] || {}, g = RAR_G[rar] || 'g-n';
+      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 교환</div>';
+      h += list.map(c => {
+        const can = M.currencies.docs >= DOC_SHOP.docCost;
+        return '<div class="sns-card"><div class="sns-row">'
+          + '<div class="shop-ico"><img src="' + CharArt.path(c.id, 'load') + '" alt="" onerror="this.remove()"></div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">🔷 보유 조각 ' + (M.shards[c.id] || 0) + '</div></div>'
+          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>📜' + DOC_SHOP.docCost + '</button>'
+          + '</div></div>';
+      }).join('');
+    });
+    if (h.indexOf('sns-card') < 0) h += '<div class="sns-card"><div class="sns-cap" style="margin:0">보유한 요원이 없어요 · 가챠로 요원을 먼저 획득하세요.</div></div>';
+    return h;
+  }
+  function shopPkgBody() {
+    return '<div class="mkt-info">💳 보석 · 재화 패키지</div>'
+      + [['💎', '보석 패키지', '💎 100 / 550 / 1200'], ['🚫', '광고 제거', '전면 광고 제거 + 보너스'], ['📅', '주간 패스', '매일 보석 · 재화 지급']]
+        .map(p => '<div class="sns-card"><div class="sns-row"><div class="shop-ico emoji">' + p[0] + '</div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + p[1] + '</div><div class="sns-ds">' + p[2] + '</div></div>'
+          + '<button class="sns-btn sm sub" disabled>준비 중</button></div></div>').join('');
+  }
   function renderShop() {
-    const g = $('gacha-box');
-    g.innerHTML = '<div class="sns-card">'
-      + '<div class="sns-title">🎲 요원 가챠</div>'
-      + '<div class="sns-cap">' + GACHA.rates.slice().reverse().map(r => (RARITY[r.rarity] || {}).name + ' ' + r.w + '%').join(' · ') + ' · 중복 시 조각 ' + GACHA.dupShards + '</div>'
-      + '<button class="sns-btn full" data-gacha="1" style="margin-bottom:8px">단일 뽑기 💎' + GACHA.cost1 + '</button>'
-      + '<button class="sns-btn full" data-gacha="10" style="margin-bottom:8px">10연 뽑기 💎' + GACHA.cost10 + '</button>'
-      + '<button class="sns-btn full ' + (freeAvailable() ? '' : 'sub') + '" data-gacha="free"' + (freeAvailable() ? '' : ' disabled') + '>' + (freeAvailable() ? '🎁 오늘의 무료 뽑기' : '무료 뽑기 (내일)') + '</button>'
-      + '</div>';
-    const d = $('doc-shop');
-    d.innerHTML = '<div class="sns-cap" style="margin:2px 2px 8px">문서 ' + DOC_SHOP.docCost + ' → 조각 ' + DOC_SHOP.shardsPer + ' · 보유 문서 📜' + M.currencies.docs + '</div>'
-      + ROSTER.filter(c => M.owned[c.id]).map(c =>
-          '<div class="sns-card"><div class="sns-row">'
-          + '<div class="sns-ico">🧩</div>'
-          + '<div class="sns-grow"><div class="sns-nm">' + c.name + ' 조각</div><div class="sns-ds">보유 🔷' + (M.shards[c.id] || 0) + '</div></div>'
-          + '<div class="sns-act"><button class="sns-btn sm" data-doc="' + c.id + '">교환</button></div>'
-          + '</div></div>').join('');
+    const el = $('shop-body'); if (!el) return;
+    const tabs = [['gacha', '🎰 가챠'], ['doc', '📜 문서'], ['pkg', '💳 패키지']];
+    let h = '<div class="sns-tabs shoptabs">' + tabs.map(t => '<button class="sns-tab' + (shopTab === t[0] ? ' on' : '') + '" data-stab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+    h += shopTab === 'doc' ? shopDocBody() : shopTab === 'pkg' ? shopPkgBody() : shopGachaBody();
+    el.innerHTML = h;
+  }
+  function openGachaInfo() {
+    const box = $('gacha-modal-box');
+    box.innerHTML = '<h2>🎰 가챠 확률</h2>'
+      + '<div class="gi-rates">' + GACHA.rates.slice().reverse().map(r => { const R = RARITY[r.rarity] || {}, g = RAR_G[r.rarity] || 'g-n'; return '<div class="gi-row"><span class="g-tag ' + g + '">' + R.name + '</span><b>' + r.w + '%</b></div>'; }).join('') + '</div>'
+      + '<div class="gi-guide"><div class="gi-g"><b>🔷 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div>'
+      + '<div class="gi-g"><b>💎 10연</b> — 한 번에 10회 뽑기</div></div>'
+      + '<button class="btn primary" data-close="1">확인</button>';
+    $('gacha-modal').hidden = false;
   }
 
   function renderMissions() {
@@ -531,14 +569,19 @@ const Meta = (function () {
       if (s >= 0 && M.owned[d.id]) { assignPartySlot(s, d.id); renderFormation(); if (typeof Sound !== 'undefined') Sound.play('click'); }
     });
     window.addEventListener('pointercancel', (e) => { if (fDrag && e.pointerId === fDrag.pid) { fDrag = null; fmtGhost().style.display = 'none'; fmtClearHi(); } });
-    // 상점 탭
-    $('gacha-box').onclick = (e) => {
-      const el = e.target.closest('[data-gacha]'); if (!el || el.disabled) return;
-      const which = el.dataset.gacha;
-      const res = which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
-      if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
+    // 상점 탭(서브탭: 가챠/문서/패키지)
+    $('shop-body').onclick = (e) => {
+      const st = e.target.closest('[data-stab]'); if (st) { shopTab = st.dataset.stab; renderShop(); return; }
+      const gi = e.target.closest('[data-gachainfo]'); if (gi) { openGachaInfo(); return; }
+      const gc = e.target.closest('[data-gacha]');
+      if (gc && !gc.disabled) {
+        const which = gc.dataset.gacha;
+        const res = which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
+        if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
+        return;
+      }
+      const dc = e.target.closest('[data-doc]'); if (dc && !dc.disabled) { buyShards(dc.dataset.doc); renderShop(); renderBar(); }
     };
-    $('doc-shop').onclick = (e) => { const el = e.target.closest('[data-doc]'); if (el) { buyShards(el.dataset.doc); renderShop(); renderBar(); } };
     // 미션
     $('mission-list').onclick = (e) => { const el = e.target.closest('[data-mission]'); if (el && !el.disabled) { claimMission(el.dataset.mission); renderMissions(); renderBar(); } };
     // 방치 보상 받기

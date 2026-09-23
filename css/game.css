@@ -510,3 +510,33 @@ body {
 .lane-slot.empty { align-items: center; justify-content: center; color: var(--muted); }
 .lane-slot.empty .lane-empty { font-size: 7cqw; opacity: .6; }
 .lane-slot.empty .lane-lbl { font-size: 2.7cqw !important; color: var(--muted); opacity: .8; margin-top: 1cqw; }
+
+/* ═══ 상점 = 스틸앤샷式 (서브탭 → 가챠 배너 / 문서 카드 / 패키지 카드) ═══ */
+.shoptabs { margin-bottom: 3cqw; }
+.mkt-info { font-size: 3.1cqw; color: var(--muted); margin: 1cqw 0.5cqw 2.4cqw; }
+/* 가챠 배너 카드 */
+.gbanner { position: relative; background: linear-gradient(180deg, #2a2350, #1a1430); border: 1px solid #ffffff22; border-radius: 4cqw; padding: 4.4cqw 3cqw 3.4cqw; margin-bottom: 2.6cqw; text-align: center; }
+.gbanner .gb-info { position: absolute; top: 2.2cqw; right: 2.2cqw; width: 6.6cqw; height: 6.6cqw; border-radius: 50%; border: 1px solid #ffffff33; background: #ffffff16; color: var(--ink); font-size: 3.4cqw; font-weight: 800; cursor: pointer; padding: 0; line-height: 1; }
+.gbanner .gb-t { font-size: 4.4cqw; font-weight: 800; color: var(--amber); }
+.gbanner .gb-d { font-size: 3.2cqw; color: var(--muted); margin-top: 1cqw; }
+.gbanner .gb-d b { color: var(--amber); }
+.gbanner .gb-rates { font-size: 2.9cqw; color: var(--muted); margin: 2cqw 0 3cqw; opacity: .9; }
+.gbanner .gb-btns { display: flex; gap: 2cqw; }
+.gbanner .gb-btns .sns-btn { flex: 1; }
+/* 상점 카드 아이콘(캐릭터 이미지/이모지) */
+.shop-ico { flex: 0 0 auto; width: 13cqw; height: 13cqw; border-radius: 2.4cqw; background: #ffffff08; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.shop-ico img { width: 100%; height: 100%; object-fit: contain; }
+.shop-ico.emoji { font-size: 7cqw; }
+/* 인라인 등급 배지 */
+.g-tag { display: inline-flex; align-items: center; justify-content: center; font-size: 2.6cqw; font-weight: 900; color: #fff; padding: 0.3cqw 1.6cqw; border-radius: 1.2cqw; margin-right: 1cqw; vertical-align: middle; }
+.g-tag.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
+.g-tag.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
+.g-tag.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
+.g-tag.g-l { background: linear-gradient(180deg,#e0a13a,#c07d1e); color: #3a2a05; }
+/* 가챠 확률 팝업 */
+.gi-rates { display: flex; flex-direction: column; gap: 1.4cqw; margin: 3cqw 0; }
+.gi-row { display: flex; align-items: center; justify-content: space-between; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 2.4cqw; padding: 2cqw 3cqw; }
+.gi-row b { font-size: 4cqw; color: var(--amber); }
+.gi-guide { text-align: left; margin: 2cqw 0 1cqw; }
+.gi-g { font-size: 3cqw; color: var(--muted); line-height: 1.5; margin: 1.4cqw 0; }
+.gi-g b { color: var(--ink); }
