@@ -481,3 +481,32 @@ body {
 .stchar .sc-name { padding: 1.8cqw 1cqw; font-size: 3.2cqw; font-weight: 800; color: var(--ink); background: #241832; border-top: 1px solid #ffffff1c; }
 .stchar .onbadge { position: absolute; top: 6cqw; left: 50%; transform: translateX(-50%); font-size: 2.6cqw; font-weight: 800;
   color: #062a26; background: var(--cyan); border-radius: 1.4cqw; padding: 0.4cqw 2cqw; z-index: 2; }
+
+/* ═══ 편성: 배치칸 상단 고정 + 보유 목록만 스크롤(스틸앤샷 staffcol 규칙) ═══ */
+#tab-formation { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+#tab-formation > h2, #tab-formation > .sns-h, #tab-formation > #lane-slots { flex: 0 0 auto; }   /* 상단 고정 */
+#tab-formation > #owned-list { flex: 1 1 0; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 2cqw; align-content: start; }
+
+/* ═══ 배치 슬롯 = 스틸앤샷 stslot (캐릭터 이미지 + 하단 등급·이름) ═══ */
+#lane-slots, #sortie-party.lane-slots-view { display: flex; gap: 2cqw; margin: 2.6cqw 0; }
+.lane-slot { flex: 1; position: relative; display: flex; flex-direction: column; min-height: 34cqw;
+  background: #140f1e; border: 2px dashed #ffffff2a; border-radius: 3cqw; overflow: hidden; cursor: pointer; touch-action: none; padding: 0; gap: 0; }
+.lane-slot.on { border-style: solid; border-color: var(--cyan); background: #17122b; }
+.lane-slot.ro { cursor: default; }
+.lane-slot.drop-hi { border-color: var(--cyan); box-shadow: 0 0 0 3px #46e6d055; background: #46e6d01a; }
+.lane-slot .ls-img { flex: 1; min-height: 0; display: flex; align-items: flex-end; justify-content: center; }
+.lane-slot .ls-img img { height: 100%; width: auto; max-width: 100%; object-fit: contain; -webkit-user-drag: none; user-select: none; pointer-events: none; }
+.lane-slot .ls-nm { position: absolute; left: 0; right: 0; bottom: 1cqw; display: flex; align-items: center; justify-content: center; gap: 1cqw; padding: 0 1.4cqw; text-shadow: 0 2px 4px #000, 0 0 3px #000; }
+.lane-slot .ls-nn { font-size: 3cqw; font-weight: 800; color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-slot .ls-g { flex: 0 0 auto; font-size: 2.1cqw; font-weight: 900; color: #fff; padding: 0.3cqw 1.4cqw; border-radius: 1.2cqw; }
+.lane-slot .ls-g.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
+.lane-slot .ls-g.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
+.lane-slot .ls-g.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
+.lane-slot .ls-g.g-l { background: linear-gradient(180deg,#e0a13a,#c07d1e); color: #3a2a05; }
+.lane-slot .ls-x { position: absolute; top: 0.8cqw; right: 0.8cqw; z-index: 3; width: 5.6cqw; height: 5.6cqw; border: 0; border-radius: 1.6cqw;
+  background: #ff5db1cc; color: #fff; font-size: 3cqw; font-weight: 800; cursor: pointer; line-height: 1; padding: 0; }
+.lane-slot .ls-rlbl { position: absolute; top: 0.8cqw; left: 0.8cqw; z-index: 3; font-size: 2.2cqw; font-weight: 800; color: var(--muted);
+  background: #0e0a18cc; padding: 0.3cqw 1.4cqw; border-radius: 1.2cqw; }
+.lane-slot.empty { align-items: center; justify-content: center; color: var(--muted); }
+.lane-slot.empty .lane-empty { font-size: 7cqw; opacity: .6; }
+.lane-slot.empty .lane-lbl { font-size: 2.7cqw !important; color: var(--muted); opacity: .8; margin-top: 1cqw; }

@@ -219,9 +219,13 @@ const Meta = (function () {
     if (box) {
       box.className = 'lane-slots-view'; box.innerHTML = '';
       partySlots().forEach((id, lane) => {
-        const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty');
-        if (id) { const c = leveledDef(id); d.innerHTML = '<b>' + c.name + '</b><span>공 ' + c.atk + ' · 체 ' + c.hp + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>'; }
-        else d.innerHTML = '<span class="lane-empty">비어 있음</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
+        const d = document.createElement('div'); d.className = 'lane-slot ro' + (id ? ' on' : ' empty');
+        if (id) {
+          const c = leveledDef(id), b = base(id), R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n';
+          d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
+            + '<div class="ls-img"><img src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()"></div>'
+            + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
+        } else d.innerHTML = '<span class="lane-empty">–</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
         box.append(d);
       });
     }
@@ -309,15 +313,14 @@ const Meta = (function () {
   function renderFormation() {
     const slots = $('lane-slots'); slots.innerHTML = '';
     partySlots().forEach((id, lane) => {
-      const d = document.createElement('div'); d.className = 'lane-slot' + (id ? '' : ' empty'); d.dataset.slot = lane; d.dataset.lane = lane;
+      const d = document.createElement('div'); d.className = 'lane-slot' + (id ? ' on' : ' empty'); d.dataset.slot = lane; d.dataset.lane = lane;
       if (id) {
-        const c = leveledDef(id), cl = CLASS[c.cls] || {};
+        const c = leveledDef(id), b = base(id), R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n';
         d.dataset.char = id;
-        d.innerHTML = '<button class="ls-x" data-un="' + lane + '">✕</button>'
-          + '<b>' + c.name + '</b>'
-          + '<span class="ls-cls" style="color:' + (cl.color || 'var(--cyan)') + '">' + (cl.icon || '') + '</span>'
-          + '<span>Lv.' + c.level + ' ★' + c.star + '</span>'
-          + '<span class="lane-lbl">' + (lane + 1) + '레인</span>';
+        d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
+          + '<button class="ls-x" data-un="' + lane + '">✕</button>'
+          + '<div class="ls-img"><img src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()"></div>'
+          + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
       } else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인 · 드래그 배치</span>';
       slots.append(d);
     });
