@@ -275,7 +275,7 @@ const Meta = (function () {
     function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
     for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
     function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
-    const fireLine = () => D.groundY - D.h * 0.14;      // 이 선 아래로 내려오면 사격
+    const fireLine = () => D.h * 0.22;      // 상단 22% 아래로 들어오면 사격(사거리 = 22%~지면, 화면 대부분)
     let last = performance.now(), fireT = 0;
     function step(dt) {
       if (Math.random() < dt * 1.3) spawn();
@@ -284,8 +284,8 @@ const Meta = (function () {
       fireT -= dt;
       const targets = D.en.filter(e => e.y > fireLine());
       if (targets.length && fireT <= 0) {
-        fireT = 0.22 + Math.random() * 0.12;                       // 사격 간격
-        const t = targets[0];                                       // 가장 앞선(먼저 진입) 적 집중 사격
+        fireT = 0.18 + Math.random() * 0.1;                        // 사격 간격
+        const t = targets.reduce((a, b) => (b.y > a.y ? b : a));    // 가장 가까운(아래쪽) 적 우선 조준
         const ci = Math.floor(Math.random() * Math.max(1, chars.length));
         D.bm.push({ x1: charX(ci, chars.length), y1: D.groundY - D.charS * 0.5, x2: t.x, y2: t.y, t: 0.16 });
         t.hp -= 1; t.hit = 0.14;
