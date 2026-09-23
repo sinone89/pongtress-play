@@ -39,10 +39,10 @@ const PEG_TYPES = {
   mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
   bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 0,  oneShot: false, boost: 1.28 },  // weight0=랜덤 스폰 제외(범퍼는 고정 장애물로 이전, 패시브/보상 설치만)
   gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
-  attack: { name: '공격',   color: '#ff6b6b', shape: 'triangle', size: 1.1,  weight: 6,  oneShot: true,  atk: 2,  label: '＋' }
+  charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' }   // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
 };
-// 일반(반사) 페그는 기능은 같되 모양을 여러 가지로(원 가중). 판이 실제 핀볼처럼 다채롭게 보이도록.
-const NORMAL_SHAPES = ['circle', 'circle', 'square', 'pentagon', 'pill'];
+// 일반(반사) 페그는 모두 원형으로 통일(가독성·정렬감).
+const NORMAL_SHAPES = ['circle'];
 
 // 페그 하나 생성: 종류별 기본 크기 × 개별 지터(±) → 물리 반경(pr)·모양(shape) 확정
 function makePeg(fx, fy, type) {
@@ -85,7 +85,7 @@ const ROSTER = [
   { id: 'berserker', cls: 'gunner', name: '카린', weapon: '캐논', rarity: 'epic', atk: 14, hp: 34, gol: 1,
     concept: '긴 흑발 크림슨 롱코트의 쿨한 에이스. 디테일이 강조된 대형 캐논(크림슨·미세 골드)',
     active: { name: '강습 포격', gauge: 16, kind: 'bigHit', mult: 4 },
-    passive: { name: '화력 증강', kind: 'addPeg', peg: 'attack', n: 1 } },
+    passive: { name: '증폭탄', kind: 'addPeg', peg: 'charge', n: 1 } },
   { id: 'valkyrie', cls: 'gunner', name: '발키리', weapon: '캐논', rarity: 'legendary', atk: 18, hp: 34, gol: 2,
     concept: '백금·핑크 롱헤어에 흑·금 제복과 날개 장식의 정예. 골드 트림 거대 캐논',
     active: { name: '풀메탈', gauge: 16, kind: 'extraShots', shots: 6 },
@@ -267,14 +267,15 @@ const COMBATS = [
 ];
 
 // ── 레벨업 보상 후보(3택1) ──
+// 개편 원칙: 선택 시 '항상' 효과가 있어야 함(무효화 없음) + 판(페그/장애물)을 건드리지 않음(겹침 방지).
+//   → 골칸 개방/버프 칸(포켓 꽉 차면 무효)·증식판/범퍼 설치(페그 겹침)는 제거하고 순수 스탯 보상으로 교체.
 const REWARDS = [
-  { id: 'heal',   name: '수리',      desc: '성벽 HP +25', apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 25); } },
-  { id: 'atk',    name: '연마',      desc: '모든 캐릭터 공격력 +1 (이번 런)', apply: (S) => { S.atkBonus += 1; } },
-  { id: 'open',   name: '골칸 개방', desc: '꽝 포켓 1칸을 충전 칸으로', apply: (S) => { openOneBlank(S); } },
-  { id: 'ball',   name: '증설',      desc: '이번 런 장전 볼 +1', apply: (S) => { S.bonusBalls += 1; } },
-  { id: 'mult',   name: '증식판',    desc: '핀볼판에 ×2 페그 추가', apply: (S) => { addPegToBoard(S, 'mult2', 2); } },
-  { id: 'buff',   name: '버프 칸',   desc: '꽝 포켓 1칸을 버프(성벽 회복) 칸으로', apply: (S) => { S.buffBonus = (S.buffBonus || 0) + 1; const pk = S.pockets.find(p => p.type === 'blank'); if (pk) pk.type = 'buff'; } },
-  { id: 'bumper', name: '범퍼 설치', desc: '핀볼판에 범퍼 2개 추가', apply: (S) => { addPegToBoard(S, 'bumper', 2); } }
+  { id: 'heal',  name: '🔧 수리',   desc: '성벽 HP +30',                  apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 30); } },
+  { id: 'atk',   name: '⚔️ 연마',   desc: '모든 캐릭터 공격력 +1',         apply: (S) => { S.atkBonus += 1; } },
+  { id: 'maxhp', name: '🏰 증축',   desc: '성벽 최대 HP +40 (+즉시 회복)', apply: (S) => { S.wallHpMax += 40; S.wallHp += 40; } },
+  { id: 'ball',  name: '➕ 증설',   desc: '이번 런 장전 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
+  { id: 'power', name: '🎯 정예화', desc: '모든 캐릭터 공격력 +2',         apply: (S) => { S.atkBonus += 2; } },
+  { id: 'fort',  name: '🛡 요새화', desc: '성벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
 ];
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──

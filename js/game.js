@@ -462,10 +462,10 @@
   }
 
   // 페그가 변환되어 생기는 "수확 볼": 상단으로 상승해 충전만 함(다른 페그와 상호작용 X → 연쇄 없음). 배수 페그는 n개.
-  function spawnBalls(x, y, n, color) {
+  function spawnBalls(x, y, n, color, charge) {
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
       const vx = (Math.random() - 0.5) * 200;                    // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
-      S.balls.push({ x, y, vx, vy: -CFG.launchSpeed * 0.92, r: CFG.ballRadius, age: 0, color, harvest: true });
+      S.balls.push({ x, y, vx, vy: -CFG.launchSpeed * 0.92, r: CFG.ballRadius, age: 0, color, harvest: true, charge: charge || 1 });
     }
   }
 
@@ -480,8 +480,8 @@
     }
     // 볼로 변환(일반1개 · 배수 ×2→2개 · ×5→5개). 페그는 사라지고 턴마다 부활.
     if (def.gold) { S.gold = (S.gold || 0) + def.gold; anim.floats.push({ x: px, y: py, text: '+' + def.gold + 'G', color: def.color, t: 1 }); }
-    if (def.atk) { S.turnAtk = (S.turnAtk || 0) + def.atk; anim.floats.push({ x: px, y: py, text: '공격+' + def.atk, color: def.color, t: 1 }); }
-    spawnBalls(px, py, 1 + (def.split || 0), def.color);
+    if (def.charge > 1) anim.floats.push({ x: px, y: py, text: '충전 ×' + def.charge, color: def.color, t: 1 });
+    spawnBalls(px, py, 1 + (def.split || 0), def.color, def.charge || 1);
     p.alive = false;
   }
 
