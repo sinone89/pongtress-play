@@ -12,10 +12,23 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=106">
+  <link rel="stylesheet" href="css/game.css?v=107">
 </head>
 <body>
   <div id="app">
+    <!-- 로그인 게이트(로컬 다중 프로필: 아이디/비번) -->
+    <div id="login">
+      <h1 class="lg-logo">PONGTRESS</h1>
+      <p class="lg-tag">튕겨서 충전하는 로그라이크 핀볼</p>
+      <div class="lg-box">
+        <input id="lg-id" placeholder="아이디" autocomplete="off" autocapitalize="off" maxlength="16">
+        <input id="lg-pw" type="password" placeholder="비밀번호" autocomplete="off" maxlength="24">
+        <div class="lg-msg" id="lg-msg"></div>
+        <button class="lg-btn" id="lg-login">로그인 / 시작</button>
+      </div>
+      <p class="lg-note">처음 쓰는 아이디는 자동으로 새 계정이 만들어져요 · 이 기기에만 저장</p>
+    </div>
+
     <!-- 타이틀(풀스크린 키아트 + 터치하여 시작) -->
     <section id="title" class="screen">
       <img id="title-art" src="assets/char/behemoth_cg.png" alt="" onerror="this.style.display='none'">
@@ -37,6 +50,7 @@
         <span class="cur">💎<b id="cur-gems">0</b></span>
         <span class="cur">📜<b id="cur-docs">0</b></span>
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
+        <button class="acct-btn" id="acct-btn"></button>
       </header>
       <main id="lobby-main">
         <div id="tab-home" class="lobby-panel">
@@ -133,9 +147,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=106"></script>
-  <script src="js/content.js?v=106"></script>
-  <script src="js/meta.js?v=106"></script>
-  <script src="js/game.js?v=106"></script>
+  <script src="js/audio.js?v=107"></script>
+  <script src="js/content.js?v=107"></script>
+  <script src="js/meta.js?v=107"></script>
+  <script src="js/game.js?v=107"></script>
 </body>
 </html>

@@ -16,6 +16,7 @@ body {
 /* 고정 세로 프레임(9:16) — transform scale 대신 실제 px로 렌더(전체 흐림 방지). 넓은 화면에선 레터박스. */
 #app { position: relative;
   width: min(100vw, calc(100dvh * 9 / 16)); height: min(100dvh, calc(100vw * 16 / 9));
+  container-type: inline-size;   /* 로비 UI를 프레임 폭 대비 cqw로 확대(스틸앤샷式 비율) */
   display: flex; flex-direction: column; overflow: hidden;
   background: radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); box-shadow: 0 0 0 1px #ffffff14, 0 0 90px #000a; }
 .screen { flex: 1; display: flex; flex-direction: column; min-height: 0; }
@@ -290,3 +291,122 @@ body {
 #build-tag { position: fixed; left: 6px; bottom: 3px; z-index: 100; font: 10px/1 monospace; color: #ffffff40; cursor: pointer; padding: 4px 6px; }
 #boot-error { position: fixed; inset: auto 0 0 0; margin: 0; padding: 12px; z-index: 99;
   background: #400; color: #fbb; font: 12px/1.4 monospace; white-space: pre-wrap; }
+
+/* ═══════════════════════════════════════════════════════════════
+   메인(로비) 화면 대형화 — 프레임 폭 대비 cqw (스틸앤샷式 비율)
+   1cqw = #app 폭의 1%. 프레임이 커지면 UI도 같은 비율로 확대(디바이스 불문 일관).
+   ═══════════════════════════════════════════════════════════════ */
+/* 상단 통화 칩 */
+#lobby-top { gap: 1.6cqw; padding: 3cqw 3.4cqw; padding-top: max(3cqw, env(safe-area-inset-top)); font-size: 3.7cqw; }
+#lobby-top .cur { gap: 1.1cqw; padding: 1.5cqw 2.8cqw; border-radius: 999px; font-size: 3.7cqw; }
+.lobby-mute { font-size: 5.4cqw; padding: 0 1cqw; }
+.acct-btn { appearance: none; border: 1px solid #ffffff22; background: #ffffff10; color: var(--muted);
+  font: inherit; font-weight: 800; font-size: 3cqw; padding: 1.4cqw 2.6cqw; border-radius: 999px; cursor: pointer; max-width: 26cqw;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* 패널/스크롤 영역 */
+#lobby-main { padding: 2cqw 4cqw; }
+.lobby-panel h2 { font-size: 5cqw; margin: 1.4cqw 0 2.4cqw; }
+/* 패널 대형 헤더 */
+#tab-formation > h2, #tab-shop > h2, #tab-mission > h2 {
+  font-size: 4.7cqw; margin: 1cqw 0.5cqw 3cqw; padding: 2.8cqw 3.6cqw;
+  border-left-width: 1cqw; border-radius: 2.6cqw; gap: 2cqw; }
+/* 서브 섹션 헤더 */
+.sns-h { font-size: 3.9cqw; margin: 3.6cqw 0.5cqw 2cqw; padding: 2.2cqw 3cqw; border-left-width: 0.8cqw; border-radius: 2cqw; gap: 1.5cqw; }
+.sns-h .sns-sub { font-size: 3.1cqw; }
+/* 카드/행 */
+.sns-card { padding: 3.4cqw; border-radius: 3.6cqw; margin-bottom: 2.6cqw; }
+.sns-card .sns-title { font-size: 4cqw; margin-bottom: 1cqw; gap: 1.5cqw; }
+.sns-card .sns-cap { font-size: 3.2cqw; margin-bottom: 2.4cqw; }
+.sns-row { gap: 2.4cqw; }
+.sns-ico { font-size: 6.6cqw; width: 11cqw; }
+.sns-nm { font-size: 4cqw; }
+.sns-ds { font-size: 3.2cqw; margin-top: 0.8cqw; }
+/* 청키 버튼 */
+.sns-btn { font-size: 4cqw; padding: 2.9cqw 4.6cqw; border-radius: 3cqw; }
+.sns-btn.sm { font-size: 3.4cqw; padding: 2cqw 3.6cqw; border-radius: 2.6cqw; }
+.sns-tabs { gap: 2cqw; margin-bottom: 3cqw; }
+.sns-tab { font-size: 3.5cqw; padding: 2.6cqw 0; border-radius: 2.6cqw; }
+.sns-act { gap: 1.5cqw; }
+/* 대형 CTA(출격 등) — 로비 한정 */
+#lobby-main .btn, .home-cta-btn { font-size: 4.8cqw; padding: 3.4cqw 7cqw; }
+/* 스테이지 선택 */
+.ss-btns { gap: 2cqw; }
+.ss-btn { font-size: 4.8cqw; padding: 3cqw 0; border-radius: 3cqw; }
+.ss-btn.locked { font-size: 3.6cqw; }
+/* 편성/출격 레인 슬롯 */
+#sortie-party, #lane-slots { gap: 2cqw; margin: 3.4cqw 0; }
+.lane-slot { padding: 3cqw 1.6cqw; min-height: 22cqw; border-radius: 3cqw; gap: 0.8cqw; }
+.lane-slot b { font-size: 4cqw; }
+.lane-slot span { font-size: 3cqw; }
+.lane-slot .ls-cls { font-size: 3.4cqw; }
+.lane-lbl { font-size: 2.7cqw !important; }
+.lane-empty { font-size: 6cqw; }
+.lane-slot .ls-x { width: 5.6cqw; height: 5.6cqw; font-size: 3.2cqw; border-radius: 1.6cqw; }
+/* 보유 캐릭터 칩 */
+#owned-list { gap: 2cqw; }
+.char-chip { padding: 2.6cqw 1cqw; border-radius: 3cqw; }
+.cc-cg { height: 24cqw; border-radius: 2cqw; }
+.cc-name { font-size: 3.7cqw; }
+.cc-sub { font-size: 3cqw; }
+.cc-cls { font-size: 2.8cqw; }
+.cc-wpn { font-size: 2.5cqw; }
+.cc-rar { font-size: 2.8cqw; }
+.cc-badge { font-size: 2.6cqw; padding: 0.3cqw 1.4cqw; border-radius: 1.6cqw; }
+/* 홈(방치형) 오버레이 카드 */
+.home-scene-tag { font-size: 3.2cqw; padding: 1cqw 2.6cqw; left: 3.2cqw; top: 2.8cqw; }
+.idle-card { padding: 3cqw 3.4cqw; border-radius: 3.6cqw; left: 3cqw; right: 3cqw; bottom: 3cqw; }
+.idle-card .il-time { font-size: 3cqw; }
+.idle-card .il-amt { font-size: 4cqw; }
+.idle-card .il-row { gap: 2.4cqw; margin-top: 2cqw; }
+/* 상점/가챠/미션 */
+.gacha-info { font-size: 3.2cqw; margin-bottom: 2.4cqw; }
+.gacha-btns { gap: 2cqw; }
+.doc-row { padding: 2.6cqw 3cqw; border-radius: 2.6cqw; font-size: 3.5cqw; margin-bottom: 1.6cqw; }
+.mission-row { padding: 3cqw; border-radius: 3cqw; margin-bottom: 2.4cqw; }
+.mi-reward { font-size: 3.4cqw; }
+.mi-desc { font-size: 3.2cqw; margin: 1cqw 0; }
+.mi-bar { height: 1.7cqw; margin-top: 2cqw; }
+.mi-claim { padding: 2.4cqw; border-radius: 2.6cqw; font-size: 3.6cqw; }
+/* 하단 내비(아이콘+라벨) */
+.tabbtn { font-size: 3.2cqw; padding: 2.4cqw 1cqw 2.8cqw; gap: 0.9cqw; }
+.tabbtn .tb-ic { font-size: 6.8cqw; }
+.tabbtn.active { box-shadow: inset 0 0.7cqw 0 var(--cyan); }
+/* 캐릭터 상세 모달 */
+.cd-head .cd-nav { width: 8cqw; height: 8cqw; font-size: 4.6cqw; border-radius: 2.4cqw; }
+.cd-title { font-size: 4.6cqw; }
+.cd-stars { font-size: 3.6cqw; }
+.cd-portrait { width: 40cqw; }
+.cd-info .cd-cls { font-size: 3.7cqw; }
+.cd-info .cd-wpn { font-size: 3.2cqw; }
+.cd-info .cd-lv { font-size: 3.3cqw; } .cd-info .cd-lv b { font-size: 4cqw; }
+.cd-statgrid span { font-size: 3cqw; padding: 1.6cqw 1cqw; border-radius: 2.4cqw; }
+.cd-statgrid b { font-size: 3.6cqw; }
+.cd-concept { font-size: 3cqw; }
+.cd-skill { padding: 2.4cqw 3cqw; border-radius: 2.8cqw; }
+.cd-sk-h b { font-size: 3.4cqw; }
+.cd-sk-tag { font-size: 2.6cqw; padding: 0.5cqw 1.7cqw; }
+.cd-sk-d { font-size: 3cqw; }
+/* 보상/결과 모달 */
+.reward-card { padding: 3.4cqw; border-radius: 3cqw; }
+.reward-card .rc-name { font-size: 4cqw; }
+.reward-card .rc-desc { font-size: 3.2cqw; }
+
+/* ── 로그인 게이트(스틸앤샷式 로컬 다중 프로필) ── */
+#login { position: absolute; inset: 0; z-index: 120; display: none; flex-direction: column;
+  align-items: center; justify-content: center; gap: 5cqw; padding: 12cqw 8cqw;
+  background: linear-gradient(180deg, #0d0b1ecc 0%, #0d0b1eee 55%, #0d0b1ef8 100%), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); }
+#login.show { display: flex; }
+#login .lg-logo { font-size: 12cqw; letter-spacing: 0.6cqw; font-weight: 800; margin: 0;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--amber));
+  -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 10px #0009); }
+#login .lg-tag { color: var(--muted); font-size: 3.4cqw; margin: -2cqw 0 2cqw; }
+#login .lg-box { display: flex; flex-direction: column; gap: 3cqw; width: 100%; max-width: 82cqw; }
+#login input { font-size: 4.4cqw; padding: 3.6cqw 4cqw; border-radius: 3cqw; border: 2px solid #ffffff26;
+  background: #160f26; color: var(--ink); text-align: center; }
+#login input:focus { outline: none; border-color: var(--cyan); }
+#login .lg-msg { min-height: 4.6cqw; font-size: 3.2cqw; font-weight: 700; color: var(--magenta); text-align: center; }
+#login .lg-btn { font-size: 5cqw; font-weight: 800; padding: 3.6cqw 0; border: 0; border-radius: 3.4cqw;
+  background: linear-gradient(90deg, var(--cyan), var(--magenta)); color: var(--bg); box-shadow: 0 8px 22px rgba(255,93,177,.3); cursor: pointer; }
+#login .lg-btn:active { transform: translateY(1px); }
+#login .lg-note { color: var(--muted); font-size: 3cqw; text-align: center; line-height: 1.5; margin-top: 1cqw; }
+#login .lg-logout { position: absolute; }

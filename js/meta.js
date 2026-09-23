@@ -3,13 +3,39 @@
  * 저장(localStorage) · 화폐 · 캐릭터 보유/편성/성장 · 가챠 · 상점 · 미션 + 로비 UI.
  */
 const Meta = (function () {
-  const KEY = 'pongtress_meta_v1';
+  const KEY = 'pongtress_meta_v1';                         // 레거시(익명) 세이브 키
+  const ACCTS_KEY = 'pongtress_accts', CUR_KEY = 'pongtress_cur';
   const $ = (id) => document.getElementById(id);
   let M = null, activeTab = 'home', onSortie = null, cdTab = 'lvup', cdId = null;
 
+  // ── 로컬 계정(다중 프로필): 아이디/비번 → 계정별 세이브 (스틸앤샷式) ──
+  let curAcct = null; try { curAcct = localStorage.getItem(CUR_KEY) || null; } catch (e) {}
+  function saveKey() { return curAcct ? ('pongtress_meta_' + curAcct) : KEY; }
+  function getAccts() { try { return JSON.parse(localStorage.getItem(ACCTS_KEY)) || {}; } catch (e) { return {}; } }
+  function setAccts(a) { try { localStorage.setItem(ACCTS_KEY, JSON.stringify(a)); } catch (e) {} }
+  function curAccount() { return curAcct; }
+  function needsLogin() { return !curAcct; }
+  function lgMsg(m) { const e = $('lg-msg'); if (e) e.textContent = m || ''; }
+  function showLogin() { const l = $('login'); if (l) l.classList.add('show'); const id = $('lg-id'); if (id) setTimeout(() => id.focus(), 80); }
+  function submitLogin() {
+    const id = ($('lg-id').value || '').trim(), pw = $('lg-pw').value || '';
+    if (!id || !pw) { lgMsg('아이디와 비밀번호를 입력하세요'); return; }
+    if (id.length < 2) { lgMsg('아이디는 2자 이상이어야 해요'); return; }
+    const a = getAccts();
+    if (a[id]) { if (a[id].pw !== pw) { lgMsg('비밀번호가 틀렸어요'); return; } }   // 기존 계정: 비번 확인
+    else { a[id] = { pw }; setAccts(a); }                                          // 새 아이디 = 새 계정 자동 생성
+    try { localStorage.setItem(CUR_KEY, id); } catch (e) {}
+    location.reload();                                                             // 리로드로 해당 계정 세이브 재초기화
+  }
+  function logout() {
+    if (!confirm('로그아웃할까요? 진행상황은 「' + curAcct + '」 계정에 저장돼 있어요.')) return;
+    try { localStorage.removeItem(CUR_KEY); } catch (e) {}
+    location.reload();
+  }
+
   // ── 저장/로드 ──
   function load() {
-    try { M = JSON.parse(localStorage.getItem(KEY)); } catch (e) { M = null; }
+    try { M = JSON.parse(localStorage.getItem(saveKey())); } catch (e) { M = null; }
     if (!M || !M.owned) M = JSON.parse(JSON.stringify(META_START));
     // 전방호환 보정
     M.currencies = Object.assign({ gold: 0, mats: 0, gems: 0, docs: 0 }, M.currencies);
@@ -24,7 +50,7 @@ const Meta = (function () {
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
     save();
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(M)); } catch (e) {} }
+  function save() { if (!curAcct) return; try { localStorage.setItem(saveKey(), JSON.stringify(M)); } catch (e) {} }   // 로그인 전(게이트)엔 저장 안 함
 
   // ── 조회/스탯 ──
   const base = (id) => ROSTER.find(c => c.id === id);
@@ -355,7 +381,7 @@ const Meta = (function () {
     else if (k === 'stages') M.maxStage = STAGE_MAX;
     else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
     else if (k === 'freegacha') M.daily.freeGachaDate = '';
-    else if (k === 'reset') { try { localStorage.removeItem(KEY); } catch (e) {} load(); }
+    else if (k === 'reset') { try { localStorage.removeItem(saveKey()); } catch (e) {} load(); }
     save(); renderCheat(); renderLobby();
   }
 
@@ -446,6 +472,12 @@ const Meta = (function () {
   // ── 이벤트 와이어링(위임) ──
   function init(opts) {
     onSortie = opts && opts.onSortie;
+    // 로그인 게이트 배선
+    const lgBtn = $('lg-login'); if (lgBtn) lgBtn.onclick = submitLogin;
+    const lgId = $('lg-id'); if (lgId) lgId.addEventListener('keydown', e => { if (e.key === 'Enter') { const p = $('lg-pw'); if (p) p.focus(); } });
+    const lgPw = $('lg-pw'); if (lgPw) lgPw.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
+    const acct = $('acct-btn'); if (acct) { acct.textContent = curAcct ? ('👤 ' + curAcct) : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }
+    if (needsLogin()) showLogin();
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
@@ -507,5 +539,5 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, get state() { return M; } };
 })();
