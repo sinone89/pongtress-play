@@ -829,8 +829,12 @@
     if (shk) { ctx.save(); ctx.translate((Math.random() - 0.5) * anim.shake, (Math.random() - 0.5) * anim.shake); }
     const r = layout();
     const fr = r.field, cellW = fr.w / CFG.fieldLanes, cellH = fr.h / CFG.fieldRows;
+    // 영역 배경 레이어(이미지 있으면 각 영역에 그림 · 없으면 현행 도형 폴백)
+    const _bg = (typeof BgArt !== 'undefined') ? BgArt : null;
+    const bgField = _bg && _bg.ready('bg_field'), bgWall = _bg && _bg.ready('bg_wall'), bgBoard = _bg && _bg.ready('bg_board');
     // 필드 배경
-    ctx.fillStyle = '#ffffff08'; ctx.fillRect(fr.x, fr.y, fr.w, fr.h);
+    if (bgField) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgField, fr.x, fr.y, fr.w, fr.h); ctx.restore(); }
+    else { ctx.fillStyle = '#ffffff08'; ctx.fillRect(fr.x, fr.y, fr.w, fr.h); }
     // 위험 지대(맨 아래 행 = 성벽 접점) 강조 → 적이 다가옴을 인지
     ctx.fillStyle = '#ff5b5b16'; ctx.fillRect(fr.x, fr.y + fr.h - cellH, fr.w, cellH);
     // 전진 칸 격자(레인 세로 + 행 가로)
@@ -870,7 +874,8 @@
     }
     // 성벽(캐릭터 방어선)
     const wr = r.wall, cw = wr.w / CFG.lanes;
-    ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h);
+    if (bgWall) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgWall, wr.x, wr.y, wr.w, wr.h); ctx.restore(); }
+    else { ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h); }
     const crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22));
     const cFont = Math.max(11, Math.round(crad * 0.62)), showChar = wr.h > 55;
     const sprState = (S.phase === 'load') ? 'load' : 'fire';
@@ -906,8 +911,9 @@
     const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
     if (pinAlpha > 0.01) {
     ctx.save(); ctx.globalAlpha = pinAlpha;
-    // 핀볼 필드
-    ctx.fillStyle = '#00000022'; ctx.fillRect(r.pins.x, r.pins.y, r.pins.w, r.pins.h);
+    // 핀볼 필드(페그판)
+    if (bgBoard) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgBoard, r.pins.x, r.pins.y, r.pins.w, r.pins.h); ctx.restore(); }
+    else { ctx.fillStyle = '#00000022'; ctx.fillRect(r.pins.x, r.pins.y, r.pins.w, r.pins.h); }
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;

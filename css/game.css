@@ -551,3 +551,9 @@ body {
 .gi-guide { text-align: left; margin: 2cqw 0 1cqw; }
 .gi-g { font-size: 3cqw; color: var(--muted); line-height: 1.5; margin: 1.4cqw 0; }
 .gi-g b { color: var(--ink); }
+
+/* ═══ 배경 이미지 슬롯 (파일 있으면 적용, 없으면 그라데이션 폴백) ═══
+   background-image 목록의 이미지가 404면 그 레이어만 비고 아래 그라데이션이 그대로 보임 */
+#combat { background: url('assets/bg/bg_battle.png') center/cover no-repeat; }   /* 404 → 투명 → #app 그라데이션 */
+#tab-home { background-image: url('assets/bg/bg_lobby.png'), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
+#login { background-image: url('assets/bg/bg_login.png'), linear-gradient(180deg, #0d0b1ecc 0%, #0d0b1eee 55%, #0d0b1ef8 100%), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); background-size: cover, cover, cover; background-position: center; background-repeat: no-repeat; }

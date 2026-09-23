@@ -353,3 +353,5 @@ const FxArt = makeCanvasLoader('assets/fx/');
 const EnemyArt = makeCanvasLoader('assets/enemy/');
 // 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
 const PegArt = makeCanvasLoader('assets/peg/');
+// 배경/영역 레이어: assets/bg/<name>.png (bg_field/bg_wall/bg_board/frame_pocket/bg_launcher…). 없으면 현행 도형 폴백.
+const BgArt = makeCanvasLoader('assets/bg/');
