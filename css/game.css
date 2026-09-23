@@ -296,6 +296,14 @@ body {
    메인(로비) 화면 대형화 — 프레임 폭 대비 cqw (스틸앤샷式 비율)
    1cqw = #app 폭의 1%. 프레임이 커지면 UI도 같은 비율로 확대(디바이스 불문 일관).
    ═══════════════════════════════════════════════════════════════ */
+/* UI 아이콘 spr-box — 이미지(assets/ui/<name>.png) 있으면 이모지 대체, 없으면 이모지 폴백 */
+.uic { display: inline-flex; align-items: center; justify-content: center; position: relative; line-height: 1; vertical-align: middle; }
+.uic > .uic-fb { line-height: 1; }
+.uic > .uic-im { display: none; width: 100%; height: 100%; object-fit: contain; }
+.uic.ok > .uic-fb { display: none; }
+.uic.ok > .uic-im { display: block; }
+.cur .uic, .tabbtn .uic { width: 1.15em; height: 1.15em; }
+
 /* 상단 통화 칩 */
 #lobby-top { gap: 1.6cqw; padding: 3cqw 3.4cqw; padding-top: max(3cqw, env(safe-area-inset-top)); font-size: 3.7cqw; }
 #lobby-top .cur { gap: 1.1cqw; padding: 1.5cqw 2.8cqw; border-radius: 999px; font-size: 3.7cqw; }

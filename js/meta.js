@@ -69,6 +69,9 @@ const Meta = (function () {
     return { atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm), gol: b.gol };
   }
   const RAR_G = { common: 'g-n', rare: 'g-r', epic: 'g-e', legendary: 'g-l' };   // 등급 배너 클래스
+  // UI 아이콘: assets/ui/<name>.png 있으면 이모지 대체, 없으면 이모지 폴백(spr-box)
+  function uiIcon(name, emoji, style) { return '<span class="uic"' + (style ? (' style="' + style + '"') : '') + '><span class="uic-fb">' + emoji + '</span><img class="uic-im" alt="" src="assets/ui/' + name + '.png" onload="this.parentNode.classList.add(\'ok\')" onerror="this.remove()"></span>'; }
+  function clsIcon(cls) { const c = CLASS[cls] || {}; return uiIcon('cls_' + cls, c.icon || '🔫'); }
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }
   function stage() { return M.stage; }
@@ -261,6 +264,7 @@ const Meta = (function () {
     const ctx = cv.getContext('2d'); const party = partySlots();
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
     const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
+    const eTypes = ['goblin', 'bat', 'orc', 'wolf', 'brute', 'slime'];   // 이미지 있으면 매칭(EnemyArt)
     // 모든 치수를 캔버스 크기(D.w/D.h) 비례로 — 현재 UI(프레임 폭) 확대에 맞춰 자동 스케일
     const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, n: 1 };
     function fit() {
@@ -274,7 +278,7 @@ const Meta = (function () {
     }
     fit();
     const enemyR = () => D.w * 0.028 + Math.random() * D.w * 0.014;           // 적 반경(폭 비례)
-    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2); return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y: y, r: enemyR(), col: eCol[Math.floor(Math.random() * eCol.length)], hp: hp, mhp: hp, hit: 0 }; }
+    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2), i = Math.floor(Math.random() * eTypes.length); return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y: y, r: enemyR(), type: eTypes[i], col: eCol[i % eCol.length], hp: hp, mhp: hp, hit: 0 }; }
     function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
     for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
     function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
@@ -303,7 +307,11 @@ const Meta = (function () {
       ctx.clearRect(0, 0, D.w, D.h);
       const hbH = Math.max(2, D.h * 0.006), hbGap = D.h * 0.014;
       for (const e of D.en) {
-        ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill();
+        const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.type) : null;
+        if (espr) {
+          const s = e.r * 2.4; ctx.imageSmoothingEnabled = true; ctx.drawImage(espr, e.x - s / 2, e.y - s / 2, s, s);
+          if (e.hit > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, e.hit * 4); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); ctx.restore(); }
+        } else { ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); }
         if (e.hp < e.mhp) { const bw = e.r * 1.8; ctx.fillStyle = '#0008'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw, hbH); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw * e.hp / e.mhp, hbH); }
       }
       for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = Math.max(2, D.w * 0.008); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
@@ -387,8 +395,8 @@ const Meta = (function () {
   }
   function renderShop() {
     const el = $('shop-body'); if (!el) return;
-    const tabs = [['gacha', '🎰 가챠'], ['doc', '📜 문서'], ['pkg', '💳 패키지']];
-    let h = '<div class="sns-tabs shoptabs">' + tabs.map(t => '<button class="sns-tab' + (shopTab === t[0] ? ' on' : '') + '" data-stab="' + t[0] + '">' + t[1] + '</button>').join('') + '</div>';
+    const tabs = [['gacha', 'ic_gacha', '🎰', '가챠'], ['doc', 'cur_docs', '📜', '문서'], ['pkg', 'ic_package', '💳', '패키지']];
+    let h = '<div class="sns-tabs shoptabs">' + tabs.map(t => '<button class="sns-tab' + (shopTab === t[0] ? ' on' : '') + '" data-stab="' + t[0] + '">' + uiIcon(t[1], t[2]) + ' ' + t[3] + '</button>').join('') + '</div>';
     h += shopTab === 'doc' ? shopDocBody() : shopTab === 'pkg' ? shopPkgBody() : shopGachaBody();
     el.innerHTML = h;
   }
@@ -521,7 +529,7 @@ const Meta = (function () {
       + '<div class="cd-irow"><div class="cd-ival cd-starsv">' + stars + '</div></div>'
       + '<div class="cd-irow"><div class="cd-ival cd-lvval">Lv.<b>' + o.level + '</b> <span>/ ' + cap + '</span></div></div>'
       + '<div class="cd-irow"><div class="cd-ival cd-nameval">' + b.name + '</div></div>'
-      + '<div class="cd-irow"><div class="cd-ival cd-clsval" style="color:' + cl.color + '">' + cl.icon + ' ' + cl.name + ' · ' + (b.weapon || '') + '</div></div>'
+      + '<div class="cd-irow"><div class="cd-ival cd-clsval" style="color:' + cl.color + '">' + clsIcon(b.cls) + ' ' + cl.name + ' · ' + (b.weapon || '') + '</div></div>'
       + '</div></div>'
       + '<div class="cd-statcol">'
       + '<div class="cd-tabs"><button class="cd-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">⬆️ 레벨업</button><button class="cd-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">✨ 승급</button></div>'
@@ -575,7 +583,7 @@ const Meta = (function () {
     });
     window.addEventListener('pointermove', (e) => {
       if (!fDrag || e.pointerId !== fDrag.pid) return;
-      if (!fDrag.moved) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) < 12) return; fDrag.moved = true; const g = fmtGhost(); const b = base(fDrag.id), cl = CLASS[b.cls] || {}; g.innerHTML = (cl.icon || '🔫') + ' ' + b.name; g.style.display = 'block'; }
+      if (!fDrag.moved) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) < 12) return; fDrag.moved = true; const g = fmtGhost(); const b = base(fDrag.id); g.innerHTML = clsIcon(b.cls) + ' ' + b.name; g.style.display = 'block'; }
       const g = fmtGhost(); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; fmtHi(e.clientX, e.clientY);
     });
     window.addEventListener('pointerup', (e) => {

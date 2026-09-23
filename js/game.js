@@ -797,7 +797,9 @@
     for (let i = 0; i < n * 2; i++) { const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? ri : ro, x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
     ctx.closePath();
   }
-  function drawPeg(px, py, R, shape, color, alive) {
+  function drawPeg(px, py, R, shape, color, alive, imgName) {
+    const pspr = (imgName && typeof PegArt !== 'undefined') ? PegArt.ready(imgName) : null;
+    if (pspr) { const s = R * 2.4; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(pspr, px - s / 2, py - s / 2, s, s); return; }
     const col = color;   // 죽은 페그는 caller가 낮은 알파(유령)로 그림
     ctx.fillStyle = col;
     switch (shape) {
@@ -846,11 +848,19 @@
       const rad = Math.min(cellW, cellH) * (e.isBoss ? 0.72 : 0.42);
       const hit = e.hitT || 0;
       const px = p0.x + (hit > 0 ? (Math.random() - 0.5) * rad * 0.5 * hit : 0), py = p0.y + (hit > 0 ? (Math.random() - 0.5) * rad * 0.5 * hit : 0);
-      ctx.beginPath(); ctx.arc(px, py, rad, 0, 7);
-      ctx.fillStyle = hit > 0.35 ? '#ffffff' : e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
-      ctx.lineWidth = e.isBoss ? 3 : 2; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
-      // HP 숫자(원 안)
-      if (showLabels) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(rad * 0.82) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + 1); ctx.textBaseline = 'alphabetic'; }
+      const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.isBoss ? ('boss_' + (e.kind || 'golem')) : e.type) : null;
+      if (espr) {                                   // 적 스프라이트(있으면 사용)
+        const s = rad * 2.3; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+        ctx.drawImage(espr, px - s / 2, py - s / 2, s, s);
+        if (hit > 0.35) { ctx.save(); ctx.globalAlpha = hit * 0.8; ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(px, py, rad, 0, 7); ctx.fill(); ctx.restore(); }
+        else if (e.stun > 0) { ctx.save(); ctx.globalAlpha = 0.4; ctx.fillStyle = '#c9c2ff'; ctx.beginPath(); ctx.arc(px, py, rad, 0, 7); ctx.fill(); ctx.restore(); }
+        if (showLabels) { ctx.font = 'bold ' + Math.round(rad * 0.58) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.85)'; ctx.strokeText(Math.max(0, Math.ceil(e.hp)), px, py + rad * 0.55); ctx.fillStyle = '#fff'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + rad * 0.55); ctx.textBaseline = 'alphabetic'; }
+      } else {                                        // 폴백: 색 원 + HP 숫자
+        ctx.beginPath(); ctx.arc(px, py, rad, 0, 7);
+        ctx.fillStyle = hit > 0.35 ? '#ffffff' : e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
+        ctx.lineWidth = e.isBoss ? 3 : 2; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
+        if (showLabels) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(rad * 0.82) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + 1); ctx.textBaseline = 'alphabetic'; }
+      }
       // 이름(위, 공간 있을 때만)
       if (showLabels && py - rad - 5 > fr.y + cellH * 0.18) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(cellH * 0.15) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(e.name, px, py - rad - 6); }
       // hp bar(아래, 얇게)
@@ -904,9 +914,10 @@
       const R = (p.pr || CFG.pegRadius) * (p.alive ? 1 : 0.85);
       ctx.save();
       if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 페그: 흐린 유령(다음 턴 부활)
-      drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive);
+      drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive, 'peg_' + p.type);
       ctx.restore();
-      if (p.alive && def.label) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
+      const pegImg = (typeof PegArt !== 'undefined') && PegArt.ready('peg_' + p.type);
+      if (p.alive && def.label && !pegImg) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
     }
     // 고정 장애물(범퍼/기둥/바)
     for (const o of S.obstacles || []) {
@@ -916,7 +927,11 @@
         ctx.fillStyle = '#c9cfda'; ctx.beginPath(); ctx.roundRect(ox, oy, ow, oh * 0.5, oh / 2); ctx.fill();
       } else {
         const ox = r.pins.x + o.fx * r.pins.w, oy = r.pins.y + o.fy * r.pins.h, rr = o.r * r.pins.w, fl = o.flash || 0;
-        if (o.t === 'bumper') {
+        const ospr = (typeof PegArt !== 'undefined') ? PegArt.ready('obst_' + o.t) : null;
+        if (ospr) {
+          const s = rr * 2.3; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(ospr, ox - s / 2, oy - s / 2, s, s);
+          if (o.t === 'bumper' && fl > 0) { ctx.save(); ctx.globalAlpha = fl; ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#eafffb'; ctx.beginPath(); ctx.arc(ox, oy, rr * 0.6, 0, 7); ctx.fill(); ctx.restore(); o.flash = Math.max(0, fl - 0.08); }
+        } else if (o.t === 'bumper') {
           ctx.fillStyle = '#0b2b28'; ctx.beginPath(); ctx.arc(ox, oy, rr, 0, 7); ctx.fill();
           ctx.strokeStyle = '#46e6d0'; ctx.lineWidth = Math.max(3, rr * 0.22); ctx.beginPath(); ctx.arc(ox, oy, rr * 0.82, 0, 7); ctx.stroke();
           ctx.fillStyle = fl > 0 ? '#eafffb' : '#46e6d0'; ctx.beginPath(); ctx.arc(ox, oy, rr * (0.42 + fl * 0.3), 0, 7); ctx.fill();

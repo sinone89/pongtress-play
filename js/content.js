@@ -337,13 +337,19 @@ const CharArt = (function () {
   return { path: path, load: load, sprite: sprite };
 })();
 
-// ── FX 이미지 로더 ── assets/fx/<name>.png (muzzle/shell/boom 등). 있으면 사용, 없으면 절차적 렌더로 폴백.
-const FxArt = (function () {
+// ── 캔버스 이미지 로더(공통) ── 있으면 Image, 없으면 null(게임이 도형으로 폴백)
+function makeCanvasLoader(dir) {
   const cache = {};
   function ready(name) {
     let img = cache[name];
-    if (!img) { img = new Image(); img.__ok = false; img.onload = function () { img.__ok = img.naturalWidth > 0; }; img.onerror = function () { img.__ok = false; }; img.src = 'assets/fx/' + name + '.png'; cache[name] = img; }
+    if (!img) { img = new Image(); img.decoding = 'async'; img.__ok = false; img.onload = function () { img.__ok = img.naturalWidth > 0; }; img.onerror = function () { img.__ok = false; }; img.src = dir + name + '.png'; cache[name] = img; }
     return (img.__ok && img.complete) ? img : null;
   }
   return { ready: ready };
-})();
+}
+// FX: assets/fx/<name>.png (muzzle/shell/boom). 있으면 사용, 없으면 절차적 렌더 폴백.
+const FxArt = makeCanvasLoader('assets/fx/');
+// 적/보스: assets/enemy/<id>.png (goblin/…, boss_golem/…). 없으면 색 원 폴백.
+const EnemyArt = makeCanvasLoader('assets/enemy/');
+// 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
+const PegArt = makeCanvasLoader('assets/peg/');

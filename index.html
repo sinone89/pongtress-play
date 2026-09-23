@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=114">
+  <link rel="stylesheet" href="css/game.css?v=115">
 </head>
 <body>
   <div id="app">
@@ -45,10 +45,10 @@
     <!-- 로비 -->
     <section id="lobby" class="screen" hidden>
       <header id="lobby-top">
-        <span class="cur">🪙<b id="cur-gold">0</b></span>
-        <span class="cur">🔩<b id="cur-mats">0</b></span>
-        <span class="cur">💎<b id="cur-gems">0</b></span>
-        <span class="cur">📜<b id="cur-docs">0</b></span>
+        <span class="cur"><span class="uic"><span class="uic-fb">🪙</span><img class="uic-im" alt="" src="assets/ui/cur_gold.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gold">0</b></span>
+        <span class="cur"><span class="uic"><span class="uic-fb">🔩</span><img class="uic-im" alt="" src="assets/ui/cur_mats.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-mats">0</b></span>
+        <span class="cur"><span class="uic"><span class="uic-fb">💎</span><img class="uic-im" alt="" src="assets/ui/cur_gems.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gems">0</b></span>
+        <span class="cur"><span class="uic"><span class="uic-fb">📜</span><img class="uic-im" alt="" src="assets/ui/cur_docs.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-docs">0</b></span>
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
         <button class="acct-btn" id="acct-btn"></button>
       </header>
@@ -81,11 +81,11 @@
         </div>
       </main>
       <nav id="lobby-nav">
-        <button class="tabbtn active" data-tab="home"><span class="tb-ic">🏠</span>홈</button>
-        <button class="tabbtn" data-tab="sortie"><span class="tb-ic">🚀</span>출격</button>
-        <button class="tabbtn" data-tab="formation"><span class="tb-ic">👥</span>편성</button>
-        <button class="tabbtn" data-tab="shop"><span class="tb-ic">🛒</span>상점</button>
-        <button class="tabbtn" data-tab="mission"><span class="tb-ic">📋</span>미션</button>
+        <button class="tabbtn active" data-tab="home"><span class="tb-ic"><span class="uic"><span class="uic-fb">🏠</span><img class="uic-im" alt="" src="assets/ui/nav_home.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></span>홈</button>
+        <button class="tabbtn" data-tab="sortie"><span class="tb-ic"><span class="uic"><span class="uic-fb">🚀</span><img class="uic-im" alt="" src="assets/ui/nav_sortie.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></span>출격</button>
+        <button class="tabbtn" data-tab="formation"><span class="tb-ic"><span class="uic"><span class="uic-fb">👥</span><img class="uic-im" alt="" src="assets/ui/nav_formation.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></span>편성</button>
+        <button class="tabbtn" data-tab="shop"><span class="tb-ic"><span class="uic"><span class="uic-fb">🛒</span><img class="uic-im" alt="" src="assets/ui/nav_shop.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></span>상점</button>
+        <button class="tabbtn" data-tab="mission"><span class="tb-ic"><span class="uic"><span class="uic-fb">📋</span><img class="uic-im" alt="" src="assets/ui/nav_mission.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></span>미션</button>
       </nav>
     </section>
 
@@ -145,9 +145,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=114"></script>
-  <script src="js/content.js?v=114"></script>
-  <script src="js/meta.js?v=114"></script>
-  <script src="js/game.js?v=114"></script>
+  <script src="js/audio.js?v=115"></script>
+  <script src="js/content.js?v=115"></script>
+  <script src="js/meta.js?v=115"></script>
+  <script src="js/game.js?v=115"></script>
 </body>
 </html>
