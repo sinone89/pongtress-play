@@ -61,6 +61,14 @@ const Meta = (function () {
     const hm = 1 + (lv - 1) * GROWTH.hpPct + (st - 1) * GROWTH.starHpPct;
     return Object.assign({}, b, { level: lv, star: st, atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm) });
   }
+  // 임의 레벨/성급의 스탯(현재→다음 비교용). gol(골칸)은 고정.
+  function statAt(id, lv, st) {
+    const b = base(id);
+    const am = 1 + (lv - 1) * GROWTH.atkPct + (st - 1) * GROWTH.starAtkPct;
+    const hm = 1 + (lv - 1) * GROWTH.hpPct + (st - 1) * GROWTH.starHpPct;
+    return { atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm), gol: b.gol };
+  }
+  const RAR_G = { common: 'g-n', rare: 'g-r', epic: 'g-e', legendary: 'g-l' };   // 등급 배너 클래스
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }
   function stage() { return M.stage; }
@@ -179,16 +187,15 @@ const Meta = (function () {
 
   function charChip(id, opts) {
     opts = opts || {};
-    const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
-    const owned = !!o;
-    return '<button class="char-chip' + (owned ? '' : ' locked') + (opts.selected ? ' sel' : '') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '" style="border-color:' + R.color + '55">'
-      + '<img class="cc-cg" src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()">'
-      + '<span class="cc-name">' + b.name + '</span>'
-      + (b.cls && CLASS[b.cls] ? '<span class="cc-cls" style="color:' + CLASS[b.cls].color + '">' + CLASS[b.cls].icon + ' ' + CLASS[b.cls].name + '</span>' : '')
-      + (b.weapon ? '<span class="cc-wpn">🔫 ' + b.weapon + '</span>' : '')
-      + (owned ? '<span class="cc-sub">Lv.' + o.level + ' ★' + o.star + '</span>' : '<span class="cc-sub">미보유</span>')
-      + '<span class="cc-rar" style="color:' + R.color + '">' + R.name + '</span>'
-      + (opts.inParty ? '<span class="cc-badge">편성</span>' : '')
+    const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n', owned = !!o;
+    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="sc-st' + (owned && s <= o.star ? ' on' : '') + '">★</span>';
+    return '<button class="stchar' + (owned ? '' : ' locked') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '">'
+      + '<div class="sc-top"><div class="sc-grade ' + g + '">' + R.name + '</div><div class="sc-star">' + stars + '</div></div>'
+      + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()">'
+      +   (owned ? '<span class="sc-lv">Lv.' + o.level + '</span>' : '<span class="sc-lv locked">미보유</span>')
+      +   (opts.inParty ? '<span class="onbadge">편성</span>' : '')
+      + '</div>'
+      + '<div class="sc-name">' + b.name + '</div>'
       + '</button>';
   }
 
@@ -423,40 +430,54 @@ const Meta = (function () {
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
     const box = $('char-modal-box'); box.classList.add('cd-modal');
     if (!o) { box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2><p class="muted">미보유 — 상점 가챠로 획득하세요.</p><button class="sns-btn sub" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
-    const c = leveledDef(id), cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
+    const cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const cl = CLASS[b.cls] || { icon: '', name: '', color: 'var(--cyan)' };
-    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += (s <= o.star ? '★' : '☆');
-    // 성장 탭 내용
-    let growth = '';
-    if (cdTab === 'lvup') {
-      const cost = GROWTH.levelUpCost(o.level), can = !maxLv && M.currencies.gold >= cost;
-      growth = '<div class="cd-grow-row"><span>Lv.' + o.level + ' → ' + (maxLv ? '최대' : o.level + 1) + '</span><span class="muted">보유 🪙' + M.currencies.gold + '</span></div>'
-        + '<button class="sns-btn full" data-lvup="' + id + '"' + (can ? '' : ' disabled') + '>' + (maxLv ? '레벨 최대' : '레벨업 · 🪙' + cost) + '</button>';
+    const gcls = RAR_G[b.rarity] || 'g-n';
+    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">★</span>';
+    // 현재 → 다음 스탯 비교 박스 + 성장 액션(스틸앤샷式)
+    const STAT = [['⚔', '공격', 'atk'], ['🛡', '체력', 'hp'], ['🎯', '골칸', 'gol']];
+    const cur = statAt(id, o.level, o.star);
+    let box6, box7, actLabel, actAttr, actEnabled;
+    if (cdTab === 'promote') {
+      const nx = statAt(id, o.level, Math.min(GROWTH.starMax, o.star + 1)), pr = GROWTH.promoteCost(o.star);
+      actEnabled = !maxStar && (M.shards[id] || 0) >= pr.shards && M.currencies.mats >= pr.mats;
+      box6 = '<div class="sc-t">현재 ★' + o.star + '</div>' + STAT.map(s => '<div class="sc-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + cur[s[2]] + '</b></div>').join('') + '<div class="sc-row"><span>레벨 상한</span><b>' + cap + '</b></div>';
+      box7 = maxStar ? '<div class="nx-max">최고 성급 ★' + GROWTH.starMax + '</div>'
+        : '<div class="sc-t">승급 → ★' + (o.star + 1) + '</div>' + STAT.map(s => '<div class="nx-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + nx[s[2]] + '</b></div>').join('') + '<div class="nx-row"><span>레벨 상한</span><b>' + (GROWTH.levelCapByStar[o.star + 1] || cap) + '</b></div>';
+      actLabel = maxStar ? '성급 최대' : '✨ 승급 · 🔷' + pr.shards + ' 🔩' + pr.mats;
+      actAttr = 'data-promote="' + id + '"';
     } else {
-      const pr = GROWTH.promoteCost(o.star), can = !maxStar && (M.shards[id] || 0) >= pr.shards && M.currencies.mats >= pr.mats;
-      growth = '<div class="cd-grow-row"><span>★' + o.star + ' → ' + (maxStar ? '최대' : '★' + (o.star + 1)) + '</span><span class="muted">보유 🔷' + (M.shards[id] || 0) + ' 🔩' + M.currencies.mats + '</span></div>'
-        + '<button class="sns-btn full" data-promote="' + id + '"' + (can ? '' : ' disabled') + '>' + (maxStar ? '성급 최대' : '승급 · 🔷' + pr.shards + ' 🔩' + pr.mats) + '</button>';
+      const nx = statAt(id, Math.min(cap, o.level + 1), o.star), cost = GROWTH.levelUpCost(o.level);
+      actEnabled = !maxLv && M.currencies.gold >= cost;
+      box6 = '<div class="sc-t">현재 능력치</div>' + STAT.map(s => '<div class="sc-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + cur[s[2]] + '</b></div>').join('');
+      box7 = maxLv ? '<div class="nx-max">레벨 상한 도달<br><span>승급으로 상한 ↑</span></div>'
+        : '<div class="sc-t">다음 Lv.' + (o.level + 1) + '</div>' + STAT.map(s => '<div class="nx-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + nx[s[2]] + (nx[s[2]] !== cur[s[2]] ? '' : '') + '</b></div>').join('');
+      actLabel = maxLv ? '레벨 최대' : '⬆️ 레벨업 · 🪙' + cost;
+      actAttr = 'data-lvup="' + id + '"';
     }
     box.innerHTML =
-      '<div class="cd-head"><button class="cd-nav" data-cnav="-1">‹</button>'
-      + '<div class="cd-title"><b>' + b.name + '</b> ' + rarTag(b.rarity) + '<div class="cd-stars">' + stars + '</div></div>'
-      + '<button class="cd-nav" data-cnav="1">›</button></div>'
-      + '<div class="cd-body">'
-      + '<div class="cd-portrait" style="border-color:' + R.color + '"><span class="cd-ph">' + (cl.icon || '🔫') + '</span><img class="cd-pimg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'"></div>'
+      '<div class="cd-head">'
+      + '<div class="cd-img"' + (o ? '' : ' style="filter:grayscale(1);opacity:.45"') + ' style="border-color:' + R.color + '"><span class="cd-ph">' + (cl.icon || '🔫') + '</span><img class="cd-pimg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'"></div>'
       + '<div class="cd-info">'
-      + '<div class="cd-cls" style="color:' + cl.color + '">' + cl.icon + ' ' + cl.name + '</div>'
-      + '<div class="cd-wpn">🔫 ' + (b.weapon || '') + '</div>'
-      + '<div class="cd-lv">Lv.<b>' + o.level + '</b>/' + cap + '</div>'
-      + '<div class="cd-statgrid"><span>⚔ <b>' + c.atk + '</b></span><span>🛡 <b>' + c.hp + '</b></span><span>🎯 <b>' + c.gol + '</b></span></div>'
+      + '<div class="cd-irow"><div class="cd-grade ' + gcls + '">' + R.name + '</div></div>'
+      + '<div class="cd-irow"><div class="cd-ival cd-starsv">' + stars + '</div></div>'
+      + '<div class="cd-irow"><div class="cd-ival cd-lvval">Lv.<b>' + o.level + '</b> <span>/ ' + cap + '</span></div></div>'
+      + '<div class="cd-irow"><div class="cd-ival cd-nameval">' + b.name + '</div></div>'
+      + '<div class="cd-irow"><div class="cd-ival cd-clsval" style="color:' + cl.color + '">' + cl.icon + ' ' + cl.name + ' · ' + (b.weapon || '') + '</div></div>'
       + '</div></div>'
-      + (b.concept ? '<p class="cd-concept">' + b.concept + '</p>' : '')
+      + '<div class="cd-statcol">'
+      + '<div class="cd-tabs"><button class="cd-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">⬆️ 레벨업</button><button class="cd-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">✨ 승급</button></div>'
+      + '<div class="cd-cmp"><div class="cd-cur">' + box6 + '</div><div class="cd-arrow">→</div><div class="cd-next">' + box7 + '</div></div>'
+      + '</div>'
       + '<div class="cd-skills">'
       + '<div class="cd-skill"><div class="cd-sk-h"><b>' + b.active.name + '</b><span class="cd-sk-tag">액티브 · 게이지 ' + b.active.gauge + '</span></div><div class="cd-sk-d">' + skillText(b.active) + '</div></div>'
       + '<div class="cd-skill"><div class="cd-sk-h"><b>' + b.passive.name + '</b><span class="cd-sk-tag pas">패시브</span></div><div class="cd-sk-d">' + skillText(b.passive) + '</div></div>'
       + '</div>'
-      + '<div class="sns-tabs cd-gtabs"><button class="sns-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">레벨업</button><button class="sns-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">승급</button></div>'
-      + '<div class="cd-growth">' + growth + '</div>'
-      + '<div class="cd-actions"><button class="sns-btn ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : '편성') + '</button><button class="sns-btn sub" data-close="1">닫기</button></div>';
+      + '<div class="cd-bot">'
+      + '<button class="btn cd-place ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : '🪧 편성') + '</button>'
+      + '<button class="btn cd-action" ' + actAttr + (actEnabled ? '' : ' disabled') + '>' + actLabel + '</button>'
+      + '</div>'
+      + '<button class="cd-x" data-close="1">닫기</button>';
     $('char-modal').hidden = false;
   }
 

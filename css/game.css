@@ -410,3 +410,74 @@ body {
 #login .lg-btn:active { transform: translateY(1px); }
 #login .lg-note { color: var(--muted); font-size: 3cqw; text-align: center; line-height: 1.5; margin-top: 1cqw; }
 #login .lg-logout { position: absolute; }
+
+/* ═══ 캐릭터 상세 = 스틸앤샷式 전면 재구성 ═══
+   초상화(좌·세로) | 정보행 스택(등급배너/성급/레벨/이름/클래스) → 탭 → 현재→다음 비교 → 스킬 → 배치/성장 */
+#char-modal.modal { padding: 24px 11cqw; }                 /* 좌우 여백 = 순환 화살표 공간 */
+.modal-box.cd-modal { padding: 3.4cqw 3cqw; max-width: 96cqw; width: 100%; max-height: 94vh; overflow-y: auto; text-align: left; }
+.cd-modal .cd-head { display: flex; gap: 2cqw; align-items: stretch; margin-bottom: 2.4cqw; }
+.cd-modal .cd-img { flex: 0 0 auto; width: 38cqw; aspect-ratio: 1086/1434; position: relative; border: 2px solid; border-radius: 3cqw; overflow: hidden; background: radial-gradient(120% 90% at 50% 15%, #2a2350, #14101f); }
+.cd-modal .cd-img .cd-ph { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 12cqw; opacity: .5; }
+.cd-modal .cd-img .cd-pimg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 12%; }
+.cd-modal .cd-info { flex: 1; display: flex; flex-direction: column; gap: 1.4cqw; min-width: 0; }
+.cd-modal .cd-irow { flex: 1; display: flex; align-items: center; justify-content: center; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 2.2cqw; padding: 0 2cqw; min-height: 0; }
+.cd-modal .cd-ival { max-width: 100%; font-size: 4cqw; font-weight: 800; color: var(--ink); display: flex; align-items: center; justify-content: center; gap: 1.2cqw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cd-modal .cd-grade { font-size: 4.4cqw; font-weight: 900; color: #fff; padding: 0.8cqw 3cqw; border-radius: 2cqw; letter-spacing: 0.4cqw; }
+.cd-modal .cd-grade.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
+.cd-modal .cd-grade.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
+.cd-modal .cd-grade.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
+.cd-modal .cd-grade.g-l { background: linear-gradient(180deg,#e0a13a,#c07d1e); color: #3a2a05; }
+.cd-modal .cd-starsv { gap: 0.5cqw; color: #3a3358; font-size: 4.4cqw; }
+.cd-modal .cd-starsv .st.on { color: var(--amber); }
+.cd-modal .cd-lvval b { font-size: 6cqw; color: var(--amber); } .cd-modal .cd-lvval span { font-size: 3cqw; color: var(--muted); font-weight: 700; }
+.cd-modal .cd-nameval { color: var(--ink); }
+.cd-modal .cd-clsval { font-size: 3.3cqw; }
+.cd-modal .cd-statcol { margin-bottom: 2cqw; }
+.cd-modal .cd-tabs { display: flex; gap: 1.6cqw; margin-bottom: 2cqw; }
+.cd-modal .cd-tab { flex: 1; font-size: 3.6cqw; font-weight: 800; padding: 2cqw 0; border-radius: 2.4cqw; border: 2px solid #ffffff1e; background: #ffffff0d; color: var(--muted); cursor: pointer; }
+.cd-modal .cd-tab.on { background: #ffcf5c1e; color: var(--amber); border-color: var(--amber); }
+.cd-modal .cd-cmp { display: flex; gap: 2cqw; align-items: stretch; min-height: 38cqw; }   /* 고정 최소높이 → 탭 전환 시 크기 안정 */
+.cd-modal .cd-cur, .cd-modal .cd-next { flex: 1; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 2.6cqw; padding: 2.4cqw 2.6cqw; }
+.cd-modal .cd-next { border-color: var(--amber); }
+.cd-modal .cd-arrow { align-self: center; flex: 0 0 auto; font-size: 5cqw; font-weight: 900; color: var(--amber); }
+.cd-modal .sc-t { font-size: 3.2cqw; font-weight: 800; color: var(--amber); margin-bottom: 1.6cqw; }
+.cd-modal .sc-row, .cd-modal .nx-row { display: flex; justify-content: space-between; align-items: center; font-size: 3.4cqw; color: var(--muted); margin: 1.6cqw 0; }
+.cd-modal .sc-row b { color: var(--ink); font-weight: 800; }
+.cd-modal .nx-row b { color: var(--amber); font-weight: 800; }
+.cd-modal .nx-max { font-size: 3.3cqw; color: var(--muted); text-align: center; padding: 4cqw 0; line-height: 1.5; }
+.cd-modal .cd-skills { display: flex; flex-direction: column; gap: 1.8cqw; margin: 2cqw 0; }
+.cd-modal .cd-bot { display: flex; gap: 2cqw; margin-top: 1cqw; }
+.cd-modal .cd-bot .btn { flex: 1; font-size: 3.8cqw; padding: 2.8cqw 0; border-radius: 2.8cqw; }
+.cd-modal .cd-bot .btn.sub { background: #ffffff14; color: var(--muted); box-shadow: none; }
+.cd-modal .cd-action[disabled] { opacity: .45; filter: grayscale(.3); }
+.cd-modal .cd-x { display: block; width: 100%; margin-top: 2cqw; appearance: none; border: 0; background: #ffffff10; color: var(--muted); font: inherit; font-weight: 800; font-size: 3.4cqw; padding: 2.4cqw 0; border-radius: 2.6cqw; cursor: pointer; }
+/* 좌우 캐릭터 순환 화살표 = 화면 가장자리 원형 */
+#char-modal .cd-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 9.5cqw; height: 9.5cqw; border-radius: 50%; border: 2px solid var(--amber); background: #1a1330ee; color: var(--amber); font-size: 6cqw; font-weight: 900; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 6px 20px #000b; }
+#char-modal .cd-prev { left: 1cqw; } #char-modal .cd-next { right: 1cqw; }
+#char-modal .cd-nav:active { transform: translateY(-50%) scale(.92); }
+
+/* ═══ 보유 캐릭터 카드 = 스틸앤샷式 stchar (등급배지+성급 / 초상화+Lv / 이름바) ═══ */
+#owned-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2cqw; }
+.stchar { appearance: none; display: flex; flex-direction: column; min-height: 40cqw; background: #1a1226;
+  border: 2px solid #ffffff20; border-radius: 3cqw; overflow: hidden; text-align: center; cursor: grab;
+  padding: 0; color: var(--ink); font: inherit; position: relative; touch-action: none; }
+.stchar.placed { opacity: .55; }
+.stchar.locked { opacity: .4; filter: grayscale(1); }
+.stchar .sc-top { display: flex; justify-content: space-between; align-items: center; gap: 1cqw; padding: 1.4cqw 1.4cqw 0; }
+.stchar .sc-grade { flex: 0 0 auto; min-width: 11cqw; height: 4.6cqw; border-radius: 1.4cqw; display: flex; align-items: center; justify-content: center;
+  font-size: 2.5cqw; font-weight: 900; color: #fff; padding: 0 1cqw; background: #3a2f5a; }
+.stchar .sc-grade.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
+.stchar .sc-grade.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
+.stchar .sc-grade.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
+.stchar .sc-grade.g-l { background: linear-gradient(180deg,#e0a13a,#c07d1e); color: #3a2a05; }
+.stchar .sc-star { flex: 1; display: flex; justify-content: flex-end; gap: 0.2cqw; overflow: hidden; }
+.stchar .sc-star .sc-st { font-size: 2.2cqw; color: #3a3350; line-height: 1; }
+.stchar .sc-star .sc-st.on { color: var(--amber); }
+.stchar .sc-img { flex: 1; display: flex; align-items: center; justify-content: center; position: relative; min-height: 22cqw; }
+.stchar .sc-cg { width: 100%; height: 100%; object-fit: contain; }
+.stchar .sc-lv { position: absolute; bottom: 1cqw; left: 50%; transform: translateX(-50%); background: #0e0a18cc; border: 1px solid #ffffff2a;
+  border-radius: 1.6cqw; padding: 0.4cqw 2cqw; font-size: 2.8cqw; font-weight: 800; color: var(--amber); white-space: nowrap; }
+.stchar .sc-lv.locked { color: var(--muted); }
+.stchar .sc-name { padding: 1.8cqw 1cqw; font-size: 3.2cqw; font-weight: 800; color: var(--ink); background: #241832; border-top: 1px solid #ffffff1c; }
+.stchar .onbadge { position: absolute; top: 6cqw; left: 50%; transform: translateX(-50%); font-size: 2.6cqw; font-weight: 800;
+  color: #062a26; background: var(--cyan); border-radius: 1.4cqw; padding: 0.4cqw 2cqw; z-index: 2; }

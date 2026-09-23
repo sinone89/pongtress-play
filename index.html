@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=107">
+  <link rel="stylesheet" href="css/game.css?v=108">
 </head>
 <body>
   <div id="app">
@@ -96,7 +96,11 @@
     </section>
 
     <!-- 캐릭터 상세 -->
-    <div id="char-modal" class="modal" hidden><div class="modal-box" id="char-modal-box"></div></div>
+    <div id="char-modal" class="modal" hidden>
+      <button class="cd-nav cd-prev" data-cnav="-1">‹</button>
+      <div class="modal-box" id="char-modal-box"></div>
+      <button class="cd-nav cd-next" data-cnav="1">›</button>
+    </div>
     <!-- 가챠 결과 -->
     <div id="gacha-modal" class="modal" hidden><div class="modal-box" id="gacha-modal-box"></div></div>
     <!-- 치트(디버그): 좌하단 build 탭 -->
@@ -147,9 +151,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=107"></script>
-  <script src="js/content.js?v=107"></script>
-  <script src="js/meta.js?v=107"></script>
-  <script src="js/game.js?v=107"></script>
+  <script src="js/audio.js?v=108"></script>
+  <script src="js/content.js?v=108"></script>
+  <script src="js/meta.js?v=108"></script>
+  <script src="js/game.js?v=108"></script>
 </body>
 </html>
