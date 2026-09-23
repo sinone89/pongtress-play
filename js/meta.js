@@ -125,8 +125,11 @@ const Meta = (function () {
 
   // ── 문서 상점 ──
   function buyShards(id) {
-    if (M.currencies.docs < DOC_SHOP.docCost) return false;
-    M.currencies.docs -= DOC_SHOP.docCost; M.shards[id] = (M.shards[id] || 0) + DOC_SHOP.shardsPer; save(); return true;
+    const b = base(id); if (!b) return false;
+    const price = DOC_SHOP.price[b.rarity]; if (!price) return false;          // 커먼 등 판매 불가 등급
+    if (!M.owned[id]) return false;                                            // 가챠로 획득한 요원만
+    if (M.currencies.docs < price) return false;
+    M.currencies.docs -= price; M.shards[id] = (M.shards[id] || 0) + 1; save(); return true;   // 1회 = 조각 1개
   }
 
   // ── 미션 ──
@@ -357,22 +360,22 @@ const Meta = (function () {
       + '</div></div>';
   }
   function shopDocBody() {
-    let h = '<div class="mkt-info">📜 문서 ' + DOC_SHOP.docCost + ' → 🔷 조각 ' + DOC_SHOP.shardsPer + ' · 보유 문서 📜' + M.currencies.docs + '</div>';
-    const rars = ['legendary', 'epic', 'rare', 'common'];
+    // 스틸앤샷式: 캐릭터 조각만 판매 · 커먼 제외 · 등급별 조각 1개당 문서 비용 · 보유 요원만 구매(미보유=잠금)
+    let h = '<div class="mkt-info">📜 캐릭터 조각 교환 · 보유(가챠 획득) 요원만 · 보유 문서 📜' + M.currencies.docs + '</div>';
+    const rars = ['legendary', 'epic', 'rare'];   // 커먼 제외(레전더리/에픽/레어만)
     rars.forEach(rar => {
-      const list = ROSTER.filter(c => c.rarity === rar && M.owned[c.id]); if (!list.length) return;
-      const R = RARITY[rar] || {}, g = RAR_G[rar] || 'g-n';
-      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 교환</div>';
+      const list = ROSTER.filter(c => c.rarity === rar); if (!list.length) return;
+      const R = RARITY[rar] || {}, g = RAR_G[rar] || 'g-n', price = DOC_SHOP.price[rar];
+      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 <span class="sns-sub">· 개당 📜' + price + '</span></div>';
       h += list.map(c => {
-        const can = M.currencies.docs >= DOC_SHOP.docCost;
-        return '<div class="sns-card"><div class="sns-row">'
-          + '<div class="shop-ico"><img src="' + CharArt.path(c.id, 'load') + '" alt="" onerror="this.remove()"></div>'
-          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">🔷 보유 조각 ' + (M.shards[c.id] || 0) + '</div></div>'
-          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>📜' + DOC_SHOP.docCost + '</button>'
+        const owned = !!M.owned[c.id], can = owned && M.currencies.docs >= price;
+        return '<div class="sns-card' + (owned ? '' : ' locked') + '"><div class="sns-row">'
+          + '<div class="shop-ico">' + (owned ? '<img src="' + CharArt.path(c.id, 'load') + '" alt="" onerror="this.remove()">' : '<span class="lock-ic">🔒</span>') + '</div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? '🔷 보유 조각 ' + (M.shards[c.id] || 0) : '요원 미보유') + '</div></div>'
+          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? '📜' + price : '미보유') + '</button>'
           + '</div></div>';
       }).join('');
     });
-    if (h.indexOf('sns-card') < 0) h += '<div class="sns-card"><div class="sns-cap" style="margin:0">보유한 요원이 없어요 · 가챠로 요원을 먼저 획득하세요.</div></div>';
     return h;
   }
   function shopPkgBody() {

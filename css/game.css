@@ -527,6 +527,9 @@ body {
 .shop-ico { flex: 0 0 auto; width: 13cqw; height: 13cqw; border-radius: 2.4cqw; background: #ffffff08; display: flex; align-items: center; justify-content: center; overflow: hidden; }
 .shop-ico img { width: 100%; height: 100%; object-fit: contain; }
 .shop-ico.emoji { font-size: 7cqw; }
+.shop-ico .lock-ic { font-size: 6cqw; opacity: .6; }
+.sns-card.locked { opacity: .5; }
+.sns-card.locked .shop-ico { filter: grayscale(1); }
 /* 인라인 등급 배지 */
 .g-tag { display: inline-flex; align-items: center; justify-content: center; font-size: 2.6cqw; font-weight: 900; color: #fff; padding: 0.3cqw 1.6cqw; border-radius: 1.2cqw; margin-right: 1cqw; vertical-align: middle; }
 .g-tag.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }

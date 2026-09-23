@@ -140,7 +140,8 @@ const GACHA = {
   cost1: 100, cost10: 900, dupShards: 15,        // 보석 비용, 중복→조각
   rates: [{ rarity: 'common', w: 60 }, { rarity: 'rare', w: 28 }, { rarity: 'epic', w: 9 }, { rarity: 'legendary', w: 3 }]
 };
-const DOC_SHOP = { shardsPer: 10, docCost: 20 }; // 문서 20 → 조각 10
+// 문서 상점(스틸앤샷式): 캐릭터 조각만 판매 · 커먼 제외 · 등급별 조각 1개당 문서 비용 · 보유(가챠 획득) 요원만 구매
+const DOC_SHOP = { price: { rare: 2, epic: 5, legendary: 12 } };
 const MISSIONS = [
   { id: 'firstWin', name: '첫 승리', desc: '런 1회 클리어', stat: 'runsWon', goal: 1, reward: { gems: 150 } },
   { id: 'kills60', name: '토벌대', desc: '적 60마리 처치', stat: 'kills', goal: 60, reward: { gold: 300 } },
