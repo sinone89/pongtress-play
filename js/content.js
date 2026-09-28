@@ -39,7 +39,11 @@ const PEG_TYPES = {
   mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
   bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 0,  oneShot: false, boost: 1.28 },  // weight0=랜덤 스폰 제외(범퍼는 고정 장애물로 이전, 패시브/보상 설치만)
   gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
-  charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' }   // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
+  charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' },  // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
+  // ── 아래는 랜덤 스폰 제외(weight 0): 스킬·적 간섭으로만 생성 ──
+  bomb:   { name: '폭탄',   color: '#ff8a3a', shape: 'circle',   size: 1.25, weight: 0,  oneShot: true,  bomb: 0.16, label: '✹' },  // 맞으면 주변 페그 연쇄 폭발(스킬이 남김)
+  rock:   { name: '바위',   color: '#7a7f8c', shape: 'pentagon', size: 1.35, weight: 0,  oneShot: false, rock: true },               // 반사만(변환·소멸 없음) — 강철거인/골렘이 설치
+  slime:  { name: '점액',   color: '#5ad0a0', shape: 'circle',   size: 1.2,  weight: 0,  oneShot: true,  slime: true, label: '≈' }   // 발사볼을 삼킴(충전 없이 소멸) — 슬라임이 설치
 };
 // 일반(반사) 페그는 모두 원형으로 통일(가독성·정렬감).
 const NORMAL_SHAPES = ['circle'];
@@ -279,6 +283,115 @@ const REWARDS = [
   { id: 'fort',  name: '🛡 요새화', desc: '성벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
 ];
 
+// ═══════════════ 유물(렐릭) ═══════════════
+// 태그 5종(클래스 3 + 보드 2). 같은 태그 유물 3개 → 세트 보너스.
+const RELIC_TAGS = {
+  precision: { name: '정밀', icon: '🎯', color: '#ff6b6b', cls: 'gunner',  set: '모든 사격 치명타 확률 +20%' },
+  explosive: { name: '폭발', icon: '💥', color: '#ffb057', cls: 'cannon',  set: '모든 사격이 인접 적에게 20% 스플래시' },
+  guard:     { name: '수호', icon: '🛡', color: '#5ce0a0', cls: 'support', set: '성벽이 무너질 때 1회 HP 50%로 버팀' },
+  pinball:   { name: '핀볼', icon: '🔮', color: '#b58cff', cls: null,      set: '매 턴 첫 발사 볼의 콤보 보너스 ×2' },
+  harvest:   { name: '수확', icon: '💰', color: '#ffd93b', cls: null,      set: '모든 충전 착지 +1' }
+};
+const RELIC_SET_N = 3;
+// 유물: 같은 유물을 다시 고르면 Lv2 = 진화(이름·효과 변경). lv1/lv2 = 효과 파라미터.
+const RELICS = {
+  // 🔮 핀볼
+  elastic:    { tag: 'pinball',   icon: '🟢', name: '탄성 코어', lv1: { desc: '장애물 범퍼에 맞으면 20% 확률로 충전볼 +1', p: 0.2 },
+                lv2: { name: '분열탄', desc: '장애물 범퍼에 맞으면 50% 확률로 충전볼 +1', p: 0.5 } },
+  chain:      { tag: 'pinball',   icon: '⛓', name: '연쇄 반응', lv1: { desc: '한 볼로 10콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 10 },
+                lv2: { name: '연쇄 폭주', desc: '한 볼로 6콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 6 } },
+  multishot:  { tag: 'pinball',   icon: '🎱', name: '다중 발사', lv1: { desc: '매 턴 첫 발사 때 볼 2개 동시 발사', n: 2 },
+                lv2: { name: '삼연발', desc: '매 턴 첫 발사 때 볼 3개 동시 발사', n: 3 } },
+  // 💰 수확
+  midas:      { tag: 'harvest',   icon: '🪙', name: '황금 손', lv1: { desc: '골드 페그가 충전볼 +1 추가', balls: 1, gmul: 1 },
+                lv2: { name: '미다스', desc: '골드 페그: 골드 ×2 · 충전볼 +2', balls: 2, gmul: 2 } },
+  overcharge: { tag: 'harvest',   icon: '⚡', name: '과충전', lv1: { desc: '증폭 페그 충전 ×3 → ×4', charge: 4 },
+                lv2: { name: '초과충전', desc: '증폭 페그 충전 ×5', charge: 5 } },
+  lucky:      { tag: 'harvest',   icon: '🍀', name: '행운 포켓', lv1: { desc: '충전 칸 착지 시 15% 확률로 충전 ×3', p: 0.15 },
+                lv2: { name: '대박 포켓', desc: '충전 칸 착지 시 30% 확률로 충전 ×3', p: 0.3 } },
+  // 🎯 정밀
+  crit:       { tag: 'precision', icon: '🎯', name: '치명탄', lv1: { desc: '치명타 15% (피해 ×2)', p: 0.15, mult: 2 },
+                lv2: { name: '급소 사격', desc: '치명타 25% (피해 ×2.5)', p: 0.25, mult: 2.5 } },
+  pierce:     { tag: 'precision', icon: '🏹', name: '관통탄', lv1: { desc: '사격이 뒤 적 1명을 추가 관통(50% 피해)', n: 1, mult: 0.5 },
+                lv2: { name: '철갑탄', desc: '사격이 뒤 적 2명을 추가 관통(70% 피해)', n: 2, mult: 0.7 } },
+  focus:      { tag: 'precision', icon: '🔭', name: '저격 집중', lv1: { desc: '같은 적을 연속 타격할수록 피해 +10% (최대 5중첩)', per: 0.10 },
+                lv2: { name: '처형자', desc: '같은 적을 연속 타격할수록 피해 +15% (최대 5중첩)', per: 0.15 } },
+  // 💥 폭발
+  shrapnel:   { tag: 'explosive', icon: '🧨', name: '파편탄', lv1: { desc: '적 처치 시 인접 적에게 처치 피해의 30%', mult: 0.3, rad: 1 },
+                lv2: { name: '유탄 파편', desc: '적 처치 시 주변 2칸 적에게 처치 피해의 50%', mult: 0.5, rad: 2 } },
+  blast:      { tag: 'explosive', icon: '🎆', name: '연쇄 폭발', lv1: { desc: '광역 스킬 타격 수 +2', count: 2, mult: 1 },
+                lv2: { name: '대폭발', desc: '광역 스킬 타격 수 +4 · 피해 +20%', count: 4, mult: 1.2 } },
+  powder:     { tag: 'explosive', icon: '🛢', name: '화약고', lv1: { desc: '전투 시작 시 모든 적에게 (총 탄약 × 1) 피해', mult: 1 },
+                lv2: { name: '탄약고 폭발', desc: '전투 시작 시 모든 적에게 (총 탄약 × 2) 피해', mult: 2 } },
+  // 🛡 수호
+  steel:      { tag: 'guard',     icon: '🧱', name: '강철 성벽', lv1: { desc: '성벽 최대 HP +20% · 매 턴 5 회복', pct: 0.2, heal: 5 },
+                lv2: { name: '철옹성', desc: '성벽 최대 HP +35% · 매 턴 10 회복', pct: 0.35, heal: 10 } },
+  plate:      { tag: 'guard',     icon: '🔰', name: '장갑판', lv1: { desc: '성벽이 받는 피해 -20%', red: 0.2 },
+                lv2: { name: '철갑 성벽', desc: '성벽이 받는 피해 -35%', red: 0.35 } },
+  delay:      { tag: 'guard',     icon: '⏱', name: '전술 지연', lv1: { desc: '적이 전진할 때 10% 확률로 멈춤', p: 0.1 },
+                lv2: { name: '시간 왜곡', desc: '적이 전진할 때 20% 확률로 멈춤', p: 0.2 } }
+};
+// 메타 해금: 처음엔 보드 태그(핀볼·수확) 전부 + 클래스 태그 1종씩(=첫 판부터 세트 가능).
+// 스테이지 첫 클리어마다 RELIC_UNLOCK_ORDER 순서로 2종씩 해금 → S3 첫 클리어 시 전 유물 해금.
+const RELIC_START_UNLOCKED = ['elastic', 'chain', 'multishot', 'midas', 'overcharge', 'lucky', 'crit', 'shrapnel', 'steel'];
+const RELIC_UNLOCK_ORDER = ['pierce', 'blast', 'plate', 'focus', 'powder', 'delay'];
+
+// ═══════════════ 분기 맵(A안: 스테이지 안의 한 판) ═══════════════
+// 층 0 = 첫 전투, 층 1~4 = 갈림길(일반/엘리트/상점/휴식), 층 5 = 보스.
+const MAP_CFG = {
+  floors: 6,
+  nodeTypes: { battle: { icon: '⚔', name: '전투' }, elite: { icon: '💀', name: '엘리트' }, shop: { icon: '🛒', name: '상점' },
+               rest: { icon: '⛺', name: '휴식' }, boss: { icon: '👑', name: '보스' } },
+  weights: { battle: 48, elite: 18, shop: 16, rest: 18 }
+};
+// 노드별 전투 구성(웨이브 = 마릿수). 층이 깊을수록 커짐. 엘리트는 정예 적 1 포함 + 웨이브 증가.
+function nodeCombat(type, floor) {
+  const base = 6 + floor * 2, mk = n => new Array(n).fill('x');
+  if (type === 'elite') return { name: '엘리트', elite: true, waves: [mk(base + 1), mk(base + 3), mk(base + 5)] };
+  return { name: '전투', waves: [mk(base), mk(base + 2), mk(base + 4)] };
+}
+const ELITE = { hpMul: 3.2, dmgMul: 1.8, expMul: 4, gold: 60 };   // 정예 적 배수·보상
+const SHOP_PRICE = { relic: 120, relicEvo: 150, heal: 60 };        // 상점(런 골드)
+const REST_HEAL = 0.4;                                             // 휴식: 최대 HP 40% 회복
+
+// ═══════════════ 스킬 → 다음 판 변화 / 적 → 판 간섭 ═══════════════
+// 스킬을 쓰면 다음 장전 판에 흔적을 남김(빌드·연계 재미). kind: 판에 추가할 페그 or 포켓 효과.
+const SKILL_BOARD = {
+  bigHit:     { peg: 'bomb',  n: 1, text: '폭탄 페그 설치' },
+  extraShots: { peg: 'mult2', n: 2, text: '증식 페그 +2' },
+  aoe:        { peg: 'bomb',  n: 2, text: '폭탄 페그 +2' },
+  heal:       { buff: 1,              text: '회복 칸 +1' },
+  stun:       { peg: 'bumper', n: 1, text: '범퍼 설치' }
+};
+// 적이 판에 간섭(장전 시작 시 적용, 해당 적이 필드에 있는 동안). 전투에서 먼저 잡을 대상이 생김.
+const ENEMY_BOARD = {
+  bat:    { steal: 1, text: '박쥐가 특수 페그를 훔쳤다!' },      // 특수 페그 → 일반 페그
+  slime:  { peg: 'slime', n: 1, text: '슬라임이 점액을 뿌렸다!' }, // 점액 페그(볼 삼킴)
+  brute:  { peg: 'rock',  n: 1, text: '강철거인이 바위를 던졌다!' } // 바위(반사만)
+};
+const ENEMY_BOARD_CAP = 4;   // 적 간섭으로 추가되는 페그 최대(판이 막히지 않게)
+// 보스 예고 패턴: N턴마다 강력한 행동 예고 → 그 턴에 기절시키면 저지.
+const BOSS_INTENT = {
+  golem:  { every: 3, name: '돌진 준비', desc: '다음 전진 때 2칸 돌진 · 피해 ×1.5' },
+  slime:  { every: 3, name: '대분열 준비', desc: '다음 전진 때 슬라임 3마리 분열' },
+  legion: { every: 3, name: '총동원', desc: '다음 전진 때 부하 4마리 소환' }
+};
+const MANUAL_SKILL_BONUS = 0.2;   // 자동이 아닌 수동 스킬 사용 시 피해 +20%(타이밍 보상)
+
+// ═══════════════ 모드(일일 도전 · 무한) ═══════════════
+const MODES = {
+  normal:  { name: '일반 출격' },
+  daily:   { name: '일일 도전', desc: '오늘의 고정 판 · 같은 시드로 기록 도전', reward: { gems: 40 } },
+  endless: { name: '무한 모드', desc: '보스를 잡을 때마다 더 강한 막이 이어짐 · 최고 기록 도전', loopScale: 0.35 }
+};
+// 콤보: N콤보마다 보너스 충전볼(충전량 = 콤보/COMBO_STEP, 최대 COMBO_MAX)
+const COMBO_STEP = 5, COMBO_MAX = 4;
+// 움직이는 잭팟 포켓: 상단 골칸 위를 좌우로 이동, 그 위로 착지하면 ×JACKPOT_MUL
+const JACKPOT_MUL = 3, JACKPOT_SPEED = 1.1;   // 속도 = 초당 포켓 칸 수
+
+// UI 아이콘(DOM): assets/ui/<name>.png 있으면 이모지 대체, 없으면 이모지 폴백(spr-box)
+function uiIcon(name, emoji, style) { return '<span class="uic"' + (style ? (' style="' + style + '"') : '') + '><span class="uic-fb">' + emoji + '</span><img class="uic-im" alt="" src="assets/ui/' + name + '.png" onload="this.parentNode.classList.add(\'ok\')" onerror="this.remove()"></span>'; }
+
 // ── 전역 헬퍼(보상·패시브에서 사용) ──
 // 골칸 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 골칸을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영
 function openOneBlank(S) {
@@ -299,20 +412,36 @@ function openBlankTemp(S) {
   const cand = S.pockets.filter(p => p.type === 'blank' && lanesWithChar.has(p.lane));
   if (cand.length) cand[0].type = 'charge';
 }
-function addPegToBoard(S, type, n) {
-  // 기존 살아있는 페그와 최소 간격 확보(겹침 방지). 후보를 여러 번 뽑아 가장 먼 자리를 채택.
-  const gap = (CFG.pegMinGap || 0.06), g2 = gap * gap, asp = 1.4;
+// 판에 페그 추가(보상·유물·스킬·적 간섭 공용). 반환: 추가된 페그 배열.
+//  - 모든 페그(터진 페그 포함 — 다음 턴 부활하므로)와 최소 간격 확보
+//  - 고정 장애물(범퍼/기둥)과 겹치지 않게 회피
+//  - opts.avoidLaunch: 중앙 발사열(fx 0.42~0.58) 회피(영구 반사체용 — 수직 발사 정면충돌 방지)
+function addPegToBoard(S, type, n, opts) {
+  opts = opts || {};
+  const gap = (CFG.pegMinGap || 0.06), g2 = gap * gap, asp = 1.4, out = [];
+  const obst = S.obstacles || [];
+  const blocked = (fx, fy) => {
+    for (const o of obst) {
+      if (o.t === 'bar') { if (fx > o.fx - 0.05 && fx < o.fx + o.fw + 0.05 && fy > o.fy - 0.05 && fy < o.fy + o.fh + 0.05) return true; continue; }
+      const dx = fx - o.fx, dy = (fy - o.fy) * asp, rr = (o.r || 0.06) + 0.055;
+      if (dx * dx + dy * dy < rr * rr) return true;
+    }
+    return opts.avoidLaunch && fx > 0.42 && fx < 0.58;
+  };
   for (let i = 0; i < n; i++) {
     let best = null, bestD = -1;
-    for (let t = 0; t < 28; t++) {
-      const fx = 0.10 + Math.random() * 0.80, fy = 0.08 + Math.random() * 0.56;
+    for (let t = 0; t < 40; t++) {
+      const fx = 0.10 + Math.random() * 0.80, fy = 0.08 + Math.random() * 0.62;
+      if (blocked(fx, fy)) continue;
       let md = 9;
-      for (const p of S.pegs) { if (!p.alive) continue; const dx = fx - p.fx, dy = (fy - p.fy) * asp; const d = dx * dx + dy * dy; if (d < md) md = d; }
+      for (const p of S.pegs) { const dx = fx - p.fx, dy = (fy - p.fy) * asp; const d = dx * dx + dy * dy; if (d < md) md = d; }
       if (md > bestD) { bestD = md; best = { fx, fy }; }
       if (md > g2 * 2.2) break;               // 충분히 떨어진 자리면 즉시 채택
     }
-    S.pegs.push(makePeg(best.fx, best.fy, type));
+    if (!best || bestD < g2 * 0.6) continue;   // 자리가 없으면 추가 생략(겹침보다 생략이 낫다)
+    const p = makePeg(best.fx, best.fy, type); S.pegs.push(p); out.push(p);
   }
+  return out;
 }
 
 // ── 캐릭터 아트 로더 ──

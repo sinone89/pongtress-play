@@ -48,7 +48,25 @@ const Meta = (function () {
     Object.keys(M.owned).forEach(id => { if (!ROSTER.some(c => c.id === id)) delete M.owned[id]; });
     while (M.party.length < 3) M.party.push(null);
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
+    // 유물 해금·시작 유물·모드·기록(전방호환)
+    if (!Array.isArray(M.relicsUnlocked)) M.relicsUnlocked = RELIC_START_UNLOCKED.slice();
+    M.relicsUnlocked = M.relicsUnlocked.filter(id => RELICS[id]);
+    M.clearedStages = M.clearedStages || {};
+    if (M.startRelic && M.relicsUnlocked.indexOf(M.startRelic) < 0) M.startRelic = null;
+    if (!MODES[M.runMode]) M.runMode = 'normal';
+    M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
+    M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
     save();
+  }
+  // ── 유물 해금 / 출격 옵션(모드·시작 유물·일일 시드) ──
+  function unlockedRelics() { return (M && M.relicsUnlocked) ? M.relicsUnlocked.slice() : RELIC_START_UNLOCKED.slice(); }
+  function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function dateSeed(key) { let h = 2166136261; for (const ch of key) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
+  function runOptions() {
+    const mode = M.runMode || 'normal';
+    const o = { mode, stage: mode === 'daily' ? M.maxStage : M.stage, startRelic: M.startRelic || null, seed: 0 };
+    if (mode === 'daily') { const k = todayKey(); o.seed = dateSeed(k); o.startRelic = RELIC_START_UNLOCKED[dateSeed(k + 'r') % RELIC_START_UNLOCKED.length]; }   // 일일: 판·시작 유물 고정
+    return o;
   }
   function save() { if (!curAcct) return; try { localStorage.setItem(saveKey(), JSON.stringify(M)); } catch (e) {} }   // 로그인 전(게이트)엔 저장 안 함
 
@@ -69,8 +87,7 @@ const Meta = (function () {
     return { atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm), gol: b.gol };
   }
   const RAR_G = { common: 'g-n', rare: 'g-r', epic: 'g-e', legendary: 'g-l' };   // 등급 배너 클래스
-  // UI 아이콘: assets/ui/<name>.png 있으면 이모지 대체, 없으면 이모지 폴백(spr-box)
-  function uiIcon(name, emoji, style) { return '<span class="uic"' + (style ? (' style="' + style + '"') : '') + '><span class="uic-fb">' + emoji + '</span><img class="uic-im" alt="" src="assets/ui/' + name + '.png" onload="this.parentNode.classList.add(\'ok\')" onerror="this.remove()"></span>'; }
+  // UI 아이콘은 content.js 전역 uiIcon(name, emoji, style) 사용
   function clsIcon(cls) { const c = CLASS[cls] || {}; return uiIcon('cls_' + cls, c.icon || '🔫'); }
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }
@@ -161,23 +178,36 @@ const Meta = (function () {
 
   // ── 런 종료 정산 ──
   function onRunEnd(r) {
-    // r = { won, kills, floors, gold, stage }
-    const mul = stageScale(r.stage || 1).reward;
+    // r = { won, kills, floors, gold, stage, mode, loop, maxCombo, score, relics }
+    const mode = r.mode || 'normal';
+    const mul = stageScale(r.stage || 1).reward * (1 + (r.loop || 0) * 0.5);
     const earn = {
       gold: Math.round(((r.gold || 0) + (r.floors || 0) * 20) * mul),
       mats: Math.round(((r.floors || 0) * 8 + (r.won ? 30 : 0)) * mul),
-      gems: r.won ? Math.round(30 * mul) : 0, docs: 0
+      gems: r.won ? Math.round(30 * mul) : 0, docs: Math.floor((r.loop || 0) * 4 + (r.won ? 2 : 0))
     };
     gain(earn);
     M.stats.kills += (r.kills || 0);
     M.stats.floors += (r.floors || 0);
-    let unlocked = 0;
-    if (r.won) {
-      M.stats.runsWon += 1;
+    let unlocked = 0, relicsUnlocked = [], record = false, dailyReward = 0;
+    if (r.won) M.stats.runsWon += 1;
+    if (r.won && mode === 'normal') {
       if ((r.stage || 1) >= M.maxStage && M.maxStage < STAGE_MAX) { M.maxStage = Math.min(STAGE_MAX, (r.stage || 1) + 1); unlocked = M.maxStage; }
+      if (!M.clearedStages[r.stage]) {            // 스테이지 첫 클리어 → 유물 2종 해금
+        M.clearedStages[r.stage] = true;
+        relicsUnlocked = RELIC_UNLOCK_ORDER.filter(id => M.relicsUnlocked.indexOf(id) < 0).slice(0, 2);
+        M.relicsUnlocked = M.relicsUnlocked.concat(relicsUnlocked);
+      }
     }
+    if (mode === 'daily') {                       // 일일: 오늘 최고 점수 · 첫 클리어 보상
+      const k = todayKey();
+      if (M.dailyRec.date !== k) M.dailyRec = { date: k, best: 0, rewarded: false };
+      if ((r.score || 0) > M.dailyRec.best) { M.dailyRec.best = r.score || 0; record = true; }
+      if (r.won && !M.dailyRec.rewarded) { M.dailyRec.rewarded = true; dailyReward = MODES.daily.reward.gems; M.currencies.gems += dailyReward; }
+    }
+    if (mode === 'endless' && (r.score || 0) > M.endlessBest.score) { M.endlessBest = { loop: r.loop || 0, floors: r.floors || 0, score: r.score || 0 }; record = true; }
     save();
-    return Object.assign(earn, { unlocked });
+    return Object.assign(earn, { unlocked, relicsUnlocked, record, dailyReward });
   }
 
   // ═══════════ 로비 UI ═══════════
@@ -210,17 +240,30 @@ const Meta = (function () {
 
   // 출격 = 스테이지 선택 + 편성 부대 + 출격 버튼
   function renderSortie() {
+    const mode = M.runMode || 'normal';
+    const ms = $('mode-select');                  // 모드: 일반 / 일일 도전 / 무한
+    if (ms) {
+      const tabs = [['normal', '⚔', '일반'], ['daily', '📅', '일일 도전'], ['endless', '♾', '무한']];
+      let info = '';
+      if (mode === 'daily') { const rec = M.dailyRec && M.dailyRec.date === todayKey() ? M.dailyRec : { best: 0, rewarded: false }; info = MODES.daily.desc + ' · 오늘 최고 <b>' + rec.best + '</b>' + (rec.rewarded ? ' · 보상 수령 완료' : ' · 첫 클리어 💎' + MODES.daily.reward.gems); }
+      else if (mode === 'endless') info = MODES.endless.desc + ' · 최고 <b>' + (M.endlessBest.loop + 1) + '막 ' + M.endlessBest.floors + '전투</b> (' + M.endlessBest.score + '점)';
+      else info = '스테이지를 골라 출격 · 첫 클리어 시 새 유물 2종 해금';
+      ms.innerHTML = '<div class="sns-tabs mode-tabs">' + tabs.map(t => '<button class="sns-tab' + (mode === t[0] ? ' on' : '') + '" data-mode="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>').join('') + '</div><p class="mode-info">' + info + '</p>';
+    }
     const ss = $('stage-select');
     if (ss) {
+      const daily = mode === 'daily';
+      $('stage-head').hidden = daily; ss.hidden = daily;
       let h = '<div class="ss-btns">';
       for (let s = 1; s <= STAGE_MAX; s++) {
         const locked = s > M.maxStage, sel = s === M.stage;
         h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? '🔒' : s) + '</button>';
       }
       ss.innerHTML = h + '</div>';
-      const sc = stageScale(M.stage);
-      $('stage-info').textContent = 'S' + M.stage + ' · 적 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' · 보상×' + sc.reward.toFixed(1);
+      const st = daily ? M.maxStage : M.stage, sc = stageScale(st);
+      $('stage-info').textContent = (daily ? '오늘의 판 · ' : '') + 'S' + st + ' · 적 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' · 보상×' + sc.reward.toFixed(1) + ' · 맵 6층(갈림길 4) + 보스';
     }
+    renderStartRelic(mode);
     const box = $('sortie-party');
     if (box) {
       box.className = 'lane-slots-view'; box.innerHTML = '';
@@ -238,6 +281,25 @@ const Meta = (function () {
     const n = partySlots().filter(Boolean).length, warn = $('sortie-warn');
     if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
+  }
+
+  // 시작 유물 선택(해금 풀) + 유물 도감(잠김 표시) + 편성 태그 친화도(클래스 씨앗)
+  function renderStartRelic(mode) {
+    const el = $('start-relic'); if (!el) return;
+    const unl = M.relicsUnlocked, daily = mode === 'daily';
+    const fixed = daily ? runOptions().startRelic : null, sel = daily ? fixed : M.startRelic;
+    // 친화도: 편성 클래스 → 연결 태그
+    const aff = {}; partySlots().forEach(id => { if (!id) return; const cls = base(id).cls; for (const t in RELIC_TAGS) if (RELIC_TAGS[t].cls === cls) aff[t] = (aff[t] || 0) + 1; });
+    const affH = Object.keys(RELIC_TAGS).filter(t => RELIC_TAGS[t].cls).map(t => '<span class="aff" style="--c:' + RELIC_TAGS[t].color + '">' + RELIC_TAGS[t].icon + ' ' + RELIC_TAGS[t].name + ' ' + ('●'.repeat(aff[t] || 0) || '–') + '</span>').join('');
+    let h = '<div class="aff-row">' + affH + '<span class="aff-note">편성 클래스에 맞는 태그 유물이 더 자주 등장</span></div>';
+    h += '<div class="sr-grid">' + Object.keys(RELICS).map(id => {
+      const d = RELICS[id], T = RELIC_TAGS[d.tag], ok = unl.indexOf(id) >= 0;
+      return '<button class="sr-it' + (ok ? '' : ' locked') + (sel === id ? ' sel' : '') + '" data-srelic="' + id + '"' + (ok && !daily ? '' : ' disabled') + ' style="--c:' + T.color + '">'
+        + '<span class="sr-ic">' + (ok ? uiIcon('relic_' + id, d.icon) : '🔒') + '</span><span class="sr-nm">' + (ok ? d.name : '???') + '</span></button>';
+    }).join('') + '</div>';
+    const cur = sel && RELICS[sel];
+    h += '<p class="sr-desc">' + (cur ? '<b style="color:' + RELIC_TAGS[cur.tag].color + '">' + cur.icon + ' ' + cur.name + '</b> · ' + cur.lv1.desc + (daily ? ' <i>(오늘의 고정 유물)</i>' : '') : '시작 유물을 고르면 그 유물을 가진 채 출격합니다 · 해금 ' + unl.length + '/' + Object.keys(RELICS).length) + '</p>';
+    el.innerHTML = h;
   }
 
   // ── 방치(idle) 보상 ──
@@ -439,6 +501,7 @@ const Meta = (function () {
       + '<button class="btn" data-cheat="shards">모든 조각 +999</button>'
       + '<button class="btn" data-cheat="max">전 캐릭터 Lv·★ 최대</button>'
       + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
+      + '<button class="btn" data-cheat="relics">전 유물 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
@@ -451,6 +514,7 @@ const Meta = (function () {
     else if (k === 'unlock') ROSTER.forEach(c => { if (!M.owned[c.id]) M.owned[c.id] = { level: 1, star: 1 }; });
     else if (k === 'shards') ROSTER.forEach(c => { M.shards[c.id] = (M.shards[c.id] || 0) + 999; });
     else if (k === 'max') Object.keys(M.owned).forEach(id => { M.owned[id].star = GROWTH.starMax; M.owned[id].level = GROWTH.levelCapByStar[GROWTH.starMax]; });
+    else if (k === 'relics') M.relicsUnlocked = Object.keys(RELICS);
     else if (k === 'stages') M.maxStage = STAGE_MAX;
     else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
     else if (k === 'freegacha') M.daily.freeGachaDate = '';
@@ -568,6 +632,8 @@ const Meta = (function () {
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
+    $('mode-select').onclick = (e) => { const b = e.target.closest('[data-mode]'); if (b && MODES[b.dataset.mode]) { M.runMode = b.dataset.mode; save(); renderSortie(); if (typeof Sound !== 'undefined') Sound.play('click'); } };
+    $('start-relic').onclick = (e) => { const b = e.target.closest('[data-srelic]'); if (!b || b.disabled) return; const id = b.dataset.srelic; M.startRelic = (M.startRelic === id) ? null : id; save(); renderSortie(); };
     // 편성 탭: 드래그하여 레인 배치(스틸앤샷式) — 임계 넘으면 고스트, 드롭한 레인에 할당 / 탭=상세
     $('lane-slots').onclick = (e) => {
       const x = e.target.closest('[data-un]'); if (x) { clearPartySlot(+x.dataset.un); renderFormation(); return; }
@@ -631,5 +697,5 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, get state() { return M; } };
 })();
