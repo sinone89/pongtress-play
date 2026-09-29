@@ -571,7 +571,7 @@
       let ch = Math.min(COMBO_MAX, Math.floor(step / COMBO_STEP));
       if (b.first && S.setsOn.pinball) ch *= 2;
       spawnBalls(x, y, 1, '#ffd93b', ch);
-      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true });
+      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, combo: true });
       Sound.play('charge');
     }
     const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 페그 생성
@@ -1498,13 +1498,15 @@
       ctx.save();
       const pop = f.note ? 1 : (f.t > 0.6 ? 1 + Math.min(0.35, f.t - 0.6) * 1.4 : 1);    // 등장 순간 크게 튀었다가 안착
       ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.7)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const fsz = Math.round((f.note ? 16 : f.big ? 44 : 30) * pop * U);
+      const cs = f.combo ? COMBO_TEXT_SCALE : 1;                                        // 콤보 팝업만 별도 배율
+      const fsz = Math.round((f.note ? 16 : f.big ? 44 : 30) * pop * U * cs);
       ctx.font = '900 ' + fsz + 'px system-ui';
       const yy = Math.max(fsz * 0.75, f.note ? f.y : f.y - (1 - Math.min(1, f.t)) * 46 * U);   // 알림(note)은 제자리 · 화면 위로 잘리지 않게 클램프
-      ctx.lineJoin = 'round'; ctx.lineWidth = (f.big ? 8 : 6) * U; ctx.strokeStyle = 'rgba(8,4,16,0.95)';
-      ctx.strokeText(f.text, f.x, yy);
-      if (f.big && !f.note) { ctx.shadowColor = f.color; ctx.shadowBlur = 14 * U; }   // 큰 숫자는 색 글로우
-      ctx.fillStyle = f.color; ctx.fillText(f.text, f.x, yy);
+      const half = ctx.measureText(f.text).width / 2 + 6 * U, xx = Math.max(half, Math.min(W - half, f.x));   // 벽 쪽에서 터져도 글자가 화면 밖으로 잘리지 않게
+      ctx.lineJoin = 'round'; ctx.lineWidth = (f.big ? 8 : 6) * U * cs; ctx.strokeStyle = 'rgba(8,4,16,0.95)';
+      ctx.strokeText(f.text, xx, yy);
+      if (f.big && !f.note) { ctx.shadowColor = f.color; ctx.shadowBlur = 14 * U * cs; }   // 큰 숫자는 색 글로우
+      ctx.fillStyle = f.color; ctx.fillText(f.text, xx, yy);
       ctx.restore();
     }
     for (const fl of anim.flashes) {                      // 타격/페그 접촉 섬광: 링 → 발광 코어
