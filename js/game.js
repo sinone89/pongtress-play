@@ -323,7 +323,7 @@
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = []; S.launchedThisTurn = 0; S.turnMaxCombo = 0;
     const heal = rv('steel', 'heal');          // 강철 성벽: 매 턴 회복
-    if (heal && S.wallHp < S.wallHpMax && S._turns) { S.wallHp = Math.min(S.wallHpMax, S.wallHp + heal); anim.floats.push({ x: W / 2, y: layout().wall.y + 14, text: '🧱+' + heal, color: '#5ce0a0', t: 1 }); }
+    if (heal && S.wallHp < S.wallHpMax && S._turns) { S.wallHp = Math.min(S.wallHpMax, S.wallHp + heal); anim.floats.push({ x: W / 2, y: layout().wall.y + 14, text: '🧱+' + heal, color: '#5ce0a0', t: 1, ld: true }); }
     applyBoardEffects();                        // 스킬 흔적 + 적 간섭(이번 턴 판 변화)
     $('c-phase').textContent = '장전';
     const side = $('battle-side'); if (side) side.style.display = '';   // 장전 중 사이드바 표시
@@ -491,7 +491,7 @@
           const ht = hitObstacles(b, r);
           if (ht) {
             if (ht === 'bumper' && rv('elastic', 'p') && (b.elastic || 0) < 3 && Math.random() < rv('elastic', 'p')) {   // 탄성 코어(볼당 최대 3 — 범퍼 파밍 방지)
-              b.elastic = (b.elastic || 0) + 1; spawnBalls(b.x, b.y, 1, '#46e6d0', 1); anim.floats.push({ x: b.x, y: b.y - 12, text: '분열!', color: '#46e6d0', t: 0.8 });
+              b.elastic = (b.elastic || 0) + 1; spawnBalls(b.x, b.y, 1, '#46e6d0', 1); anim.floats.push({ x: b.x, y: b.y - 12, text: '분열!', color: '#46e6d0', t: 0.8, ld: true });
             }
           }
         }
@@ -516,7 +516,7 @@
     if (b.harvest) return;                 // 수확 볼은 페그를 변환하지 않음(연쇄 방지)
     if (def.slime) {                       // 점액: 발사볼을 삼킴(충전 없음) — 슬라임 간섭
       p.alive = false; b.eaten = true;
-      anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1 }); Sound.play('wall');
+      anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1, ld: true }); Sound.play('wall');
       return;
     }
     if (def.boost) {                       // 범퍼: 속도 킥(영구·안 사라짐) — 영구 반사체는 콤보 미집계(무한 파밍 방지)
@@ -536,11 +536,11 @@
     if (def.gold) {
       const g = def.gold * (rv('midas', 'gmul') || 1);
       S.gold = (S.gold || 0) + g; n += rv('midas', 'balls') || 0;
-      anim.floats.push({ x: px, y: py, text: '+' + g + 'G', color: def.color, t: 1 });
+      anim.floats.push({ x: px, y: py, text: '+' + g + 'G', color: def.color, t: 1, ld: true });
     }
     if (def.charge > 1) {
       charge = rv('overcharge', 'charge') || def.charge;
-      anim.floats.push({ x: px, y: py, text: '충전 ×' + charge, color: def.color, t: 1 });
+      anim.floats.push({ x: px, y: py, text: '충전 ×' + charge, color: def.color, t: 1, ld: true });
     }
     spawnBalls(px, py, n, def.color, charge);
     p.alive = false;
@@ -559,7 +559,7 @@
       else convertPeg(p, def, qx, qy);
       popped++;
     }
-    if (popped) { addCombo(b, popped, px, py); anim.floats.push({ x: px, y: py - 14, text: '💥 ' + popped + '연쇄!', color: '#ff8a3a', t: 1.1, big: true }); }
+    if (popped) { addCombo(b, popped, px, py); anim.floats.push({ x: px, y: py - 14, text: '💥 ' + popped + '연쇄!', color: '#ff8a3a', t: 1.1, big: true, ld: true }); }
   }
   // 콤보: 발사볼 1개가 연속으로 맞힌 페그·장애물 수. COMBO_STEP마다 보너스 충전볼(핀볼 세트: 첫 볼 ×2). 연쇄 반응 유물.
   function addCombo(b, k, x, y) {
@@ -571,13 +571,13 @@
       let ch = Math.min(COMBO_MAX, Math.floor(step / COMBO_STEP));
       if (b.first && S.setsOn.pinball) ch *= 2;
       spawnBalls(x, y, 1, '#ffd93b', ch);
-      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ts: COMBO_TEXT_SCALE });
+      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ld: true });
       Sound.play('charge');
     }
     const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 페그 생성
     if (every && (S.chainAdded || 0) < 6 && Math.floor(b.combo / every) > Math.floor((b.combo - k) / every)) {
       const added = addPegToBoard(S, 'charge', 1);
-      if (added.length) { S.chainAdded = (S.chainAdded || 0) + 1; added[0].alive = true; anim.floats.push({ x: x, y: y - 30, text: '⛓ 증폭 생성', color: '#7ef29a', t: 1 }); }
+      if (added.length) { S.chainAdded = (S.chainAdded || 0) + 1; added[0].alive = true; anim.floats.push({ x: x, y: y - 30, text: '⛓ 증폭 생성', color: '#7ef29a', t: 1, ld: true }); }
     }
   }
 
@@ -588,22 +588,22 @@
     const pk = S.pockets[idx];
     const fx = (b.x - g.x) / g.w, jack = S.jack && Math.abs(fx - S.jack.x) < 0.5 / 9;   // 잭팟 포켓 위 착지
     const px = g.x + (idx + 0.5) * (g.w / 9);
-    if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ts: COMBO_TEXT_SCALE }); }
+    if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ld: true }); }
     if (pk && pk.type === 'charge') {
       const c = S.chars.find(ch => ch.lane === pk.lane);
       let amt = (b.charge || 1) + (S.setsOn.harvest ? 1 : 0);                            // 수확 세트: +1
-      const lp = rv('lucky', 'p'); if (lp && Math.random() < lp) { amt *= 3; anim.floats.push({ x: px, y: g.y - 22, text: '🍀 ×3', color: '#7ef29a', t: 1 }); }
+      const lp = rv('lucky', 'p'); if (lp && Math.random() < lp) { amt *= 3; anim.floats.push({ x: px, y: g.y - 22, text: '🍀 ×3', color: '#7ef29a', t: 1, ld: true }); }
       if (jack) amt *= JACKPOT_MUL;
       if (c) { c.ammo += amt; c.gauge += amt; renderSkills(); }
       Sound.play('charge');
-      anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1 });
+      anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1, ld: true });
     } else if (pk && pk.type === 'buff') {
       const amt = (b.charge || 1) * 6 * (jack ? JACKPOT_MUL : 1);
       S.wallHp = Math.min(S.wallHpMax, S.wallHp + amt);
       Sound.play('charge');
-      anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: '#6cf', t: 1 });
+      anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: '#6cf', t: 1, ld: true });
     } else if (jack) {                            // 꽝 칸이라도 잭팟이면 골드
-      S.gold = (S.gold || 0) + 10; anim.floats.push({ x: px, y: g.y + 10, text: '+10G', color: '#ffd93b', t: 1 });
+      S.gold = (S.gold || 0) + 10; anim.floats.push({ x: px, y: g.y + 10, text: '+10G', color: '#ffd93b', t: 1, ld: true });
     }
   }
 
@@ -1499,12 +1499,13 @@
       ctx.save();
       const pop = f.note ? 1 : (f.t > 0.6 ? 1 + Math.min(0.35, f.t - 0.6) * 1.4 : 1);    // 등장 순간 크게 튀었다가 안착
       ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.7)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const cs = f.ts || 1;                                                             // 텍스트별 크기 배율(콤보·JACKPOT 팝업은 COMBO_TEXT_SCALE)
-      const fsz = Math.round((f.note ? 16 : f.big ? 44 : 30) * pop * U * cs);
+      const base = f.note ? 16 : f.ld ? LOAD_POPUP_PX : f.big ? 44 : 30;               // 장전 화면 팝업(ld)은 종류 불문 같은 크기
+      const cs = f.ld ? COMBO_TEXT_SCALE : 1;                                          // 외곽선·글로우도 같은 비율
+      const fsz = Math.round(base * pop * U);
       ctx.font = '900 ' + fsz + 'px system-ui';
       const yy = Math.max(fsz * 0.75, f.note ? f.y : f.y - (1 - Math.min(1, f.t)) * 46 * U);   // 알림(note)은 제자리 · 화면 위로 잘리지 않게 클램프
       const half = ctx.measureText(f.text).width / 2 + 6 * U, xx = Math.max(half, Math.min(W - half, f.x));   // 벽 쪽에서 터져도 글자가 화면 밖으로 잘리지 않게
-      ctx.lineJoin = 'round'; ctx.lineWidth = (f.big ? 8 : 6) * U * cs; ctx.strokeStyle = 'rgba(8,4,16,0.95)';
+      ctx.lineJoin = 'round'; ctx.lineWidth = (f.big || f.ld ? 8 : 6) * U * cs; ctx.strokeStyle = 'rgba(8,4,16,0.95)';
       ctx.strokeText(f.text, xx, yy);
       if (f.big && !f.note) { ctx.shadowColor = f.color; ctx.shadowBlur = 14 * U * cs; }   // 큰 숫자는 색 글로우
       ctx.fillStyle = f.color; ctx.fillText(f.text, xx, yy);
