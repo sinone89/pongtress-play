@@ -571,7 +571,7 @@
       let ch = Math.min(COMBO_MAX, Math.floor(step / COMBO_STEP));
       if (b.first && S.setsOn.pinball) ch *= 2;
       spawnBalls(x, y, 1, '#ffd93b', ch);
-      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, combo: true });
+      anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ts: COMBO_TEXT_SCALE });
       Sound.play('charge');
     }
     const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 페그 생성
@@ -588,7 +588,7 @@
     const pk = S.pockets[idx];
     const fx = (b.x - g.x) / g.w, jack = S.jack && Math.abs(fx - S.jack.x) < 0.5 / 9;   // 잭팟 포켓 위 착지
     const px = g.x + (idx + 0.5) * (g.w / 9);
-    if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true }); }
+    if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ts: COMBO_TEXT_SCALE }); }
     if (pk && pk.type === 'charge') {
       const c = S.chars.find(ch => ch.lane === pk.lane);
       let amt = (b.charge || 1) + (S.setsOn.harvest ? 1 : 0);                            // 수확 세트: +1
@@ -1435,9 +1435,10 @@
       ctx.fillStyle = b.color || '#eafcff'; ctx.fill();
       if (!b.harvest && b.combo >= 3) {                  // 콤보 카운터(발사볼 위)
         const big = b.combo >= 10;
-        ctx.save(); ctx.font = 'bold ' + (big ? 17 : 13) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.lineWidth = 3.5; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText(b.combo + ' HIT', b.x, b.y - b.r - 10);
-        ctx.fillStyle = big ? '#ffd93b' : '#fff'; ctx.fillText(b.combo + ' HIT', b.x, b.y - b.r - 10); ctx.restore();
+        const k = COMBO_TEXT_SCALE, ty = b.y - b.r - 10 * k;
+        ctx.save(); ctx.font = 'bold ' + Math.max(10, Math.round((big ? 17 : 13) * k)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // 70%, 단 페그 위에서 읽히도록 최소 10px
+        ctx.lineWidth = 3.5 * k; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText(b.combo + ' HIT', b.x, ty);
+        ctx.fillStyle = big ? '#ffd93b' : '#fff'; ctx.fillText(b.combo + ' HIT', b.x, ty); ctx.restore();
       }
     }
     // 발사대(하단 중앙) + 조준 가이드
@@ -1498,7 +1499,7 @@
       ctx.save();
       const pop = f.note ? 1 : (f.t > 0.6 ? 1 + Math.min(0.35, f.t - 0.6) * 1.4 : 1);    // 등장 순간 크게 튀었다가 안착
       ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.7)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      const cs = f.combo ? COMBO_TEXT_SCALE : 1;                                        // 콤보 팝업만 별도 배율
+      const cs = f.ts || 1;                                                             // 텍스트별 크기 배율(콤보·JACKPOT 팝업은 COMBO_TEXT_SCALE)
       const fsz = Math.round((f.note ? 16 : f.big ? 44 : 30) * pop * U * cs);
       ctx.font = '900 ' + fsz + 'px system-ui';
       const yy = Math.max(fsz * 0.75, f.note ? f.y : f.y - (1 - Math.min(1, f.t)) * 46 * U);   // 알림(note)은 제자리 · 화면 위로 잘리지 않게 클램프

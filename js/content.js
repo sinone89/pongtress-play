@@ -386,7 +386,7 @@ const MODES = {
 };
 // 콤보: N콤보마다 보너스 충전볼(충전량 = 콤보/COMBO_STEP, 최대 COMBO_MAX)
 const COMBO_STEP = 5, COMBO_MAX = 4;
-const COMBO_TEXT_SCALE = 0.7;   // 장전 화면 콤보 팝업("N HIT! +X") 글자 크기 배율 — 다른 큰 텍스트 대비 70%
+const COMBO_TEXT_SCALE = 0.7;   // 장전 화면 콤보 팝업("N HIT! +X")·JACKPOT 팝업·볼 위 "N HIT" 카운터가 공유하는 글자 크기 배율(70%)
 // 움직이는 잭팟 포켓: 상단 골칸 위를 좌우로 이동, 그 위로 착지하면 ×JACKPOT_MUL
 const JACKPOT_MUL = 3, JACKPOT_SPEED = 1.1;   // 속도 = 초당 포켓 칸 수
 
