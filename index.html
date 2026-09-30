@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=124">
+  <link rel="stylesheet" href="css/game.css?v=126">
 </head>
 <body>
   <div id="app">
@@ -38,7 +38,6 @@
       </div>
       <div class="title-btm">
         <button id="btn-start" class="btn primary">터치하여 시작</button>
-        <p class="version">prototype 0.2 · 전투 코어</p>
       </div>
     </section>
 
@@ -55,23 +54,19 @@
       <main id="lobby-main">
         <div id="tab-home" class="lobby-panel">
           <canvas id="idle-canvas"></canvas>
-          <span class="home-scene-tag">⚔ 자동 전투 중…</span>
           <div id="idle-reward" class="idle-card"></div>
         </div>
         <div id="tab-sortie" class="lobby-panel" hidden>
           <div id="mode-select"></div>
           <div class="sns-h" id="stage-head">스테이지 선택</div>
           <div id="stage-select"></div>
-          <p id="stage-info" class="muted"></p>
-          <div class="sns-h">시작 유물 <span class="sns-sub">탭하여 선택 · 유물 도감</span></div>
-          <div id="start-relic"></div>
-          <div class="sns-h">편성 부대 <span class="sns-sub">편성 탭에서 변경</span></div>
+          <div class="sns-h">편성 부대</div>
           <div id="sortie-party"></div>
           <p id="sortie-warn" class="muted" hidden></p>
           <button id="btn-sortie" class="btn primary home-cta-btn">출격</button>
         </div>
         <div id="tab-formation" class="lobby-panel" hidden>
-          <div class="sns-h">부대 배치 <span class="sns-sub">캐릭터를 슬롯으로 드래그 · ✕ 해제</span></div>
+          <div class="sns-h">부대 배치</div>
           <div id="lane-slots"></div>
           <div class="sns-h">보유 캐릭터 <span class="sns-sub" id="owned-count"></span></div>
           <div id="owned-list"></div>
@@ -130,7 +125,6 @@
         <div id="map-head"></div>
         <div id="map-relics"></div>
         <div id="map-body"></div>
-        <p id="map-hint"></p>
       </div>
     </section>
 
@@ -142,7 +136,7 @@
     <div id="reward" class="modal" hidden>
       <div class="modal-box">
         <h2 id="reward-title">레벨 업!</h2>
-        <p class="muted" id="reward-sub">보상 하나를 고르세요</p>
+        <p class="muted" id="reward-sub"></p>
         <div id="reward-choices"></div>
       </div>
     </div>
@@ -160,9 +154,9 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=124"></script>
-  <script src="js/content.js?v=124"></script>
-  <script src="js/meta.js?v=124"></script>
-  <script src="js/game.js?v=124"></script>
+  <script src="js/audio.js?v=126"></script>
+  <script src="js/content.js?v=126"></script>
+  <script src="js/meta.js?v=126"></script>
+  <script src="js/game.js?v=126"></script>
 </body>
 </html>

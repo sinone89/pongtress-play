@@ -48,24 +48,24 @@ const Meta = (function () {
     Object.keys(M.owned).forEach(id => { if (!ROSTER.some(c => c.id === id)) delete M.owned[id]; });
     while (M.party.length < 3) M.party.push(null);
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
-    // 유물 해금·시작 유물·모드·기록(전방호환)
+    // 유물 해금·모드·기록(전방호환)
     if (!Array.isArray(M.relicsUnlocked)) M.relicsUnlocked = RELIC_START_UNLOCKED.slice();
     M.relicsUnlocked = M.relicsUnlocked.filter(id => RELICS[id]);
     M.clearedStages = M.clearedStages || {};
-    if (M.startRelic && M.relicsUnlocked.indexOf(M.startRelic) < 0) M.startRelic = null;
+    delete M.startRelic;                                   // 시작 유물 기능 제거 — 구 세이브에 남은 선택값 정리
     if (!MODES[M.runMode]) M.runMode = 'normal';
     M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
     M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
     save();
   }
-  // ── 유물 해금 / 출격 옵션(모드·시작 유물·일일 시드) ──
+  // ── 유물 해금 / 출격 옵션(모드·일일 시드) ──
   function unlockedRelics() { return (M && M.relicsUnlocked) ? M.relicsUnlocked.slice() : RELIC_START_UNLOCKED.slice(); }
   function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function dateSeed(key) { let h = 2166136261; for (const ch of key) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
   function runOptions() {
     const mode = M.runMode || 'normal';
-    const o = { mode, stage: mode === 'daily' ? M.maxStage : M.stage, startRelic: M.startRelic || null, seed: 0 };
-    if (mode === 'daily') { const k = todayKey(); o.seed = dateSeed(k); o.startRelic = RELIC_START_UNLOCKED[dateSeed(k + 'r') % RELIC_START_UNLOCKED.length]; }   // 일일: 판·시작 유물 고정
+    const o = { mode, stage: mode === 'daily' ? M.maxStage : M.stage, seed: 0 };
+    if (mode === 'daily') o.seed = dateSeed(todayKey());   // 일일: 날짜 시드로 맵·판 고정
     return o;
   }
   function save() { if (!curAcct) return; try { localStorage.setItem(saveKey(), JSON.stringify(M)); } catch (e) {} }   // 로그인 전(게이트)엔 저장 안 함
@@ -244,11 +244,17 @@ const Meta = (function () {
     const ms = $('mode-select');                  // 모드: 일반 / 일일 도전 / 무한
     if (ms) {
       const tabs = [['normal', '⚔', '일반'], ['daily', '📅', '일일 도전'], ['endless', '♾', '무한']];
-      let info = '';
-      if (mode === 'daily') { const rec = M.dailyRec && M.dailyRec.date === todayKey() ? M.dailyRec : { best: 0, rewarded: false }; info = MODES.daily.desc + ' · 오늘 최고 <b>' + rec.best + '</b>' + (rec.rewarded ? ' · 보상 수령 완료' : ' · 첫 클리어 💎' + MODES.daily.reward.gems); }
-      else if (mode === 'endless') info = MODES.endless.desc + ' · 최고 <b>' + (M.endlessBest.loop + 1) + '막 ' + M.endlessBest.floors + '전투</b> (' + M.endlessBest.score + '점)';
-      else info = '스테이지를 골라 출격 · 첫 클리어 시 새 유물 2종 해금';
-      ms.innerHTML = '<div class="sns-tabs mode-tabs">' + tabs.map(t => '<button class="sns-tab' + (mode === t[0] ? ' on' : '') + '" data-mode="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>').join('') + '</div><p class="mode-info">' + info + '</p>';
+      // 설명 문구 없이 '기록·보상 상태'만 표시 (없으면 줄 자체를 만들지 않음)
+      const parts = [];
+      if (mode === 'daily') {
+        const rec = M.dailyRec && M.dailyRec.date === todayKey() ? M.dailyRec : { best: 0, rewarded: false };
+        if (rec.best) parts.push('오늘 최고 <b>' + rec.best + '</b>점');
+        if (!rec.rewarded) parts.push('첫 클리어 💎' + MODES.daily.reward.gems);
+      } else if (mode === 'endless' && M.endlessBest.score > 0) {
+        parts.push('최고 <b>' + (M.endlessBest.loop + 1) + '막 ' + M.endlessBest.floors + '전투</b> (' + M.endlessBest.score + '점)');
+      }
+      ms.innerHTML = '<div class="sns-tabs mode-tabs">' + tabs.map(t => '<button class="sns-tab' + (mode === t[0] ? ' on' : '') + '" data-mode="' + t[0] + '">' + t[1] + ' ' + t[2] + '</button>').join('') + '</div>'
+        + (parts.length ? '<p class="mode-info">' + parts.join(' · ') + '</p>' : '');
     }
     const ss = $('stage-select');
     if (ss) {
@@ -260,10 +266,7 @@ const Meta = (function () {
         h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? '🔒' : s) + '</button>';
       }
       ss.innerHTML = h + '</div>';
-      const st = daily ? M.maxStage : M.stage, sc = stageScale(st);
-      $('stage-info').textContent = (daily ? '오늘의 판 · ' : '') + 'S' + st + ' · 적 체력×' + sc.hp.toFixed(1) + ' 공격×' + sc.dmg.toFixed(1) + ' · 보상×' + sc.reward.toFixed(1) + ' · 맵 6층(갈림길 4) + 보스';
     }
-    renderStartRelic(mode);
     const box = $('sortie-party');
     if (box) {
       box.className = 'lane-slots-view'; box.innerHTML = '';
@@ -283,25 +286,6 @@ const Meta = (function () {
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
   }
 
-  // 시작 유물 선택(해금 풀) + 유물 도감(잠김 표시) + 편성 태그 친화도(클래스 씨앗)
-  function renderStartRelic(mode) {
-    const el = $('start-relic'); if (!el) return;
-    const unl = M.relicsUnlocked, daily = mode === 'daily';
-    const fixed = daily ? runOptions().startRelic : null, sel = daily ? fixed : M.startRelic;
-    // 친화도: 편성 클래스 → 연결 태그
-    const aff = {}; partySlots().forEach(id => { if (!id) return; const cls = base(id).cls; for (const t in RELIC_TAGS) if (RELIC_TAGS[t].cls === cls) aff[t] = (aff[t] || 0) + 1; });
-    const affH = Object.keys(RELIC_TAGS).filter(t => RELIC_TAGS[t].cls).map(t => '<span class="aff" style="--c:' + RELIC_TAGS[t].color + '">' + RELIC_TAGS[t].icon + ' ' + RELIC_TAGS[t].name + ' ' + ('●'.repeat(aff[t] || 0) || '–') + '</span>').join('');
-    let h = '<div class="aff-row">' + affH + '<span class="aff-note">편성 클래스에 맞는 태그 유물이 더 자주 등장</span></div>';
-    h += '<div class="sr-grid">' + Object.keys(RELICS).map(id => {
-      const d = RELICS[id], T = RELIC_TAGS[d.tag], ok = unl.indexOf(id) >= 0;
-      return '<button class="sr-it' + (ok ? '' : ' locked') + (sel === id ? ' sel' : '') + '" data-srelic="' + id + '"' + (ok && !daily ? '' : ' disabled') + ' style="--c:' + T.color + '">'
-        + '<span class="sr-ic">' + (ok ? uiIcon('relic_' + id, d.icon) : '🔒') + '</span><span class="sr-nm">' + (ok ? d.name : '???') + '</span></button>';
-    }).join('') + '</div>';
-    const cur = sel && RELICS[sel];
-    h += '<p class="sr-desc">' + (cur ? '<b style="color:' + RELIC_TAGS[cur.tag].color + '">' + cur.icon + ' ' + cur.name + '</b> · ' + cur.lv1.desc + (daily ? ' <i>(오늘의 고정 유물)</i>' : '') : '시작 유물을 고르면 그 유물을 가진 채 출격합니다 · 해금 ' + unl.length + '/' + Object.keys(RELICS).length) + '</p>';
-    el.innerHTML = h;
-  }
-
   // ── 방치(idle) 보상 ──
   function idleEnsure() { if (!M.idle) M.idle = { last: 0 }; if (!M.idle.last) { M.idle.last = Date.now(); save(); } }
   function idlePending() {
@@ -313,7 +297,7 @@ const Meta = (function () {
   function renderIdleCard() {
     const el = $('idle-reward'); if (!el) return;
     const p = idlePending(), hh = Math.floor(p.mins / 60), mm = Math.floor(p.mins % 60), has = (p.gold + p.mats) > 0;
-    el.innerHTML = '<div class="il-top"><b>⏳ 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분 · S' + M.maxStage + ' ×' + IDLE.mul(M.maxStage).toFixed(1) + '</span></div>'
+    el.innerHTML = '<div class="il-top"><b>⏳ 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분</span></div>'
       + '<div class="il-row"><span class="il-amt">🪙 ' + p.gold + '  🔩 ' + p.mats + '</span>'
       + '<button class="sns-btn sm" data-idle="claim"' + (has ? '' : ' disabled') + '>받기</button></div>';
   }
@@ -408,7 +392,7 @@ const Meta = (function () {
           + '<button class="ls-x" data-un="' + lane + '">✕</button>'
           + '<div class="ls-img"><img src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()"></div>'
           + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
-      } else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인 · 드래그 배치</span>';
+      } else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
       slots.append(d);
     });
     const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
@@ -418,12 +402,10 @@ const Meta = (function () {
   // ── 상점(스틸앤샷式): 서브탭(가챠/문서/패키지) → 배너·카드 ──
   function shopGachaBody() {
     const free = freeAvailable();
-    const rateLine = GACHA.rates.slice().reverse().map(r => (RARITY[r.rarity] || {}).name + ' ' + r.w + '%').join(' · ');
     return '<div class="gbanner">'
-      + '<button class="gb-info" data-gachainfo="1">❔</button>'
+      + '<button class="gb-info" data-gachainfo="1">❔</button>'          // 확률은 ❔ 팝업에서만 표시(배너에 중복 표기 안 함)
       + '<div class="gb-t">🎫 상시 배너</div>'
-      + '<div class="gb-d">모든 요원 등장' + (free ? ' · <b>오늘 무료 1회!</b>' : '') + '</div>'
-      + '<div class="gb-rates">' + rateLine + '</div>'
+      + (free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
       + '<div class="gb-btns">'
       +   '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '">단일 ' + (free ? '무료' : '💎' + GACHA.cost1) + '</button>'
       +   '<button class="sns-btn" data-gacha="10">10연 💎' + GACHA.cost10 + '</button>'
@@ -431,7 +413,7 @@ const Meta = (function () {
   }
   function shopDocBody() {
     // 스틸앤샷式: 캐릭터 조각만 판매 · 커먼 제외 · 등급별 조각 1개당 문서 비용 · 보유 요원만 구매(미보유=잠금)
-    let h = '<div class="mkt-info">📜 캐릭터 조각 교환 · 보유(가챠 획득) 요원만 · 보유 문서 📜' + M.currencies.docs + '</div>';
+    let h = '';
     const rars = ['legendary', 'epic', 'rare'];   // 커먼 제외(레전더리/에픽/레어만)
     rars.forEach(rar => {
       const list = ROSTER.filter(c => c.rarity === rar); if (!list.length) return;
@@ -449,8 +431,7 @@ const Meta = (function () {
     return h;
   }
   function shopPkgBody() {
-    return '<div class="mkt-info">💳 보석 · 재화 패키지</div>'
-      + [['💎', '보석 패키지', '💎 100 / 550 / 1200'], ['🚫', '광고 제거', '전면 광고 제거 + 보너스'], ['📅', '주간 패스', '매일 보석 · 재화 지급']]
+    return [['💎', '보석 패키지', '💎 100 / 550 / 1200'], ['🚫', '광고 제거', '전면 광고 제거 + 보너스'], ['📅', '주간 패스', '매일 보석 · 재화 지급']]
         .map(p => '<div class="sns-card"><div class="sns-row"><div class="shop-ico emoji">' + p[0] + '</div>'
           + '<div class="sns-grow"><div class="sns-nm">' + p[1] + '</div><div class="sns-ds">' + p[2] + '</div></div>'
           + '<button class="sns-btn sm sub" disabled>준비 중</button></div></div>').join('');
@@ -466,8 +447,7 @@ const Meta = (function () {
     const box = $('gacha-modal-box');
     box.innerHTML = '<h2>🎰 가챠 확률</h2>'
       + '<div class="gi-rates">' + GACHA.rates.slice().reverse().map(r => { const R = RARITY[r.rarity] || {}, g = RAR_G[r.rarity] || 'g-n'; return '<div class="gi-row"><span class="g-tag ' + g + '">' + R.name + '</span><b>' + r.w + '%</b></div>'; }).join('') + '</div>'
-      + '<div class="gi-guide"><div class="gi-g"><b>🔷 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div>'
-      + '<div class="gi-g"><b>💎 10연</b> — 한 번에 10회 뽑기</div></div>'
+      + '<div class="gi-guide"><div class="gi-g"><b>🔷 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
       + '<button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -580,7 +560,7 @@ const Meta = (function () {
       const nx = statAt(id, Math.min(cap, o.level + 1), o.star), cost = GROWTH.levelUpCost(o.level);
       actEnabled = !maxLv && M.currencies.gold >= cost;
       box6 = '<div class="sc-t">현재 능력치</div>' + STAT.map(s => '<div class="sc-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + cur[s[2]] + '</b></div>').join('');
-      box7 = maxLv ? '<div class="nx-max">레벨 상한 도달<br><span>승급으로 상한 ↑</span></div>'
+      box7 = maxLv ? '<div class="nx-max">레벨 상한 도달</div>'
         : '<div class="sc-t">다음 Lv.' + (o.level + 1) + '</div>' + STAT.map(s => '<div class="nx-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + nx[s[2]] + (nx[s[2]] !== cur[s[2]] ? '' : '') + '</b></div>').join('');
       actLabel = maxLv ? '레벨 최대' : '⬆️ 레벨업 · 🪙' + cost;
       actAttr = 'data-lvup="' + id + '"';
@@ -633,7 +613,6 @@ const Meta = (function () {
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
     $('mode-select').onclick = (e) => { const b = e.target.closest('[data-mode]'); if (b && MODES[b.dataset.mode]) { M.runMode = b.dataset.mode; save(); renderSortie(); if (typeof Sound !== 'undefined') Sound.play('click'); } };
-    $('start-relic').onclick = (e) => { const b = e.target.closest('[data-srelic]'); if (!b || b.disabled) return; const id = b.dataset.srelic; M.startRelic = (M.startRelic === id) ? null : id; save(); renderSortie(); };
     // 편성 탭: 드래그하여 레인 배치(스틸앤샷式) — 임계 넘으면 고스트, 드롭한 레인에 할당 / 탭=상세
     $('lane-slots').onclick = (e) => {
       const x = e.target.closest('[data-un]'); if (x) { clearPartySlot(+x.dataset.un); renderFormation(); return; }

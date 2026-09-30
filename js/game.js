@@ -15,7 +15,6 @@
     const s = [...document.scripts].find(x => /game\.js/.test(x.src));
     BUILD = s ? ((s.src.match(/v=(\d+)/) || [])[1] || '?') : '?';
     const tag = document.getElementById('build-tag'); if (tag) tag.textContent = 'build ' + BUILD;
-    const ver = document.querySelector('.version'); if (ver) ver.textContent = 'prototype 0.2 · build ' + BUILD;
   })();
 
   const canvas = $('stage'); const ctx = canvas.getContext('2d');
@@ -92,7 +91,6 @@
       combat: null, over: false
     };
     show('combat'); resize();
-    if (opts.startRelic && RELICS[opts.startRelic]) gainRelic(opts.startRelic, true);   // 메타 시작 유물
     S.map = genMap(); showMap();
     if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }
   }
@@ -928,12 +926,13 @@
   function showReward() {
     const lvl = S.rewardQueue[0];
     const next = () => { S.rewardQueue.shift(); S.pendingRewards = S.rewardQueue.length; syncHud(); if (S.rewardQueue.length > 0) showReward(); else advanceEnemies(); };
-    if (lvl % 2 === 0) { showRelicPick({ title: '레벨 ' + lvl + ' · 유물', sub: '유물 하나를 고르세요', evoChance: 0.4 }, next); return; }
+    const pendingText = S.rewardQueue.length > 1 ? '남은 보상 ' + S.rewardQueue.length + '개' : '';   // 안내 문구 없이 '남은 개수'만
+    if (lvl % 2 === 0) { showRelicPick({ title: '레벨 ' + lvl + ' · 유물', sub: pendingText, evoChance: 0.4 }, next); return; }
     const box = $('reward-choices'); box.replaceChildren();
     const pool = REWARDS.slice(); const pick = [];
     for (let i = 0; i < 3 && pool.length; i++) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     $('reward-title').textContent = '레벨 ' + lvl + '!';
-    $('reward-sub').textContent = '남은 보상 ' + S.rewardQueue.length + '개 · 하나를 고르세요';
+    $('reward-sub').textContent = pendingText;
     pick.forEach(rw => {
       const b = document.createElement('button'); b.className = 'reward-card';
       b.innerHTML = '<div class="rc-name">' + rw.name + '</div><div class="rc-desc">' + rw.desc + '</div>';
@@ -977,7 +976,7 @@
     const ids = relicOffer(3, opts);
     if (!ids.length) { done && done(); return; }
     const box = $('reward-choices'); box.replaceChildren();
-    $('reward-title').textContent = opts.title || '유물 획득'; $('reward-sub').textContent = opts.sub || '하나를 고르세요';
+    $('reward-title').textContent = opts.title || '유물 획득'; $('reward-sub').textContent = opts.sub || '';
     ids.forEach(id => {
       const b = document.createElement('button'); b.className = 'reward-card relic-card';
       b.innerHTML = relicCardHTML(id);
@@ -987,7 +986,7 @@
     $('reward').hidden = false;
   }
   // 유물 획득: Lv+1(최대 2) → 즉시 효과(강철 성벽 HP) → 세트 체크 → HUD
-  function gainRelic(id, silent) {
+  function gainRelic(id) {
     const d = RELICS[id]; if (!d) return;
     const before = rl(id); if (before >= 2) return;
     const lv = before + 1; S.relics[id] = lv;
@@ -995,7 +994,7 @@
       const pct = (lv >= 2 ? d.lv2.pct : d.lv1.pct) - (before ? d.lv1.pct : 0), add = Math.round(S.wallBase * pct);
       S.wallHpMax += add; S.wallHp += add;
     }
-    if (!silent) { toast((lv >= 2 ? '★ 진화! ' : '유물 획득 · ') + d.icon + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play('level'); }
+    toast((lv >= 2 ? '★ 진화! ' : '유물 획득 · ') + d.icon + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play('level');
     // 세트: 같은 태그 유물 RELIC_SET_N개
     const cnt = {}; for (const k in S.relics) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
     for (const t in cnt) if (cnt[t] >= RELIC_SET_N && !S.setsOn[t]) {
@@ -1018,8 +1017,8 @@
     const cnt = {}; for (const k of ids) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
     let h = ids.map(id => '<span class="rb-it' + (rl(id) >= 2 ? ' evo' : '') + '" title="' + relicName(id, rl(id)) + '">' + uiIcon('relic_' + id, RELICS[id].icon) + (rl(id) >= 2 ? '<i>★</i>' : '') + '</span>').join('');
     h += Object.keys(cnt).map(t => '<span class="rb-set' + (S.setsOn[t] ? ' on' : '') + '" style="--c:' + RELIC_TAGS[t].color + '">' + RELIC_TAGS[t].icon + Math.min(cnt[t], RELIC_SET_N) + '/' + RELIC_SET_N + '</span>').join('');
-    el.innerHTML = h || '<span class="rb-empty">유물 없음 · 전투 승리·레벨업으로 획득</span>';
-    const mr = $('map-relics'); if (mr) mr.innerHTML = el.innerHTML;
+    el.innerHTML = h;                                   // 유물이 없으면 빈 채로 두고 CSS(:empty)로 숨김 — 안내 문구 없음
+    const mr = $('map-relics'); if (mr) mr.innerHTML = h;
   }
   function openRelicInfo() {
     const box = $('run-modal-box'), ids = Object.keys(S.relics);
@@ -1038,7 +1037,7 @@
     S.phase = 'map';
     if (S.combat && S.combat.boss) { nextLoop(); return; }
     const t = S.combat && S.combat.elite ? '정예 격파 보상' : '전투 승리 보상';
-    showRelicPick({ title: t, sub: '유물 하나를 고르세요 (진화 후보 포함)', guaranteeEvo: true }, showMap);
+    showRelicPick({ title: t, guaranteeEvo: true }, showMap);
   }
   function earnedText(e) { return '획득 🪙' + e.gold + ' 🔩' + e.mats + (e.gems ? ' 💎' + e.gems : ''); }
   function runScore(won) { return S.floorsCleared * 100 + S.runKills * 5 + (S.runMaxCombo || 0) * 10 + (S.loop || 0) * 800 + (won ? 1000 : 0); }
@@ -1129,7 +1128,6 @@
     $('map-body').innerHTML = svg + nodes;
     $('map-head').innerHTML = '<b>' + (S.mode === 'endless' ? '♾ 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? '📅 일일 도전' : '스테이지 ' + S.stage) + '</b>'
       + '<span>🛡 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>🪙 ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>';
-    $('map-hint').textContent = pos.f < 0 ? '첫 전투를 선택하세요' : (pos.f + 1 < F ? '다음 노드를 선택하세요 · 갈림길마다 위험과 보상이 다릅니다' : '');
     renderRelicBar();
     $('map').hidden = false;
   }
@@ -1146,7 +1144,7 @@
     const key = S.mapPos.f + '-' + S.mapPos.i;
     if (!S.shop || S.shop.key !== key) S.shop = { key, relics: relicOffer(3, { evoChance: 0.5 }), sold: {}, healed: false };
     const sh = S.shop, g = S.gold || 0;
-    let h = '<h2>🛒 상점</h2><p class="muted">보유 🪙 <b class="sh-gold">' + g + '</b> · 런 골드는 남기면 정산 보상이 됩니다</p><div class="shop-list">';
+    let h = '<h2>🛒 상점</h2><p class="muted">보유 🪙 <b class="sh-gold">' + g + '</b></p><div class="shop-list">';
     for (const id of sh.relics) {
       const evo = rl(id) === 1, price = evo ? SHOP_PRICE.relicEvo : SHOP_PRICE.relic, sold = sh.sold[id] || rl(id) >= 2;
       h += '<div class="shop-item' + (sold ? ' sold' : '') + '">' + relicCardHTML(id) + '<button class="btn sm" data-buy="' + id + '"' + (sold || g < price ? ' disabled' : '') + '>' + (sold ? '구매 완료' : '🪙 ' + price) + '</button></div>';
@@ -1164,7 +1162,7 @@
   // 휴식: 회복 또는 단련(보유 유물 1개 진화) 중 택1
   function openRest() {
     const lv1 = Object.keys(S.relics).filter(id => rl(id) === 1);
-    let h = '<h2>⛺ 휴식</h2><p class="muted">하나를 고르세요</p><div class="rest-opts">'
+    let h = '<h2>⛺ 휴식</h2><div class="rest-opts">'
       + '<button class="reward-card" data-rest="heal"><div class="rc-name">💤 휴식</div><div class="rc-desc">성벽 HP +' + Math.round(REST_HEAL * 100) + '% 회복 (현재 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + ')</div></button>';
     h += lv1.length ? lv1.map(id => '<button class="reward-card relic-card" data-rest="evo:' + id + '">' + '<div class="rc-top"><span class="rc-name">⚒ 단련 → ' + RELICS[id].lv2.name + '</span></div><div class="rc-desc">' + RELICS[id].lv2.desc + '</div></button>').join('')
       : '<button class="reward-card" disabled><div class="rc-name">⚒ 단련</div><div class="rc-desc">진화할 유물이 없어요(Lv1 유물 필요)</div></button>';
@@ -1184,7 +1182,7 @@
     S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * 0.3));
     S.map = genMap(); S.mapPos = { f: -1, i: -1 };
     toast('♾ ' + (S.loop + 1) + '막 돌입 · 적 강화 ×' + k.toFixed(2), '#ff5db1', true);
-    showRelicPick({ title: '보스 격파 보상', sub: '다음 막으로 가져갈 유물', guaranteeEvo: true }, showMap);
+    showRelicPick({ title: '보스 격파 보상', guaranteeEvo: true }, showMap);
   }
 
   // ============ 판 변화: 스킬 흔적 + 적 간섭 (매 장전 시작) ============
@@ -1766,7 +1764,7 @@
     const lv = +qs.get('lvl'), sr = +qs.get('star');
     if (lv >= 1 || sr >= 1) Object.keys(Meta.state.owned).forEach(id => { if (lv >= 1) Meta.state.owned[id].level = lv; if (sr >= 1) Meta.state.owned[id].star = sr; });
     const mode = qs.get('mode') || 'normal';
-    startRun({ mode, stage: Meta.state.stage, seed: mode === 'daily' ? 20260928 : 0, startRelic: qs.get('relic') || null });
+    startRun({ mode, stage: Meta.state.stage, seed: mode === 'daily' ? 20260928 : 0 });
     if (qs.has('win')) { S.atkBonus += 60; S.autoSkill = true; }
     const maxTicks = +qs.get('ticks') || 4000, maxLoop = +qs.get('loops') || 1;
     let ticks = 0, launched = 0, nodes = [];
