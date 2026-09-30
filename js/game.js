@@ -1,6 +1,6 @@
 'use strict';
 /* PONGTRESS 프로토타입 0.2 — 전투 코어 슬라이스
- * content.js(CFG·ROSTER·ENEMIES·BOSS_GOLEM·COMBATS·REWARDS·expToNext) 이후 로드.
+ * content.js(CFG·ROSTER·ENEMIES·BOSSES·COMBATS·REWARDS·expToNext) 이후 로드.
  * 한 턴 = 장전 phase(플런저로 볼을 쏘아 배수 페그로 불리고 9칸 골 포켓에 떨어뜨려 캐릭터 탄환 충전)
  *        → 전투 phase(충전된 캐릭터가 맨 앞 적 자동 공격, EXP·레벨업·보상, 적 전진).
  */
@@ -129,7 +129,7 @@
     if (combat.boss) { spawnBoss(); S.waves = []; }
     else {
       S.waves = combat.waves.slice(); spawnWave();
-      if (combat.elite && S.enemies.length) {            // 정예 적: 첫 웨이브 맨 앞 중앙 1마리를 강화
+      if (combat.elite && S.enemies.length) {            // 정예 적: 첫 웨이브 맨 앞 중앙 1기를 강화
         const e = S.enemies.slice().sort((a, b) => (a.row - b.row) || (Math.abs(a.lane - 2.5) - Math.abs(b.lane - 2.5)))[0];
         e.elite = true; e.name = '정예 ' + e.name; e.hp = e.maxHp = Math.round(e.maxHp * ELITE.hpMul);
         e.dmg = Math.round(e.dmg * ELITE.dmgMul); e.exp = Math.round(e.exp * ELITE.expMul);
@@ -483,7 +483,7 @@
             if (b.eaten) break;
           }
         }
-        if (b.eaten) { S.balls.splice(i, 1); gone = true; break; }   // 점액 페그에 삼켜짐
+        if (b.eaten) { S.balls.splice(i, 1); gone = true; break; }   // 오염 페그에 흡수됨
         // 고정 장애물(범퍼/기둥/바) 충돌 — 수확 볼 제외
         if (!b.harvest && S.obstacles && S.obstacles.length) {
           const ht = hitObstacles(b, r);
@@ -512,7 +512,7 @@
   // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 볼로 변환되며 사라짐(볼이 지나갈 길이 뚫려 끼지 않음), 턴마다 부활.
   function applyPegHit(b, p, def, px, py) {
     if (b.harvest) return;                 // 수확 볼은 페그를 변환하지 않음(연쇄 방지)
-    if (def.slime) {                       // 점액: 발사볼을 삼킴(충전 없음) — 슬라임 간섭
+    if (def.sludge) {                      // 오염: 발사볼을 삼킴(충전 없음) — 슬러지 간섭
       p.alive = false; b.eaten = true;
       anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1, ld: true }); Sound.play('wall');
       return;
@@ -523,7 +523,7 @@
       anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
       return;
     }
-    if (def.rock) return;                  // 바위: 반사만(변환·소멸 없음)
+    if (def.scrap) return;                 // 파편: 반사만(변환·소멸 없음)
     addCombo(b, 1, px, py);                // 콤보 = 터뜨린(소모되는) 페그 수
     if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 페그 연쇄 폭발
     convertPeg(p, def, px, py);
@@ -551,7 +551,7 @@
     let popped = 0;
     for (const p of S.pegs) {
       if (!p.alive || p === bp) continue;
-      const def = PEG_TYPES[p.type] || PEG_TYPES.normal; if (def.rock || def.slime || def.boost) continue;
+      const def = PEG_TYPES[p.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost) continue;
       const qx = r.x + p.fx * r.w, qy = r.y + p.fy * r.h; if (Math.hypot(qx - px, qy - py) > R) continue;
       if (def.bomb && depth < 3) explodeBomb(b, p, qx, qy, depth + 1);
       else convertPeg(p, def, qx, qy);
@@ -756,8 +756,8 @@
     const cc = (rv('crit', 'p') || 0) + (S.setsOn.precision ? 0.2 : 0);                      // 치명탄 / 정밀 세트
     if (!shot.splash && !shot.powder && cc > 0 && Math.random() < cc) { crit = true; dmg *= (rv('crit', 'mult') || 2); }
     dmg = Math.round(dmg);
-    if (e.armor) dmg = Math.max(1, dmg - e.armor);                                            // 방어(강철거인)
-    if (e.isBoss && e.stun > 0 && S.bossDef && S.bossDef.vulnerable) dmg = Math.round(dmg * (1 + S.bossDef.vulnerable));  // 골렘 스턴 취약
+    if (e.armor) dmg = Math.max(1, dmg - e.armor);                                            // 방어(헤비아머 장갑)
+    if (e.isBoss && e.stun > 0 && S.bossDef && S.bossDef.vulnerable) dmg = Math.round(dmg * (1 + S.bossDef.vulnerable));  // 타이탄 과열(스턴) 중 코어 노출 → 취약
     e.hp -= dmg;
     const pos = enemyPos(e);
     e.hitT = 1;
@@ -833,9 +833,9 @@
       if (S.bossIntent.left <= 0) {
         const bp = enemyPos(boss);
         if (boss.stun > 0) { anim.floats.push({ x: bp.x, y: bp.y - 30, text: '저지! ' + BI.name + ' 취소', color: '#8cf', t: 1.4, big: true }); }
-        else if (boss.kind === 'golem') { charge = true; anim.floats.push({ x: bp.x, y: bp.y - 30, text: '돌진!', color: '#ff6b6b', t: 1.3, big: true }); anim.shake = Math.max(anim.shake, 10); }
-        else if (boss.kind === 'slime') { splitBossSlime(boss, 3); anim.floats.push({ x: bp.x, y: bp.y - 30, text: '대분열!', color: '#5ad0a0', t: 1.3, big: true }); }
-        else if (boss.kind === 'legion') { for (let k = 0; k < 4; k++) summonAdd(); anim.floats.push({ x: bp.x, y: bp.y - 30, text: '총동원!', color: '#6fae4f', t: 1.3, big: true }); }
+        else if (boss.kind === 'titan') { charge = true; anim.floats.push({ x: bp.x, y: bp.y - 30, text: '돌진!', color: '#ff6b6b', t: 1.3, big: true }); anim.shake = Math.max(anim.shake, 10); }
+        else if (boss.kind === 'swarm') { splitSwarm(boss, 3); anim.floats.push({ x: bp.x, y: bp.y - 30, text: '대분리!', color: '#5ad0a0', t: 1.3, big: true }); }
+        else if (boss.kind === 'carrier') { for (let k = 0; k < 4; k++) summonAdd(); anim.floats.push({ x: bp.x, y: bp.y - 30, text: '증원 투입!', color: '#6fb1e8', t: 1.3, big: true }); }
         S.bossIntent.left = BI.every;
       }
     }
@@ -844,7 +844,7 @@
       if (e.stun > 0) { e.stun--; continue; }   // 기절(스킬) — 이번 턴 전진 스킵
       if (dp && !e.isBoss && Math.random() < dp) { const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 14, text: '⏱', color: '#8cf', t: 0.9 }); continue; }   // 전술 지연
       const isCharge = charge && e === boss;
-      e.row -= (e.speed || 1) + (isCharge ? 2 : 0);   // 빠른 적(늑대)은 2칸, 골렘 돌진 +2칸
+      e.row -= (e.speed || 1) + (isCharge ? 2 : 0);   // 빠른 적(하운드)은 2칸, 타이탄 돌진 +2칸
       if (e.row < 0) {
         const dmg = Math.round(e.dmg * (isCharge ? 1.5 : 1) * (1 - red));
         S.wallHp -= dmg;
@@ -860,8 +860,8 @@
       anim.floats.push({ x: W / 2, y: layout().wall.y, text: '🛡 수호 발동! 성벽 50%', color: '#5ce0a0', t: 1.6, big: true }); anim.shake = Math.max(anim.shake, 8);
     }
     if (S.wallHp <= 0) { S.wallHp = 0; loseRun(); return; }
-    // 고블린 군주(정지형): 매 턴 부하 소환
-    if (S.combat.boss && S.bossDef && S.bossDef.kind === 'legion' && S.enemies.some(x => x.isBoss)) summonAdd();
+    // 드론 모함(정지형): 매 턴 경비봇 사출
+    if (S.combat.boss && S.bossDef && S.bossDef.kind === 'carrier' && S.enemies.some(x => x.isBoss)) summonAdd();
     // 스폰
     if (!S.combat.boss) {
       if (S.enemies.length === 0 && S.waves.length === 0) { winCombat(); return; }
@@ -872,10 +872,10 @@
   }
 
   function boss_retreatRow() { return Math.min(CFG.fieldRows - 1, Math.round(CFG.fieldRows / 2)); }
-  function summonAdd() {                        // 고블린 군주 부하 소환
+  function summonAdd() {                        // 드론 모함 경비봇 사출
     if (!S.bossDef || S.enemies.length >= 22) return;
-    const def = ENEMIES[S.bossDef.addType || 'goblin'], lane = Math.floor(Math.random() * CFG.fieldLanes), hp = Math.round(def.hp * S.scale.hp);
-    S.enemies.push({ type: S.bossDef.addType || 'goblin', name: def.name, lane, row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
+    const def = ENEMIES[S.bossDef.addType || 'sentry'], lane = Math.floor(Math.random() * CFG.fieldLanes), hp = Math.round(def.hp * S.scale.hp);
+    S.enemies.push({ type: S.bossDef.addType || 'sentry', name: def.name, lane, row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
   }
 
   function spawnWave() {
@@ -903,21 +903,21 @@
     const frac = e.hp / e.maxHp;
     while (e.thHit < b.thresholds.length && frac <= b.thresholds[e.thHit]) {
       e.thHit++;
-      if (b.kind === 'golem') {   // 돌진형: 후퇴 + 스턴
+      if (b.kind === 'titan') {   // 돌격형: 과열 정지(후퇴 + 스턴)
         e.row = Math.min(CFG.fieldRows - 1, e.row + b.retreat); e.stun = b.stunTurns;
-        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '휘청!', color: '#ffcf5c', t: 1.2 });
-      } else if (b.kind === 'slime') {   // 분열형: 슬라임 소환
-        splitBossSlime(e, b.splitCount);
-        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '분열!', color: '#5ad0a0', t: 1.2 }); Sound.play('kill');
+        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '과열!', color: '#ffcf5c', t: 1.2 });
+      } else if (b.kind === 'swarm') {   // 분리형: 슬러지 분리
+        splitSwarm(e, b.splitCount);
+        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '분리!', color: '#5ad0a0', t: 1.2 }); Sound.play('kill');
       }
     }
   }
-  function splitBossSlime(e, n) {
-    const def = ENEMIES.slime;
+  function splitSwarm(e, n) {
+    const def = ENEMIES.sludge;
     for (let i = 0; i < (n || 2) && S.enemies.length < 26; i++) {
       const lane = Math.max(0, Math.min(CFG.fieldLanes - 1, e.lane + (i - Math.floor(n / 2))));
       const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type: 'slime', name: def.name, lane, row: e.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0 });
+      S.enemies.push({ type: 'sludge', name: def.name, lane, row: e.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0 });
     }
   }
 
@@ -1199,8 +1199,8 @@
     S.nextBoardFx = [];
     const cnt = {}; for (const e of S.enemies) cnt[e.type] = (cnt[e.type] || 0) + 1;   // 적 간섭(필드에 있는 동안)
     const boss = S.enemies.find(e => e.isBoss);
-    if (boss && boss.kind === 'golem') cnt.brute = (cnt.brute || 0) + 1;
-    if (boss && boss.kind === 'slime') cnt.slime = (cnt.slime || 0) + 1;
+    if (boss && boss.kind === 'titan') cnt.heavy = (cnt.heavy || 0) + 1;
+    if (boss && boss.kind === 'swarm') cnt.sludge = (cnt.sludge || 0) + 1;
     let added = 0, stolen = 0;
     for (const type in ENEMY_BOARD) {
       const n = Math.min(cnt[type] || 0, 2); if (!n) continue;
@@ -1208,7 +1208,7 @@
       if (eb.steal) {
         const cands = S.pegs.filter(p => p.alive && !p.temp && ['mult2', 'mult5', 'gold', 'charge'].indexOf(p.type) >= 0);
         for (let k = 0; k < n && cands.length && stolen < 3; k++) { const p = cands.splice(Math.floor(Math.random() * cands.length), 1)[0]; p.stolen = p.type; p.type = 'normal'; p.shape = 'circle'; stolen++; }
-        if (stolen) notes.push({ text: '🦇 ' + eb.text, color: '#b58cff' });
+        if (stolen) notes.push({ text: '📡 ' + eb.text, color: '#b58cff' });
       } else if (eb.peg && added < ENEMY_BOARD_CAP) {
         const ps = addPegToBoard(S, eb.peg, Math.min(n * eb.n, ENEMY_BOARD_CAP - added), { avoidLaunch: true });
         ps.forEach(p => { p.temp = true; }); added += ps.length;
@@ -1320,7 +1320,7 @@
         ag.addColorStop(0, 'rgba(255,217,59,' + (0.35 * pul).toFixed(3) + ')'); ag.addColorStop(1, 'rgba(255,217,59,0)');
         ctx.fillStyle = ag; ctx.beginPath(); ctx.arc(px, py, rad * 1.7, 0, 7); ctx.fill(); ctx.restore();
       }
-      const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.isBoss ? ('boss_' + (e.kind || 'golem')) : e.type) : null;
+      const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.isBoss ? ('boss_' + (e.kind || 'titan')) : e.type) : null;
       if (espr) {                                   // 적 스프라이트(있으면 사용)
         const s = rad * 2.3; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
         ctx.drawImage(espr, px - s / 2, py - s / 2, s, s);

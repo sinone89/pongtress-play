@@ -42,8 +42,8 @@ const PEG_TYPES = {
   charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' },  // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
   // ── 아래는 랜덤 스폰 제외(weight 0): 스킬·적 간섭으로만 생성 ──
   bomb:   { name: '폭탄',   color: '#ff8a3a', shape: 'circle',   size: 1.25, weight: 0,  oneShot: true,  bomb: 0.16, label: '✹' },  // 맞으면 주변 페그 연쇄 폭발(스킬이 남김)
-  rock:   { name: '바위',   color: '#7a7f8c', shape: 'pentagon', size: 1.35, weight: 0,  oneShot: false, rock: true },               // 반사만(변환·소멸 없음) — 강철거인/골렘이 설치
-  slime:  { name: '점액',   color: '#5ad0a0', shape: 'circle',   size: 1.2,  weight: 0,  oneShot: true,  slime: true, label: '≈' }   // 발사볼을 삼킴(충전 없이 소멸) — 슬라임이 설치
+  scrap:  { name: '파편',   color: '#7a7f8c', shape: 'pentagon', size: 1.35, weight: 0,  oneShot: false, scrap: true },               // 반사만(변환·소멸 없음) — 헤비아머/타이탄이 설치
+  sludge: { name: '오염',   color: '#5ad0a0', shape: 'circle',   size: 1.2,  weight: 0,  oneShot: true,  sludge: true, label: '≈' }   // 발사볼을 삼킴(충전 없이 소멸) — 슬러지가 설치
 };
 // 일반(반사) 페그는 모두 원형으로 통일(가독성·정렬감).
 const NORMAL_SHAPES = ['circle'];
@@ -148,7 +148,7 @@ const GACHA = {
 const DOC_SHOP = { price: { rare: 2, epic: 5, legendary: 12 } };
 const MISSIONS = [
   { id: 'firstWin', name: '첫 승리', desc: '런 1회 클리어', stat: 'runsWon', goal: 1, reward: { gems: 150 } },
-  { id: 'kills60', name: '토벌대', desc: '적 60마리 처치', stat: 'kills', goal: 60, reward: { gold: 300 } },
+  { id: 'kills60', name: '토벌대', desc: '적 60기 격파', stat: 'kills', goal: 60, reward: { gold: 300 } },
   { id: 'floors12', name: '연전연승', desc: '전투 12회 클리어', stat: 'floors', goal: 12, reward: { gems: 100, mats: 80 } },
   { id: 'wins3', name: '삼전삼승', desc: '런 3회 클리어', stat: 'runsWon', goal: 3, reward: { gems: 200, docs: 20 } }
 ];
@@ -182,23 +182,24 @@ const IDLE = {
   mul: (maxStage) => 1 + (Math.max(1, maxStage) - 1) * 0.5     // S1 ×1 … S5 ×3
 };
 
-// ── 적 ──
+// ── 적 — 컨셉: 「폭주 병기군단」(SF 밀리터리 캐릭터와 같은 세계관) ──
 // 적 종류 — speed(턴당 전진 칸), armor(피격 시 고정 감소). 스테이지가 높을수록 강한 적 등장.
+// 필드 라벨 폭 때문에 이름은 4글자 이내(슬러지=오염된 나노 젤). 이미지: assets/enemy/<id>.png
 const ENEMIES = {
-  goblin: { name: '고블린', hp: 68,  dmg: 13, exp: 6,  color: '#7ac74f', speed: 1, armor: 0 },
-  bat:    { name: '박쥐',   hp: 43,  dmg: 10, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },
-  orc:    { name: '오크',   hp: 138, dmg: 22, exp: 15, color: '#e0733a', speed: 1, armor: 0 },
-  wolf:   { name: '늑대',   hp: 51,  dmg: 13, exp: 9,  color: '#d08a55', speed: 2, armor: 0 },   // 빠름(턴당 2칸)·물몸
-  brute:  { name: '강철거인', hp: 200, dmg: 24, exp: 22, color: '#7f8aa0', speed: 1, armor: 4 },  // 방어(피격 -4)
-  slime:  { name: '슬라임', hp: 84,  dmg: 13, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }
+  sentry: { name: '경비봇',   hp: 68,  dmg: 13, exp: 6,  color: '#6fb1e8', speed: 1, armor: 0 },   // 기본 보병형 로봇(보스 부하도 이 유닛)
+  drone:  { name: '해킹드론', hp: 43,  dmg: 10, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },   // 비행 드론 — 특수 페그를 해킹(일반화)
+  walker: { name: '워커',     hp: 138, dmg: 22, exp: 15, color: '#e0733a', speed: 1, armor: 0 },   // 중형 이족 전투기(고체력·고공격)
+  hound:  { name: '하운드',   hp: 51,  dmg: 13, exp: 9,  color: '#e8b04a', speed: 2, armor: 0 },   // 사족보행 로봇견 — 빠름(턴당 2칸)·물몸
+  heavy:  { name: '헤비아머', hp: 200, dmg: 24, exp: 22, color: '#7f8aa0', speed: 1, armor: 4 },   // 대형 기갑 — 장갑(피격 -4)
+  sludge: { name: '슬러지',   hp: 84,  dmg: 13, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }    // 오염된 나노 젤 — 오염 페그(볼 흡수)
 };
 // 스테이지별 적 풀(가중치) — 상위 스테이지에 강한 적이 섞임
 const STAGE_POOL = {
-  1: [['goblin', 3], ['bat', 2]],
-  2: [['goblin', 3], ['bat', 2], ['orc', 1]],
-  3: [['goblin', 3], ['orc', 2], ['wolf', 1]],
-  4: [['goblin', 2], ['orc', 2], ['wolf', 2], ['brute', 1], ['slime', 1]],
-  5: [['orc', 2], ['wolf', 2], ['brute', 1], ['slime', 2], ['goblin', 1]]
+  1: [['sentry', 3], ['drone', 2]],
+  2: [['sentry', 3], ['drone', 2], ['walker', 1]],
+  3: [['sentry', 3], ['walker', 2], ['hound', 1]],
+  4: [['sentry', 2], ['walker', 2], ['hound', 2], ['heavy', 1], ['sludge', 1]],
+  5: [['walker', 2], ['hound', 2], ['heavy', 1], ['sludge', 2], ['sentry', 1]]
 };
 function pickEnemyType(s) {
   const pool = STAGE_POOL[Math.min(STAGE_MAX, Math.max(1, s))] || STAGE_POOL[1];
@@ -207,17 +208,16 @@ function pickEnemyType(s) {
   return pool[0][0];
 }
 
-// ── 보스 3종 (스테이지 티어별) ──
+// ── 보스 3종 (스테이지 티어별) ── 이미지: assets/enemy/boss_<kind>.png
 const BOSSES = {
-  golem:  { name: '거대 골렘', kind: 'golem', hp: 1320, dmg: 50, exp: 110, color: '#8a8f9a',
-            thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌진형: HP% 후퇴+스턴, 스턴 중 피해+50%
-  slime:  { name: '거대 슬라임', kind: 'slime', hp: 1080, dmg: 32, exp: 130, color: '#5ad0a0',
-            thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분열형: 임계마다 슬라임 분열
-  legion: { name: '고블린 군주', kind: 'legion', hp: 1600, dmg: 28, exp: 150, color: '#6fae4f',
-            addType: 'goblin' }                                                            // 정지형: 매 턴 부하 소환
+  titan:   { name: '타이탄', kind: 'titan', hp: 1320, dmg: 50, exp: 110, color: '#8a8f9a',
+             thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌격형: HP% 구간마다 과열 정지(후퇴+스턴), 코어 노출 중 피해+50%
+  swarm:   { name: '스웜 코어', kind: 'swarm', hp: 1080, dmg: 32, exp: 130, color: '#5ad0a0',
+             thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분리형: 임계마다 슬러지 분리
+  carrier: { name: '드론 모함', kind: 'carrier', hp: 1600, dmg: 28, exp: 150, color: '#5f8fd0',
+             addType: 'sentry' }                                                            // 정지형: 매 턴 경비봇 사출
 };
-function stageBoss(s) { return s >= 5 ? 'legion' : s >= 3 ? 'slime' : 'golem'; }
-const BOSS_GOLEM = BOSSES.golem;   // 하위호환
+function stageBoss(s) { return s >= 5 ? 'carrier' : s >= 3 ? 'swarm' : 'titan'; }
 
 // ── 스테이지별 고정 페그판 ──
 // [전투0, 전투1, 전투2, 보스] 순. 매 판 랜덤이던 것을 스테이지·전투마다 고정 → 밸런스 재현성 확보.
@@ -250,7 +250,7 @@ const STAGE_OBST = {
 
 // ── 전투(웨이브) 구성: 런 = 3 일반전투 + 보스 ──
 // 각 전투는 적을 순차 스폰. spawn[i] = 이 턴에 상단에 등장시킬 적 목록(레인은 자동 분배)
-// 웨이브는 전투가 진행될수록 점점 커지고 오크 비중↑ (초반 완만, 후반 압박)
+// 웨이브는 전투가 진행될수록 점점 커짐 (초반 완만, 후반 압박)
 // 웨이브 길이 = 마릿수(종류는 스테이지 풀에서 결정). 필드 6열×5행=30칸 → 최대 ~18로 압박
 const COMBATS = [
   { name: '전투 1', waves: [
@@ -268,7 +268,7 @@ const COMBATS = [
     new Array(13).fill('x'),
     new Array(15).fill('x'),
     new Array(18).fill('x') ] },
-  { name: '보스 · 거대 골렘', boss: true }
+  { name: '보스 · 타이탄', boss: true }
 ];
 
 // ── 레벨업 보상 후보(3택1) ──
@@ -365,16 +365,16 @@ const SKILL_BOARD = {
 };
 // 적이 판에 간섭(장전 시작 시 적용, 해당 적이 필드에 있는 동안). 전투에서 먼저 잡을 대상이 생김.
 const ENEMY_BOARD = {
-  bat:    { steal: 1, text: '박쥐가 특수 페그를 훔쳤다!' },      // 특수 페그 → 일반 페그
-  slime:  { peg: 'slime', n: 1, text: '슬라임이 점액을 뿌렸다!' }, // 점액 페그(볼 삼킴)
-  brute:  { peg: 'rock',  n: 1, text: '강철거인이 바위를 던졌다!' } // 바위(반사만)
+  drone:  { steal: 1, text: '해킹드론이 특수 페그를 교란했다!' },        // 특수 페그 → 일반 페그(해킹)
+  sludge: { peg: 'sludge', n: 1, text: '슬러지가 오염 페그를 뿌렸다!' },   // 오염 페그(볼 흡수)
+  heavy:  { peg: 'scrap',  n: 1, text: '헤비아머가 파편을 흩뿌렸다!' }    // 파편(반사만)
 };
 const ENEMY_BOARD_CAP = 4;   // 적 간섭으로 추가되는 페그 최대(판이 막히지 않게)
 // 보스 예고 패턴: N턴마다 강력한 행동 예고 → 그 턴에 기절시키면 저지.
 const BOSS_INTENT = {
-  golem:  { every: 3, name: '돌진 준비', desc: '다음 전진 때 2칸 돌진 · 피해 ×1.5' },
-  slime:  { every: 3, name: '대분열 준비', desc: '다음 전진 때 슬라임 3마리 분열' },
-  legion: { every: 3, name: '총동원', desc: '다음 전진 때 부하 4마리 소환' }
+  titan:   { every: 3, name: '돌격 모드', desc: '다음 전진 때 2칸 돌진 · 피해 ×1.5' },
+  swarm:   { every: 3, name: '대분리 준비', desc: '다음 전진 때 슬러지 3기 분리' },
+  carrier: { every: 3, name: '증원 요청', desc: '다음 전진 때 경비봇 4기 사출' }
 };
 const MANUAL_SKILL_BONUS = 0.2;   // 자동이 아닌 수동 스킬 사용 시 피해 +20%(타이밍 보상)
 
@@ -490,7 +490,7 @@ function makeCanvasLoader(dir) {
 }
 // FX: assets/fx/<name>.png (muzzle/shell/boom). 있으면 사용, 없으면 절차적 렌더 폴백.
 const FxArt = makeCanvasLoader('assets/fx/');
-// 적/보스: assets/enemy/<id>.png (goblin/…, boss_golem/…). 없으면 색 원 폴백.
+// 적/보스: assets/enemy/<id>.png (sentry/…, boss_titan/…). 없으면 색 원 폴백.
 const EnemyArt = makeCanvasLoader('assets/enemy/');
 // 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
 const PegArt = makeCanvasLoader('assets/peg/');

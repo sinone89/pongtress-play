@@ -312,8 +312,7 @@ const Meta = (function () {
     const cv = $('idle-canvas'); if (!cv) return; idleStop();
     const ctx = cv.getContext('2d'); const party = partySlots().filter(Boolean);
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
-    const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
-    const eTypes = ['goblin', 'bat', 'orc', 'wolf', 'brute', 'slime'];   // 이미지 있으면 매칭(EnemyArt)
+    const eTypes = Object.keys(ENEMIES);                                 // 전투와 같은 적 6종·색(이미지 있으면 EnemyArt 매칭)
     const FX_LIFE = { muz: 0.14, hit: 0.26, boom: 0.5 };
     // 모든 치수를 캔버스 크기(D.w/D.h) 비례로 — 현재 UI(프레임 폭) 확대에 맞춰 자동 스케일
     const D = { w: 0, h: 0, U: 1, en: [], pj: [], fx: [], cs: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, now: 0 };
@@ -338,7 +337,7 @@ const Meta = (function () {
     const enemyR = () => D.w * 0.028 + Math.random() * D.w * 0.014;           // 적 반경(폭 비례)
     function mkEnemy(y) {
       const hp = 2 + Math.floor(Math.random() * 2), i = Math.floor(Math.random() * eTypes.length);
-      return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y, r: enemyR(), type: eTypes[i], col: eCol[i % eCol.length], hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
+      return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y, r: enemyR(), type: eTypes[i], col: ENEMIES[eTypes[i]].color, hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
     }
     function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
     for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
