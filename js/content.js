@@ -468,6 +468,16 @@ const CharArt = (function () {
   return { path: path, load: load, sprite: sprite };
 })();
 
+// ── 총구 앵커(실측) ──
+// 사격 스프라이트(assets/char/<id>_fire.png)에서 총구 섬광 중심의 위치를 [x, y] = 스프라이트 폭·높이 대비 비율로 기록.
+// 포탄·머즐 이펙트가 캐논 끝에서 나가도록 홈 연출·전투 모두 이 값을 쓴다. ⚠ 사격 스프라이트를 새로 그리면 다시 측정할 것.
+const MUZZLE = {
+  knight: [0.799, 0.223], archer: [0.836, 0.202], berserker: [0.885, 0.197], valkyrie: [0.882, 0.149],
+  grenadier: [0.821, 0.236], mortar: [0.838, 0.191], mage: [0.879, 0.178], behemoth: [0.885, 0.142],
+  guard: [0.831, 0.230], rogue: [0.830, 0.204], priest: [0.874, 0.179], seraph: [0.885, 0.182]
+};
+function muzzleAnchor(id) { return MUZZLE[id] || [0.85, 0.2]; }
+
 // ── 캔버스 이미지 로더(공통) ── 있으면 Image, 없으면 null(게임이 도형으로 폴백)
 function makeCanvasLoader(dir) {
   const cache = {};

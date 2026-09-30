@@ -726,6 +726,7 @@
   }
   function fireShot(shot, e) {
     const c = S.chars.find(ch => ch.lane === shot.lane);
+    if (c) c.fireT = 1;                                   // 총구 좌표는 반동(fireT)이 반영된 스프라이트 위치 기준이라 먼저 설정
     const targets = shot.aoe ? frontmostN(shot.aoe) : [e];
     let beam = null, cx = 0, cy = 0;
     for (const t of targets) { const p = enemyPos(t); if (!beam) beam = p; cx += p.x; cy += p.y; hitEnemy(t, shot); }
@@ -740,7 +741,6 @@
       anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: col, big: shot.big || shot.fx === 'bigHit', flash: true, thick: shot.fx === 'bigHit' ? 3 : 1 });
       if (shot.fx === 'aoe') anim.fx.push({ type: 'ring', x: cx, y: cy, t: 1, r: layout().field.w / CFG.fieldLanes * 1.6, color: '#ffb057' });   // 광역 충격링
     }
-    if (c) c.fireT = 1;
     Sound.play('shot');
   }
   function frontmostN(n) {
@@ -1243,8 +1243,9 @@
     const fire = c.fireT || 0;
     const feetY = wr.y + wr.h * 0.72 - fire * 4;
     const sh = Math.min(cw * 0.92, wr.h * 2.3);
-    // 스프라이트 캐논 총구는 로컬좌표 (0.82, 0.24) 부근(우측 수평 캐논). sw==sh.
-    return { x: x + sh * 0.32, y: feetY - sh * 0.70 };
+    // 캐릭터별 실측 총구 앵커(MUZZLE) — 스프라이트는 (x - sh/2, feetY - sh*0.94)에 sh×sh로 그려진다(drawChar와 동일)
+    const a = muzzleAnchor(c.ref.id);
+    return { x: x - sh / 2 + a[0] * sh, y: feetY - sh * 0.94 + a[1] * sh };
   }
 
   // ── 페그 모양 그리기 ──
@@ -1750,7 +1751,7 @@
 
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
-    get S() { return S; }, get anim() { return anim; }, startRun, launchBall, enterBattle, CFG,
+    get S() { return S; }, get anim() { return anim; }, get idle() { return Meta.idleDebug ? Meta.idleDebug() : null; }, startRun, launchBall, enterBattle, CFG,
     showMap, enterNode, gainRelic, relicOffer, genMap, applyBoardEffects, advanceEnemies,
     setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(1.3, CFG.pegStep)); },
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },

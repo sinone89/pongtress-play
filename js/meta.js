@@ -303,81 +303,203 @@ const Meta = (function () {
   }
 
   // ── 방치 홈 자동전투 연출(코스메틱) ──
-  let _idleRAF = 0;
+  // 캐릭터가 '장전(정면 대기 포즈) → 점사(사격 포즈) → 재장전'을 반복한다.
+  // 포탄은 실측한 총구(MUZZLE)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
+  let _idleRAF = 0, _idleDbg = null;
   function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }
+  function idleDebug() { return _idleDbg; }
   function idleStart() {
     const cv = $('idle-canvas'); if (!cv) return; idleStop();
-    const ctx = cv.getContext('2d'); const party = partySlots();
+    const ctx = cv.getContext('2d'); const party = partySlots().filter(Boolean);
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
     const eCol = ['#7ac74f', '#9b6cff', '#e0733a', '#5ad0a0'];
     const eTypes = ['goblin', 'bat', 'orc', 'wolf', 'brute', 'slime'];   // 이미지 있으면 매칭(EnemyArt)
+    const FX_LIFE = { muz: 0.14, hit: 0.26, boom: 0.5 };
     // 모든 치수를 캔버스 크기(D.w/D.h) 비례로 — 현재 UI(프레임 폭) 확대에 맞춰 자동 스케일
-    const D = { w: 0, h: 0, en: [], bm: [], pop: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, n: 1 };
+    const D = { w: 0, h: 0, U: 1, en: [], pj: [], fx: [], cs: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, now: 0 };
+    D.cs = party.map((id, i) => {
+      const t = 0.5 + i * 0.55 + Math.random() * 0.4;                    // 캐릭터마다 시작 시점을 어긋나게(동시 사격 방지)
+      return { id, i, cls: (base(id) || {}).cls, st: 'ready', t, rl: t, burst: 0, cd: 0, hold: 0, recoil: 0, sw: 0, ph: Math.random() * 6.28 };
+    });
     function fit() {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
-      D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260);
+      D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260); D.U = D.w / 405;
       cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const card = $('idle-reward'); D.cardH = (card && card.offsetHeight) ? card.offsetHeight : D.h * 0.18;
-      D.n = Math.max(1, party.filter(Boolean).length);
+      const n = Math.max(1, D.cs.length);
       D.groundY = D.h - D.cardH - D.h * 0.05;                                  // 캐릭터 발치(방치보상 카드 위)
-      D.charS = Math.min(D.w / D.n * 0.84, D.groundY * 0.66, D.w * 0.34);      // 캐릭터 크기(폭·높이 비례)
+      D.charS = Math.min(D.w / n * 0.84, D.groundY * 0.66, D.w * 0.34);        // 캐릭터 크기(폭·높이 비례)
     }
     fit();
+    const fireLine = () => D.h * 0.22;      // 상단 22% 아래로 들어오면 사격(사거리 = 22%~지면, 화면 대부분)
+    const fall = () => D.h * 0.07;          // 적 낙하 속도(높이 비례)
+    const cxOf = (i) => D.w * (i + 0.5) / Math.max(1, D.cs.length);
+    const exOf = (e) => e.x + Math.sin(D.now * 1.8 + e.ph) * D.w * 0.006;   // 적의 좌우 흔들림 포함한 실제 x
     const enemyR = () => D.w * 0.028 + Math.random() * D.w * 0.014;           // 적 반경(폭 비례)
-    function mkEnemy(y) { const hp = 2 + Math.floor(Math.random() * 2), i = Math.floor(Math.random() * eTypes.length); return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y: y, r: enemyR(), type: eTypes[i], col: eCol[i % eCol.length], hp: hp, mhp: hp, hit: 0 }; }
+    function mkEnemy(y) {
+      const hp = 2 + Math.floor(Math.random() * 2), i = Math.floor(Math.random() * eTypes.length);
+      return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y, r: enemyR(), type: eTypes[i], col: eCol[i % eCol.length], hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
+    }
     function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
     for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
-    function charX(i, n) { n = Math.max(1, n); return D.w * (i + 0.5) / n; }
-    const fireLine = () => D.h * 0.22;      // 상단 22% 아래로 들어오면 사격(사거리 = 22%~지면, 화면 대부분)
-    let last = performance.now(), fireT = 0;
-    function step(dt) {
-      if (Math.random() < dt * 1.3) spawn();
-      for (const e of D.en) { e.y += dt * D.h * 0.07; if (e.hit > 0) e.hit -= dt; }   // 낙하 속도(높이 비례)
-      const chars = party.filter(Boolean);
-      fireT -= dt;
-      const targets = D.en.filter(e => e.y > fireLine());
-      if (targets.length && fireT <= 0) {
-        fireT = 0.18 + Math.random() * 0.1;                        // 사격 간격
-        const t = targets.reduce((a, b) => (b.y > a.y ? b : a));    // 가장 가까운(아래쪽) 적 우선 조준
-        const ci = Math.floor(Math.random() * Math.max(1, chars.length));
-        D.bm.push({ x1: charX(ci, chars.length), y1: D.groundY - D.charS * 0.5, x2: t.x, y2: t.y, t: 0.16 });
-        t.hp -= 1; t.hit = 0.14;
-        if (t.hp <= 0) { D.pop.push({ x: t.x, y: t.y, r: t.r, t: 0.32 }); t.dead = true; }
+
+    // 스프라이트 변환 — 그리기와 총구 좌표 계산이 같은 값을 쓴다(어긋남 방지)
+    function pose(c) {
+      const s = D.charS, pop = c.sw > 0 ? c.sw / 0.16 : 0;
+      const bob = c.st === 'ready' ? Math.sin(D.now * 2.4 + c.ph) * s * 0.010 : 0;     // 대기 중 숨쉬기
+      return { sx: 1 + 0.05 * pop, sy: 1 - 0.09 * pop, kx: -s * 0.045 * c.recoil, ky: bob + s * 0.012 * c.recoil };
+    }
+    function muzzle(c) {                                                                // 사격 스프라이트의 총구 섬광 중심(월드 좌표)
+      const s = D.charS, p = pose(c), a = muzzleAnchor(c.id);
+      return { x: cxOf(c.i) + p.kx + p.sx * (a[0] - 0.5) * s, y: D.groundY + p.ky + p.sy * (a[1] - 0.9) * s };
+    }
+    function pickTarget(c) {
+      const m = muzzle(c); let best = null, bs = -1e9;
+      for (const e of D.en) {
+        if (e.dead || e.y < fireLine() || e.hp - e.pend <= 0) continue;                 // 사거리 밖 · 이미 죽을 예정인 적 제외(과잉 사격 방지)
+        const sc = e.y - Math.abs(exOf(e) - m.x) * 0.35;                                // 가깝고(아래) 자기 열에 가까운 적 우선
+        if (sc > bs) { bs = sc; best = e; }
       }
-      D.en = D.en.filter(e => !e.dead && e.y < D.groundY - D.charS * 0.2);   // 캐릭터/카드 위에서 소멸(겹침 방지)
-      for (const b of D.bm) b.t -= dt; D.bm = D.bm.filter(b => b.t > 0);
-      for (const p of D.pop) p.t -= dt; D.pop = D.pop.filter(p => p.t > 0);
+      return best;
+    }
+    function shoot(c, e) {
+      c.recoil = 1;
+      const m = muzzle(c), ex = exOf(e), dist = Math.hypot(ex - m.x, e.y - m.y);
+      const dur = Math.min(0.32, Math.max(0.13, dist / (D.h * 1.8))), tx = ex, ty = e.y + fall() * dur;   // 낙하분만큼 앞을 조준
+      const col = (CLASS[c.cls] || {}).color || '#ffe9a8';
+      e.pend++;
+      D.pj.push({ x1: m.x, y1: m.y, x2: tx, y2: ty, t: 0, dur, e, col });
+      D.fx.push({ k: 'muz', x: m.x, y: m.y, t: 1, col, ang: Math.atan2(ty - m.y, tx - m.x) });   // 홈 연출은 무음(원래 동작 유지)
+    }
+    function stepChar(c, dt) {
+      c.recoil = Math.max(0, c.recoil - dt * 6.5);
+      if (c.sw > 0) c.sw = Math.max(0, c.sw - dt);
+      if (c.st === 'ready') {                                   // 재장전 중: 시간이 다 되면 표적이 있을 때 사격 자세로
+        c.t -= dt;
+        if (c.t <= 0 && pickTarget(c)) { c.st = 'fire'; c.sw = 0.16; c.burst = 2 + Math.floor(Math.random() * 3); c.cd = 0.05; c.hold = 0; }
+      } else if (c.burst > 0) {                                 // 점사 중: 일정 간격으로 발사
+        c.cd -= dt;
+        if (c.cd <= 0) {
+          const e = pickTarget(c);
+          if (e) { shoot(c, e); c.burst--; c.cd = 0.22 + Math.random() * 0.08; } else c.burst = 0;   // 표적이 없으면 점사 종료
+          if (c.burst <= 0) c.hold = 0.28;
+        }
+      } else {                                                  // 점사 후 잠깐 자세 유지 → 재장전
+        c.hold -= dt;
+        if (c.hold <= 0) { c.st = 'ready'; c.sw = 0.16; c.rl = 1.0 + Math.random() * 0.8; c.t = c.rl; }
+      }
+    }
+    function hitAt(p) {                                         // 포탄 도착: 이 순간에 피해·이펙트
+      const e = p.e;
+      if (e && !e.dead && D.en.indexOf(e) >= 0) {
+        e.pend = Math.max(0, e.pend - 1); e.hp -= 1; e.hit = 0.2; e.kick = 1;
+        D.fx.push({ k: 'hit', x: exOf(e), y: e.y, t: 1, col: p.col });
+        if (e.hp <= 0) { e.dead = true; D.fx.push({ k: 'boom', x: exOf(e), y: e.y, t: 1, col: e.col, r: e.r }); }
+      } else D.fx.push({ k: 'hit', x: p.x2, y: p.y2, t: 1, col: p.col, sm: true });
+    }
+    function step(dt) {
+      D.now += dt;
+      if (Math.random() < dt * 1.3) spawn();
+      for (const e of D.en) { e.y += dt * fall(); e.hit = Math.max(0, e.hit - dt); e.kick = Math.max(0, e.kick - dt * 8); }
+      D.cs.forEach(c => stepChar(c, dt));
+      for (const p of D.pj) { p.t += dt / p.dur; if (p.t >= 1 && !p.done) { p.done = true; hitAt(p); } }
+      D.pj = D.pj.filter(p => !p.done);
+      for (const f of D.fx) f.t -= dt / FX_LIFE[f.k]; D.fx = D.fx.filter(f => f.t > 0);
+      D.en = D.en.filter(e => {                                 // 죽은 적 제거 · 캐릭터 앞까지 온 적은 조용히 소멸(겹침 방지)
+        if (e.dead) return false;
+        if (e.y >= D.groundY - D.charS * 0.2) { D.fx.push({ k: 'boom', x: exOf(e), y: e.y, t: 1, col: e.col, r: e.r, sm: true }); return false; }
+        return true;
+      });
       D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
+    }
+
+    function drawEnemy(e) {
+      const U = D.U, x = exOf(e), y = e.y - e.kick * D.h * 0.008, r = e.r * (1 + 0.16 * e.kick);
+      const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.type) : null;
+      if (espr) {
+        const s = r * 2.4; ctx.imageSmoothingEnabled = true; ctx.drawImage(espr, x - s / 2, y - s / 2, s, s);
+        if (e.hit > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, e.hit * 4); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.restore(); }
+      } else { ctx.fillStyle = e.hit > 0.06 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+      if (e.hp < e.mhp) {
+        const bw = r * 1.8, hbH = Math.max(2, D.h * 0.006), by = y - r - D.h * 0.014;
+        ctx.fillStyle = '#0008'; ctx.fillRect(x - bw / 2, by, bw, hbH); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(x - bw / 2, by, bw * Math.max(0, e.hp) / e.mhp, hbH);
+      }
+    }
+    function drawChar(c) {
+      const cx = cxOf(c.i), cy = D.groundY, s = D.charS, p = pose(c), col = laneCol[c.i % 3], ry = Math.max(3, s * 0.08);
+      ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = col;                       // 레인색 발판
+      ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, ry, 0, 0, 7); ctx.fill(); ctx.restore();
+      if (c.st === 'ready') {                                                         // 재장전 진행 링(가득 차면 발사 준비 완료)
+        const pr = c.rl > 0 ? 1 - Math.max(0, c.t) / c.rl : 1;
+        ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.95; ctx.lineWidth = Math.max(2, s * 0.03); ctx.lineCap = 'round';
+        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, ry, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, pr)); ctx.stroke(); ctx.restore();
+      }
+      const want = c.st === 'fire' ? 'fire' : 'load';
+      const spr = (typeof CharArt !== 'undefined') ? (CharArt.sprite(c.id, want) || CharArt.sprite(c.id, want === 'fire' ? 'load' : 'fire')) : null;
+      if (!spr) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.12, 0, 7); ctx.fill(); return; }
+      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.save(); ctx.translate(cx + p.kx, cy + p.ky); ctx.scale(p.sx, p.sy);
+      ctx.drawImage(spr, -s / 2, -s * 0.9, s, s);
+      if (c.sw > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4 * (c.sw / 0.16); ctx.drawImage(spr, -s / 2, -s * 0.9, s, s); }   // 자세 전환 순간 번쩍
+      ctx.restore();
+    }
+    function drawShell(p) {
+      const U = D.U, tt = Math.min(1, p.t), x = p.x1 + (p.x2 - p.x1) * tt, y = p.y1 + (p.y2 - p.y1) * tt;
+      const tail = Math.max(0, tt - 0.3), bx = p.x1 + (p.x2 - p.x1) * tail, by = p.y1 + (p.y2 - p.y1) * tail, hr = 11 * U;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      const gr = ctx.createLinearGradient(bx, by, x, y); gr.addColorStop(0, p.col + '00'); gr.addColorStop(1, p.col);
+      ctx.globalAlpha = 0.75; ctx.strokeStyle = gr; ctx.lineWidth = 6 * U; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
+      const shell = (typeof FxArt !== 'undefined') ? FxArt.ready('shell') : null;
+      if (shell) { ctx.globalAlpha = 1; ctx.translate(x, y); ctx.rotate(Math.atan2(p.y2 - p.y1, p.x2 - p.x1) + Math.PI / 2); ctx.drawImage(shell, -hr * 1.3, -hr * 1.3, hr * 2.6, hr * 2.6); }
+      else {
+        const rg = ctx.createRadialGradient(x, y, 0, x, y, hr); rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.35, p.col); rg.addColorStop(1, p.col + '00');
+        ctx.globalAlpha = 1; ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, hr, 0, 7); ctx.fill();
+        ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, hr * 0.34, 0, 7); ctx.fill();
+      }
+      ctx.restore();
+    }
+    function drawFx(f) {
+      const U = D.U, t = Math.max(0, f.t), fr = 1 - t;
+      ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
+      if (f.k === 'muz') {                                                            // 총구 섬광
+        const muz = (typeof FxArt !== 'undefined') ? FxArt.ready('muzzle') : null, R = D.charS * 0.16 * (0.6 + fr * 0.5);
+        if (muz) { ctx.globalAlpha = t; ctx.translate(f.x, f.y); ctx.rotate(f.ang + Math.PI / 2); ctx.drawImage(muz, -R * 1.2, -R * 1.2, R * 2.4, R * 2.4); }
+        else {
+          const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R); g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, f.col); g.addColorStop(1, f.col + '00');
+          ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
+          ctx.translate(f.x, f.y); ctx.rotate(f.ang); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5 * U; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.7, 0); ctx.stroke();
+        }
+      } else if (f.k === 'hit') {                                                     // 타격: 발광 코어 + 방사 스파크
+        const R = (f.sm ? 16 : 26) * U, rr = R * (0.55 + fr * 0.75), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, f.col); g.addColorStop(1, f.col + '00');
+        ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
+        ctx.strokeStyle = f.col; ctx.lineWidth = 2.5 * U;
+        for (let i = 0; i < 6; i++) { const a = i * 1.047 + f.x * 0.02, d0 = R * (0.35 + fr * 0.9), d1 = d0 + R * 0.5; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * d0, f.y + Math.sin(a) * d0); ctx.lineTo(f.x + Math.cos(a) * d1, f.y + Math.sin(a) * d1); ctx.stroke(); }
+      } else {                                                                        // 처치 폭발: 화염구 + 충격 링 + 파편
+        const R0 = (f.sm ? 0.9 : 1.7) * f.r * 1.8, rr = R0 * (0.4 + fr * 0.9), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, f.col); g.addColorStop(0.7, f.col + '66'); g.addColorStop(1, f.col + '00');
+        ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
+        ctx.globalAlpha = t * 0.9; ctx.strokeStyle = '#fff'; ctx.lineWidth = (f.sm ? 2 : 3.5) * U; ctx.beginPath(); ctx.arc(f.x, f.y, R0 * (0.6 + fr * 1.1), 0, 7); ctx.stroke();
+        ctx.strokeStyle = f.col; ctx.lineWidth = 3 * U;
+        for (let i = 0; i < 8; i++) { const a = i * 0.785 + f.x * 0.01, d0 = R0 * (0.3 + fr * 1.3), d1 = d0 + R0 * 0.45; ctx.globalAlpha = t; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * d0, f.y + Math.sin(a) * d0); ctx.lineTo(f.x + Math.cos(a) * d1, f.y + Math.sin(a) * d1); ctx.stroke(); }
+      }
+      ctx.restore();
     }
     function render() {
       ctx.clearRect(0, 0, D.w, D.h);
-      const hbH = Math.max(2, D.h * 0.006), hbGap = D.h * 0.014;
-      for (const e of D.en) {
-        const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.type) : null;
-        if (espr) {
-          const s = e.r * 2.4; ctx.imageSmoothingEnabled = true; ctx.drawImage(espr, e.x - s / 2, e.y - s / 2, s, s);
-          if (e.hit > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, e.hit * 4); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); ctx.restore(); }
-        } else { ctx.fillStyle = e.hit > 0 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(e.x, e.y, e.r, 0, 7); ctx.fill(); }
-        if (e.hp < e.mhp) { const bw = e.r * 1.8; ctx.fillStyle = '#0008'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw, hbH); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(e.x - bw / 2, e.y - e.r - hbGap, bw * e.hp / e.mhp, hbH); }
-      }
-      for (const b of D.bm) { ctx.strokeStyle = 'rgba(255,220,120,' + (b.t / 0.18) + ')'; ctx.lineWidth = Math.max(2, D.w * 0.008); ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(b.x1, b.y1); ctx.lineTo(b.x2, b.y2); ctx.stroke(); }
-      for (const p of D.pop) { ctx.strokeStyle = 'rgba(255,255,255,' + (p.t / 0.3) + ')'; ctx.lineWidth = Math.max(2, D.w * 0.006); ctx.beginPath(); ctx.arc(p.x, p.y, p.r + (0.3 - p.t) * D.w * 0.12, 0, 7); ctx.stroke(); }
-      const chars = party.filter(Boolean);
-      for (let i = 0; i < chars.length; i++) {
-        const id = chars[i], cx = charX(i, chars.length), cy = D.groundY, s = D.charS;
-        ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = laneCol[i % 3];   // 레인색 발판
-        ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, Math.max(3, s * 0.08), 0, 0, 7); ctx.fill(); ctx.restore();
-        const spr = (typeof CharArt !== 'undefined') ? CharArt.sprite(id, 'fire') : null;
-        if (spr) { ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(spr, cx - s / 2, cy - s * 0.9, s, s); }
-        else { ctx.fillStyle = laneCol[i % 3]; ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.12, 0, 7); ctx.fill(); ctx.strokeStyle = '#ffffff55'; ctx.lineWidth = 2; ctx.stroke(); }
-      }
+      for (const e of D.en) drawEnemy(e);
+      D.cs.forEach(drawChar);
+      for (const p of D.pj) drawShell(p);
+      for (const f of D.fx) drawFx(f);
     }
+    let last = performance.now();
     function frame(now) {
       if (cv.offsetParent === null) { idleStop(); return; }   // 홈이 숨겨지면 자동 정지
       if (Math.abs(cv.clientWidth - D.w) > 1 || Math.abs(cv.clientHeight - D.h) > 1) fit();   // 리사이즈 대응
       const dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); render();
       _idleRAF = requestAnimationFrame(frame);
     }
+    _idleDbg = { D, step, render, fit, muzzle, stop: idleStop };   // 검증용(수동 스텝·좌표 확인)
     _idleRAF = requestAnimationFrame(frame);
   }
 
@@ -676,5 +798,5 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug, get state() { return M; } };
 })();
