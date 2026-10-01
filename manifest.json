@@ -1,7 +1,7 @@
 {
-  "name": "PONGTRESS",
-  "short_name": "PONGTRESS",
-  "description": "튕겨서 부수는 로그라이크 핀볼",
+  "name": "방벽 이상 무",
+  "short_name": "방벽 이상 무",
+  "description": "튕겨서 충전하는 로그라이크 핀볼",
   "start_url": "./index.html",
   "display": "standalone",
   "orientation": "portrait",

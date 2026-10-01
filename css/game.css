@@ -412,7 +412,7 @@ body {
 #login .lg-btn { font-size: 5cqw; font-weight: 800; padding: 3.6cqw 0; border: 0; border-radius: 3.4cqw;
   background: linear-gradient(90deg, var(--cyan), var(--magenta)); color: var(--bg); box-shadow: 0 8px 22px rgba(255,93,177,.3); cursor: pointer; }
 #login .lg-btn:active { transform: translateY(1px); }
-#login .lg-note { color: var(--muted); font-size: 3cqw; text-align: center; line-height: 1.5; margin-top: 1cqw; }
+#login .lg-note { color: var(--muted); font-size: 3cqw; text-align: center; line-height: 1.5; margin-top: 1cqw; word-break: keep-all; }
 #login .lg-logout { position: absolute; }
 
 /* ═══ 캐릭터 상세 = 스틸앤샷式 전면 재구성 ═══
