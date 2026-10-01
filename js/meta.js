@@ -214,11 +214,16 @@ const Meta = (function () {
   function rarTag(rar) { const R = RARITY[rar] || RARITY.common; return '<span class="rar" style="color:' + R.color + '">' + R.name + '</span>'; }
   function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => uiCur(k) + v).join(' '); }
 
+  // 상단 칩용 축약(만 단위): 9,999 이하는 그대로, 그 위는 1.2만 · 123만 · 1.2억 — 숫자가 커져도 칩이 화면 밖으로 밀리지 않게(정확한 값은 title)
+  function fmtCur(n) {
+    n = Math.floor(n);
+    if (n < 10000) return String(n);
+    if (n < 1e6) return (Math.floor(n / 1000) / 10).toFixed(1) + '만';
+    if (n < 1e8) return Math.floor(n / 10000) + '만';
+    return (Math.floor(n / 1e7) / 10).toFixed(1) + '억';
+  }
   function renderBar() {
-    $('cur-gold').textContent = M.currencies.gold;
-    $('cur-mats').textContent = M.currencies.mats;
-    $('cur-gems').textContent = M.currencies.gems;
-    $('cur-docs').textContent = M.currencies.docs;
+    for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); }
   }
 
   function charChip(id, opts) {
@@ -243,7 +248,7 @@ const Meta = (function () {
     const mode = M.runMode || 'normal';
     const ms = $('mode-select');                  // 모드: 일반 / 일일 도전 / 무한
     if (ms) {
-      const tabs = [['normal', ui('ic_battle', '💥'), '일반'], ['daily', ui('ic_timer', '📅'), '일일 도전'], ['endless', '♾', '무한']];
+      const tabs = [['normal', ui('ic_battle', '💥'), '일반'], ['daily', ui('ic_timer', '📅'), '일일 도전'], ['endless', ui('ic_promote', '♾'), '무한']];
       // 설명 문구 없이 '기록·보상 상태'만 표시 (없으면 줄 자체를 만들지 않음)
       const parts = [];
       if (mode === 'daily') {
@@ -266,6 +271,18 @@ const Meta = (function () {
         h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? ui('ic_lock', '🔒') : s) + '</button>';
       }
       ss.innerHTML = h + '</div>';
+    }
+    // 스테이지 정보 카드(일일 도전 제외): 이 스테이지에 나오는 적 종류 · 보스 · 난이도·보상 배율 — 설명 문장 없이 아이콘과 수치만
+    const si = $('stage-info');
+    if (si) {
+      si.hidden = mode === 'daily';
+      if (mode !== 'daily') {
+        const s = M.stage, sc = stageScale(s), bk = stageBoss(s), boss = BOSSES[bk];
+        const ic = (key, boss) => '<i class="stg-ic" style="background-image:url(assets/enemy/' + key + '.webp);background-size:' + (boss ? '400% 200%' : '400% 100%') + '"></i>';
+        si.innerHTML = '<div class="stg-tiles">' + (STAGE_POOL[s] || []).map(p => '<div class="stg-tile">' + ic(p[0]) + '<span>' + ENEMIES[p[0]].name + '</span></div>').join('')
+          + '<div class="stg-tile boss">' + ic('boss_' + bk, true) + '<span>' + boss.name + '</span></div></div>'
+          + '<div class="stg-mul"><span>적 HP ×' + sc.hp.toFixed(1) + '</span><span>적 공격 ×' + sc.dmg.toFixed(1) + '</span><span>' + uiCur('gold') + ' 보상 ×' + sc.reward.toFixed(1) + '</span></div>';
+      }
     }
     const box = $('sortie-party');
     if (box) {
@@ -619,7 +636,7 @@ const Meta = (function () {
   function renderCheat() {
     const box = $('cheat-box');
     box.innerHTML = '<h2>치트 · 디버그</h2>'
-      + '<p class="muted">🪙' + M.currencies.gold + ' 🔩' + M.currencies.mats + ' 💎' + M.currencies.gems + ' 📄' + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
+      + '<p class="muted">' + uiCur('gold') + M.currencies.gold + ' ' + uiCur('mats') + M.currencies.mats + ' ' + uiCur('gems') + M.currencies.gems + ' ' + uiCur('docs') + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
       + '<div class="cd-btns">'
       + '<button class="btn" data-cheat="cur">화폐 전체 +9999</button>'
       + '<button class="btn" data-cheat="unlock">전 캐릭터 획득</button>'
@@ -739,8 +756,9 @@ const Meta = (function () {
   // ── 가챠 결과 모달 ──
   function showGachaResult(res) {
     const box = $('gacha-modal-box');
-    box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res">'
-      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'thumb') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
+    const cols = Math.min(4, res.length);
+    box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res" style="--cols:' + cols + ';max-width:' + (cols * 19) + 'cqw">'
+      + res.map((r, i) => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + ';--rc:' + R.color + ';--d:' + (i * 0.06).toFixed(2) + 's"><img class="gr-cg" src="' + CharArt.path(r.id, 'thumb') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag' + (r.isNew ? ' new' : '') + '">' + (r.isNew ? 'NEW' : uiCur('shards') + '+' + GACHA.dupShards) + '</span></div>'; }).join('')
       + '</div><button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -752,7 +770,7 @@ const Meta = (function () {
     const lgBtn = $('lg-login'); if (lgBtn) lgBtn.onclick = submitLogin;
     const lgId = $('lg-id'); if (lgId) lgId.addEventListener('keydown', e => { if (e.key === 'Enter') { const p = $('lg-pw'); if (p) p.focus(); } });
     const lgPw = $('lg-pw'); if (lgPw) lgPw.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-    const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? (ui('ic_account', '👤') + ' ' + curAcct.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))) : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }
+    const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? uiIcon('ic_account', '👤', 'width:72%;height:72%') : ''; acct.title = curAcct ? ('계정: ' + curAcct + ' (누르면 로그아웃)') : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }   // 이름은 공간을 못 쓰므로 아이콘만 — 이름은 title 과 로그아웃 확인창에
     if (needsLogin()) showLogin();
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
@@ -819,7 +837,18 @@ const Meta = (function () {
     };
     $('gacha-modal').onclick = (e) => { if (e.target.dataset.close || e.target === $('gacha-modal')) $('gacha-modal').hidden = true; };
     // 치트: 좌하단 build 태그 탭
-    const tag = $('build-tag'); if (tag) tag.onclick = openCheat;
+    // 치트창: 빌드 표시를 한 번 눌러서는 열리지 않는다(홈 탭 모서리와 겹쳐 오터치 위험) — 2.5초 안에 5번 연속 탭해야 열림. 아래 탭 버튼은 가리지 않도록 표시는 클릭을 가로채지 않고 좌표로 센다
+    const tag = $('build-tag');
+    if (tag) {
+      tag.style.pointerEvents = 'none';
+      let taps = [];
+      window.addEventListener('pointerdown', (ev) => {
+        const r = tag.getBoundingClientRect();
+        if (ev.clientX < r.left - 6 || ev.clientX > r.right + 6 || ev.clientY < r.top - 6 || ev.clientY > r.bottom + 6) return;
+        const now = Date.now(); taps = taps.filter(t => now - t < 2500); taps.push(now);
+        if (taps.length >= 5) { taps = []; openCheat(); }
+      }, true);
+    }
     $('cheat-modal').onclick = (e) => {
       if (e.target.dataset.close || e.target === $('cheat-modal')) { $('cheat-modal').hidden = true; return; }
       const b = e.target.closest('[data-cheat]'); if (b) doCheat(b.dataset.cheat);

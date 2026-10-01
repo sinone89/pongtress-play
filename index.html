@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=138">
+  <link rel="stylesheet" href="css/game.css?v=139">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
@@ -62,10 +62,11 @@
           <div id="mode-select"></div>
           <div class="sns-h" id="stage-head">스테이지 선택</div>
           <div id="stage-select"></div>
+          <div id="stage-info"></div>
           <div class="sns-h">편성 부대</div>
           <div id="sortie-party"></div>
           <p id="sortie-warn" class="muted" hidden></p>
-          <button id="btn-sortie" class="btn primary home-cta-btn">출격</button>
+          <div class="cta-bar"><button id="btn-sortie" class="btn primary home-cta-btn">출격</button></div>
         </div>
         <div id="tab-formation" class="lobby-panel" hidden>
           <div class="sns-h">부대 배치</div>
@@ -109,6 +110,7 @@
         <button class="mute-btn combat-mute"><span class="mute-icon">🔊</span></button>
         <div id="exp-bar"><div id="exp-fill"></div></div>
         <div id="relic-bar"></div>
+        <div id="enemy-bar"></div>
       </header>
       <div id="battle-main">
         <div id="stage-wrap">
@@ -145,9 +147,12 @@
 
     <!-- 결과 -->
     <div id="result" class="modal" hidden>
-      <div class="modal-box">
+      <div class="modal-box result-box" id="result-box">
         <h2 id="result-title">승리</h2>
-        <p id="result-body" class="muted"></p>
+        <p id="result-body" class="rs-sub"></p>
+        <div id="result-stats" class="rs-stats"></div>
+        <div id="result-earn" class="rs-earn"></div>
+        <div id="result-notes" class="rs-notes"></div>
         <button id="btn-result" class="btn primary">로비로</button>
       </div>
     </div>
@@ -156,10 +161,10 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=138"></script>
-  <script src="js/spritemeta.js?v=138"></script>
-  <script src="js/content.js?v=138"></script>
-  <script src="js/meta.js?v=138"></script>
-  <script src="js/game.js?v=138"></script>
+  <script src="js/audio.js?v=139"></script>
+  <script src="js/spritemeta.js?v=139"></script>
+  <script src="js/content.js?v=139"></script>
+  <script src="js/meta.js?v=139"></script>
+  <script src="js/game.js?v=139"></script>
 </body>
 </html>

@@ -612,6 +612,7 @@
     S.layoutTarget = 1;                             // 전투 화면으로 부드럽게 확장(핀볼 페이드아웃)
     $('c-phase').textContent = '전투';
     const side = $('battle-side'); if (side) side.style.display = 'none';   // 전투 중 사이드바 숨김
+    anim.floats = anim.floats.filter(f => !f.note);                         // 장전 화면용 안내 문구는 전투에 들고 가지 않는다
     anim.skillCuts = []; anim.cut = null;
     // 액티브 스킬 발동(자동 또는 armed) 결정 → 샷 큐 구성
     S.shotQueue = [];
@@ -1095,32 +1096,42 @@
     const t = S.combat && S.combat.elite ? '정예 격파 보상' : '전투 승리 보상';
     showRelicPick({ title: t, guaranteeEvo: true }, showMap);
   }
-  function earnedText(e) { return '획득 🪙' + e.gold + ' 🔩' + e.mats + (e.gems ? ' 💎' + e.gems : ''); }
   function runScore(won) { return S.floorsCleared * 100 + S.runKills * 5 + (S.runMaxCombo || 0) * 10 + (S.loop || 0) * 800 + (won ? 1000 : 0); }
   function runInfo(won) { return { won, kills: S.runKills, floors: S.floorsCleared, gold: S.gold, stage: S.stage, mode: S.mode, loop: S.loop, maxCombo: S.runMaxCombo || 0, score: runScore(won), relics: Object.keys(S.relics).length }; }
-  function extraText(e) {
-    let t = '';
-    if (e.unlocked) t += ' · 스테이지 ' + e.unlocked + ' 해금!';
-    if (e.relicsUnlocked && e.relicsUnlocked.length) t += ' · 모듈 해금: ' + e.relicsUnlocked.map(id => RELICS[id].icon + RELICS[id].name).join(', ');
-    if (e.record) t += ' · 🏆 신기록!';
-    if (e.dailyReward) t += ' · 일일 보상 💎' + e.dailyReward;
-    return t;
-  }
   function winRun() {
     if (S.over) return; S.over = true;
     const e = Meta.onRunEnd(runInfo(true));
-    endResult('승리', (S.mode === 'daily' ? '일일 도전' : '스테이지 ' + S.stage) + ' 클리어! 레벨 ' + S.level + ' · 점수 ' + runScore(true) + ' · 최대 콤보 ' + (S.runMaxCombo || 0) + ' · ' + earnedText(e) + extraText(e));
+    showResult({ win: true, title: '승리', sub: (S.mode === 'daily' ? '일일 도전' : '스테이지 ' + S.stage) + ' 클리어', e });
   }
   function loseRun() {
     if (S.over) return; S.over = true;
     const e = Meta.onRunEnd(runInfo(false));
     const where = S.mode === 'endless' ? '무한 ' + (S.loop + 1) + '막 ' + (S.combatIndex + 1) + '층' : runLabel();
-    endResult(S.mode === 'endless' ? '작전 종료' : '패배', where + '에서 방벽이 붕괴했습니다. 전투 ' + S.floorsCleared + '회 돌파 · 점수 ' + runScore(false) + ' · ' + earnedText(e) + extraText(e));
+    showResult({ win: false, endless: S.mode === 'endless', title: S.mode === 'endless' ? '작전 종료' : '패배', sub: where + '에서 방벽이 붕괴했습니다', e });
   }
-  function endResult(title, body) {
+  // 결과 화면: 승리/패배 배너 + 통계 행(아이콘) + 획득 재화 칩 + 해금·신기록 알림. 항목은 차례로 떠오른다(rsIn, 지연 i*0.07s)
+  function showResult(o) {
     $('map').hidden = true; $('run-modal').hidden = true; $('reward').hidden = true;
-    $('result-title').textContent = title; $('result-body').textContent = body; $('result').hidden = false;
-    Sound.play(title === '승리' ? 'win' : 'lose');
+    const e = o.e || {}, fmt = (n) => Math.round(n).toLocaleString();
+    const ic = (name, emoji) => uiIcon(name, emoji, 'width:100%;height:100%');
+    $('result-box').className = 'modal-box result-box ' + (o.win ? 'win' : o.endless ? 'endless' : 'lose');
+    $('result-title').textContent = o.title; $('result-body').textContent = o.sub;
+    const stats = [
+      [ic('ic_battle', '💥'), '처치', fmt(S.runKills || 0)], [ic('node_battle', '⚔'), '돌파한 전투', fmt(S.floorsCleared || 0)],
+      [ic('relic_chain', '⛓'), '최고 콤보', fmt(S.runMaxCombo || 0)], [ic('ic_levelup', '⬆'), '레벨', 'Lv.' + S.level],
+      [ic('ic_star', '⭐'), '점수', fmt(runScore(!!o.win)), 'big']
+    ];
+    $('result-stats').innerHTML = stats.map((s, i) => '<div class="rs-row ' + (s[3] || '') + '" style="animation-delay:' + (0.12 + i * 0.07).toFixed(2) + 's"><span class="rs-ic">' + s[0] + '</span><span class="rs-lb">' + s[1] + '</span><b class="rs-v">' + s[2] + '</b></div>').join('');
+    const earn = [['gold', e.gold], ['mats', e.mats], ['gems', e.gems], ['docs', e.docs]].filter(x => x[1] > 0);
+    $('result-earn').innerHTML = earn.map((x, i) => '<span class="rs-chip" style="animation-delay:' + (0.55 + i * 0.07).toFixed(2) + 's">' + uiCur(x[0]) + ' +' + fmt(x[1]) + '</span>').join('');
+    const notes = [];
+    if (e.unlocked) notes.push(ui('nav_sortie', '🚀') + ' 스테이지 ' + e.unlocked + ' 해금');
+    (e.relicsUnlocked || []).forEach(id => notes.push(ui('relic_' + id, RELICS[id].icon) + ' 모듈 해금 · ' + RELICS[id].name));
+    if (e.record) notes.push(ui('ic_star', '⭐') + ' 신기록!');
+    if (e.dailyReward) notes.push(uiCur('gems') + ' 일일 보상 +' + e.dailyReward);
+    $('result-notes').innerHTML = notes.map((t, i) => '<div class="rs-note" style="animation-delay:' + (0.8 + i * 0.07).toFixed(2) + 's">' + t + '</div>').join('');
+    $('result').hidden = false;
+    Sound.play(o.win ? 'win' : 'lose');
   }
 
   // ============ 분기 맵(A안) ============
@@ -1182,8 +1193,8 @@
         + '<span class="mn-ic">' + uiIcon('node_' + n.type, T.icon) + '</span><span class="mn-nm">' + T.name + '</span></button>';
     }));
     $('map-body').innerHTML = svg + nodes;
-    $('map-head').innerHTML = '<b>' + (S.mode === 'endless' ? '♾ 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? '📅 일일 도전' : '스테이지 ' + S.stage) + '</b>'
-      + '<span>🛡 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>🪙 ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>';
+    $('map-head').innerHTML = '<b>' + (S.mode === 'endless' ? ui('ic_promote', '♾') + ' 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? ui('ic_timer', '📅') + ' 일일 도전' : '스테이지 ' + S.stage) + '</b>'
+      + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>';
     renderRelicBar();
     $('map').hidden = false;
   }
@@ -1271,8 +1282,9 @@
         if (ps.length) notes.push({ text: eb.text, color: PEG_TYPES[eb.peg].color });
       }
     }
-    const r = layout().pins;
-    notes.forEach((nt, k) => anim.floats.push({ x: r.x + r.w / 2, y: r.y + 18 + k * 22, text: nt.text, color: nt.color, t: 2.4, note: true }));
+    // 안내 문구 위치 = '장전 화면'의 핀볼판 위쪽(전투→장전 전환 중엔 layout()이 아직 전투 비율이라 화면 아래로 가므로 장전 비율로 직접 계산). 줄 간격은 글자 크기(U)에 비례
+    const U = W / 405, py = H * (LOAD_FRAC.field + LOAD_FRAC.wall + LOAD_FRAC.goal), px = W * (1 - SIDE_FR) / 2;
+    notes.forEach((nt, k) => anim.floats.push({ x: px, y: py + (20 + k * 26) * U, text: nt.text, color: nt.color, t: 2.4, note: true }));
   }
 
   // ============ 렌더 ============
@@ -1428,14 +1440,16 @@
       ctx.fillStyle = e.elite ? '#ffd93b' : '#ff6b6b'; ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), bh);
       if (e.isBoss && S.bossIntent && BOSS_INTENT[e.kind]) {   // 보스 예고(남은 턴) — 그 턴에 기절시키면 저지
         const BI = BOSS_INTENT[e.kind], left = S.bossIntent.left, urgent = left <= 1;
-        const label = (urgent ? '⚠ 다음 턴 ' : '⏳ ' + left + '턴 후 ') + BI.name;
-        ctx.save(); ctx.font = 'bold ' + Math.max(12, Math.round(cellH * 0.16)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        const tw = ctx.measureText(label).width + 16, th = Math.max(20, cellH * 0.24);
+        const tic = UiArt.ready('ic_timer'), label = (tic ? '' : '⏳ ') + (urgent ? '다음 턴 ' : left + '턴 후 ') + BI.name;   // 시계 아이콘(없으면 이모지)
+        const fs = Math.max(12, Math.round(cellH * 0.16)), iw = tic ? fs * 1.3 : 0;
+        ctx.save(); ctx.font = 'bold ' + fs + 'px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+        const tw = ctx.measureText(label).width + 16 + (iw ? iw + 4 : 0), th = Math.max(20, cellH * 0.24);
         const tx = Math.max(fr.x + tw / 2 + 4, Math.min(fr.x + fr.w - tw / 2 - 4, px));
         let ty = py - rad - (showLabels ? 26 : 12); if (ty - th / 2 < fr.y + 2) ty = py + rad + th / 2 + 8;   // 필드 위로 잘리면 보스 아래로
         ctx.fillStyle = urgent ? 'rgba(120,20,30,.92)' : 'rgba(20,14,40,.88)'; ctx.beginPath(); ctx.roundRect(tx - tw / 2, ty - th / 2, tw, th, th / 2); ctx.fill();
         ctx.strokeStyle = urgent ? '#ff6b6b' : '#ffcf5c'; ctx.lineWidth = 1.5; ctx.stroke();
-        ctx.fillStyle = urgent ? '#ffd0d0' : '#ffe9a8'; ctx.fillText(label, tx, ty + 1); ctx.restore();
+        if (tic) ctx.drawImage(tic, tx - tw / 2 + 8, ty - iw / 2, iw, iw);
+        ctx.fillStyle = urgent ? '#ffd0d0' : '#ffe9a8'; ctx.fillText(label, tx - tw / 2 + 8 + (iw ? iw + 4 : 0), ty + 1); ctx.restore();
       }
     }
     // 방벽(캐릭터 방어선)
@@ -1463,7 +1477,9 @@
     ctx.fillStyle = '#0007'; ctx.fillRect(wr.x + 8, hbY, hbW, hbH);
     ctx.fillStyle = '#46e6d0'; ctx.fillRect(wr.x + 8, hbY, hbW * Math.max(0, S.wallHp / S.wallHpMax), hbH);
     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(11, Math.round(hbH * 0.82)) + 'px system-ui'; ctx.textAlign = 'left';
-    ctx.fillText('🛡 ' + Math.ceil(S.wallHp) + ' / ' + S.wallHpMax, wr.x + 14, hbY + hbH - Math.max(2, hbH * 0.2));
+    const hic = UiArt.ready('stat_hp'), hisz = hbH * 1.1;                     // 방벽 HP 아이콘(없으면 이모지)
+    if (hic) ctx.drawImage(hic, wr.x + 12, hbY + (hbH - hisz) / 2, hisz, hisz);
+    ctx.fillText((hic ? '' : '🛡 ') + Math.ceil(S.wallHp) + ' / ' + S.wallHpMax, wr.x + 14 + (hic ? hisz + 2 : 0), hbY + hbH - Math.max(2, hbH * 0.2));
 
     // ── 핀볼 영역(전투로 갈수록 페이드아웃 → 전투 화면에선 안 보임) ──
     const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
@@ -1716,12 +1732,12 @@
     ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
     // 전투 시작 배너(가로 띠 + 글자)
     if (S.phase === 'battle' && S.battleStage === 'intro') {
-      const cy = r.field.y + r.field.h * 0.5;
+      const cy = r.field.y + r.field.h * 0.5, bk = W / 405;                     // 화면 폭에 비례
       ctx.save();
-      ctx.fillStyle = '#ffcf5c22'; ctx.fillRect(0, cy - 30, W, 60);
-      ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30, W, 2); ctx.fillRect(0, cy + 28, W, 2);
-      ctx.fillStyle = '#ffcf5c'; ctx.textAlign = 'center'; ctx.font = 'bold 34px system-ui';
-      ctx.fillText('전투!', W / 2, cy + 12);
+      ctx.fillStyle = '#ffcf5c22'; ctx.fillRect(0, cy - 30 * bk, W, 60 * bk);
+      ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30 * bk, W, 2 * bk); ctx.fillRect(0, cy + 28 * bk, W, 2 * bk);
+      ctx.fillStyle = '#ffcf5c'; ctx.textAlign = 'center'; ctx.font = 'bold ' + Math.round(34 * bk) + 'px system-ui';
+      ctx.fillText('전투!', W / 2, cy + 12 * bk);
       ctx.restore();
     }
     if (shk) ctx.restore();   // 화면 흔들림 종료(컷인 UI는 안 흔들림)
@@ -1754,9 +1770,32 @@
     side.style.top = (layout().goal.y + 1) + 'px';
     side.classList.toggle('away', (S.layoutT || 0) > 0.3);
   }
+  // 적 요약 줄(헤더): 종류별 아이콘(걷기 시트 첫 프레임) ×수 · 대기 중인 수 · 남은 총 HP. 내용(시그니처)이 바뀔 때만 DOM 갱신
+  let _ebSig = '', _ebHp = -1;
+  function renderEnemyBar() {
+    const el = $('enemy-bar'); if (!el || !S) return;
+    if (!el.querySelector('.eb-chips')) { el.innerHTML = '<span class="eb-chips"></span><span class="eb-sum">' + ui('stat_hp', '♥') + '<b class="eb-hp"></b></span>'; _ebSig = ''; _ebHp = -1; }   // 뼈대는 한 번만(아이콘 깜빡임 방지) — 칩은 구성이 바뀔 때만, 총 HP 숫자는 값이 바뀔 때만 갱신
+    const list = S.enemies.slice().sort((a, b) => a.row - b.row), cnt = {}, order = [];
+    let hp = 0;
+    for (const e of list) { const k = e.isBoss ? 'boss_' + (e.kind || 'titan') : e.type; if (!cnt[k]) { cnt[k] = 0; order.push(k); } cnt[k]++; hp += Math.max(0, Math.ceil(e.hp)); }
+    const wait = (S.waves || []).reduce((s, w) => s + w.length, 0);
+    const sig = order.map(k => k + cnt[k]).join(',') + '|' + wait;
+    if (sig !== _ebSig) {
+      _ebSig = sig;
+      let h = '';
+      for (const k of order) {
+        const isB = k.indexOf('boss_') === 0;
+        h += '<span class="eb-it' + (isB ? ' boss' : '') + '"><i class="eb-ic" style="background-image:url(assets/enemy/' + k + '.webp);background-size:' + (isB ? '400% 200%' : '400% 100%') + '"></i>' + (isB ? '' : '×' + cnt[k]) + '</span>';
+      }
+      if (wait) h += '<span class="eb-it wait">+' + wait + '</span>';
+      el.querySelector('.eb-chips').innerHTML = h;
+    }
+    if (hp !== _ebHp) { _ebHp = hp; el.querySelector('.eb-hp').textContent = hp.toLocaleString(); }
+    el.querySelector('.eb-sum').style.visibility = order.length ? '' : 'hidden';
+  }
   // 화면 연출 진행(이펙트·캐릭터/적 애니메이션) — 로직과 무관한 것만. 루프와 테스트 훅(tick)이 함께 쓴다
   function stepVisuals(d) {
-    syncSide();
+    syncSide(); renderEnemyBar();
     for (let i = anim.fx.length - 1; i >= 0; i--) { anim.fx[i].t -= d * 1.8; if (anim.fx[i].t <= 0) anim.fx.splice(i, 1); }   // 이펙트는 모든 phase에서 진행
     if (anim.shake > 0) anim.shake = Math.max(0, anim.shake - d * 40);
     for (let i = anim.floats.length - 1; i >= 0; i--) { anim.floats[i].t -= d * 1.05; if (anim.floats[i].t <= 0) anim.floats.splice(i, 1); }
@@ -1794,7 +1833,8 @@
       if (!c) { b.className = 'skillbtn empty'; b.disabled = true; b.textContent = '빈 슬롯'; col.append(b); continue; }
       const sk = c.ref.active, ready = c.gauge >= sk.gauge;
       b.className = 'skillbtn' + (ready ? ' ready' : '') + (c.armed ? ' armed' : '');
-      b.innerHTML = '<span class="sb-nm">' + c.ref.name + '</span><span class="sb-sk">' + sk.name + '</span><span class="sb-g">' + Math.min(c.gauge, sk.gauge) + '/' + sk.gauge + '</span>';
+      b.style.setProperty('--lc', laneHex(lane));                                           // 게이지 막대 = 레인 색
+      b.innerHTML = '<i class="sb-fill" style="height:' + Math.round(100 * Math.min(1, c.gauge / sk.gauge)) + '%"></i><span class="sb-nm">' + c.ref.name + '</span><span class="sb-sk">' + sk.name + '</span><span class="sb-g">' + Math.min(c.gauge, sk.gauge) + '/' + sk.gauge + '</span>';
       b.onclick = () => { if (c.gauge >= sk.gauge) { c.armed = !c.armed; renderSkills(); } };
       col.append(b);
     }
@@ -1869,12 +1909,15 @@
   window.addEventListener('resize', fitStage);
   window.addEventListener('orientationchange', fitStage);
   fitStage();
+  // 전투 영역 크기가 바뀌면(모듈 바·적 요약 줄이 생겨 헤더가 커지는 등) 캔버스도 즉시 다시 맞춘다 — 안 그러면 아래쪽(방벽 HP바·핀볼판 테두리)이 잘린다
+  if (window.ResizeObserver) new ResizeObserver(() => { const el = $('stage-wrap'); if (!$('combat').hidden && (Math.abs(el.clientHeight - H) > 1 || Math.abs(el.clientWidth - W) > 1)) resize(); }).observe($('stage-wrap'));   // 캔버스는 관찰 대상이 아니라 되먹임 루프 없음
 
   // 에셋 미리 받기 — 타이틀·로비가 뜬 뒤 한가할 때 전투에서 쓰는 이미지(적·FX·페그·배경)를 받아 둔다(첫 전투에서 도형 폴백이 보이지 않게)
   setTimeout(function () {
     FxArt.preload(['muzzle', 'shell', 'boom', 'hit_spark']);
     EnemyArt.preload(Object.keys(ENEMIES).concat(['boss_titan', 'boss_swarm', 'boss_carrier']));
     BgArt.preload(['bg_field', 'bg_wall', 'bg_board', 'frame_pocket']);
+    UiArt.preload(['stat_hp', 'ic_timer']);
     PegArt.preload(Object.keys(PEG_TYPES).map(function (k) { return 'peg_' + k; }).concat(['obst_bumper', 'obst_pillar']));
   }, 600);
 
@@ -1886,7 +1929,7 @@
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     // 화면 연출까지 한 걸음(rAF가 멈춘 숨은 탭에서 수동 진행용): layoutT 보간 포함
     step(dt) { if (!S || S.over) return; const tgt = S.layoutTarget || 0; if (S.layoutT !== tgt) { const st = dt / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + st) : Math.max(tgt, S.layoutT - st); } if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } stepVisuals(dt); },
-    render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos
+    render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos, renderSkills, showResult, renderEnemyBar
   };
 
   // 헤드리스 자가 테스트: ?sim=1 로 런을 자동 진행하며 런타임 오류·상태를 #boot-error 에 남긴다.

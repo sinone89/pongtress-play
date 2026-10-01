@@ -498,6 +498,8 @@ const EnemyArt = makeCanvasLoader('assets/enemy/', 'webp');
 const PegArt = makeCanvasLoader('assets/peg/', 'png');
 // 배경/영역 레이어: assets/bg/<name>.webp (bg_field/bg_wall/bg_board) · frame_pocket 만 png
 const BgArt = makeCanvasLoader('assets/bg/', 'webp', { frame_pocket: 'png' });
+// UI 아이콘(캔버스에 그릴 때): assets/ui/<name>.png (DOM 에서는 uiIcon/ui 사용)
+const UiArt = makeCanvasLoader('assets/ui/', 'png');
 
 // ── 시트 그리기 도구 ──
 // 큰 시트를 2배 이상 줄여 그리면 계단·반짝임이 생기므로, 절반(1/2, 1/4) 크기 사본을 한 번 만들어 거기서 샘플링한다.
