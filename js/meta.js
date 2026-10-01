@@ -305,6 +305,8 @@ const Meta = (function () {
   // ── 방치 홈 자동전투 연출(코스메틱) ──
   // 캐릭터가 '재장전(정면 대기·재장전 동작) → 돌아서서 점사(뒷모습 조준·발사 프레임) → 다시 정면'을 반복한다 — 전투와 같은 CharAnim.
   // 포탄은 실측한 총구(SHEET_META)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
+  // 홈 배경 assets/bg/bg_lobby.webp(1080×1920)에서 뒷벽이 바닥과 만나는 선의 y(이미지 좌표). 배경을 바꾸면 이 값도 다시 잴 것.
+  const BG_LOBBY = { w: 1080, h: 1920, farY: 930 };
   let _idleRAF = 0, _idleDbg = null;
   function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }
   function idleDebug() { return _idleDbg; }
@@ -329,39 +331,55 @@ const Meta = (function () {
       const n = Math.max(1, D.cs.length);
       D.groundY = D.h - D.cardH - D.h * 0.05;                                  // 캐릭터 발치(방치보상 카드 위)
       D.charS = Math.min(D.w / n * 0.84, D.groundY * 0.66, D.w * 0.34);        // 캐릭터 크기(폭·높이 비례)
+      // 배경(bg_lobby, CSS cover·가운데 정렬)에서 뒷벽이 바닥과 만나는 선의 화면 y — 적은 여기서 나타난다
+      const bs = Math.max(D.w / BG_LOBBY.w, D.h / BG_LOBBY.h);
+      D.farY = Math.min((D.h - BG_LOBBY.h * bs) / 2 + BG_LOBBY.farY * bs, D.groundY - D.h * 0.14);
     }
     fit();
-    const fireLine = () => D.h * 0.22;      // 상단 22% 아래로 들어오면 사격(사거리 = 22%~지면, 화면 대부분)
-    const fall = () => D.h * 0.07;          // 적 낙하 속도(높이 비례)
     const cxOf = (i) => D.w * (i + 0.5) / Math.max(1, D.cs.length);
-    const exOf = (e) => e.x + Math.sin(D.now * 1.8 + e.ph) * D.w * 0.006;   // 적의 좌우 흔들림 포함한 실제 x
-    const enemyR = () => D.w * 0.028 + Math.random() * D.w * 0.014;           // 적 반경(폭 비례)
-    function mkEnemy(y) {
-      const hp = 2 + Math.floor(Math.random() * 2), i = Math.floor(Math.random() * eTypes.length);
-      return { x: D.w * 0.07 + Math.random() * D.w * 0.86, y, r: enemyR(), type: eTypes[i], col: ENEMIES[eTypes[i]].color, hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
+
+    // ── 적: 하늘에서 떨어지지 않는다 — 바닥 안쪽 끝(뒷벽이 바닥과 만나는 선)에서 나타나 바닥을 따라 걸어오고, 캐릭터 쪽으로 올수록 커진다(원근) ──
+    // e.d = 깊이(0 = 먼 끝 → 1 = 캐릭터 발치 줄), e.u = 바닥 폭에 대한 좌우 위치(-1..1; 가까울수록 바닥이 넓어져 부채꼴로 벌어진다)
+    const FAR_HALF = 0.25, NEAR_HALF = 0.62;                                   // 바닥 절반 폭(캔버스 폭 비율): 먼 끝 / 캐릭터 줄
+    const depthK = (d) => 0.42 + 0.58 * d;                                      // 원근 배율(멀수록 작게)
+    const ESZ = { sentry: 0.15, drone: 0.15, walker: 0.19, hound: 0.165, heavy: 0.2, sludge: 0.14 };   // 가까이 왔을 때 스프라이트 한 변(캔버스 폭 비율)
+    const ESPD = { sentry: 1, drone: 1.1, walker: 0.85, hound: 1.5, heavy: 0.72, sludge: 0.8 };        // 걸음 속도 배율
+    const speedOf = (e) => 0.19 * (ESPD[e.type] || 1) * (0.55 + 0.85 * e.d);                            // 깊이/초(멀수록 느리게 보임)
+    // 적의 화면 위치·크기: (x, y)=발 닿는 곳, s=스프라이트 한 변, cy=몸통 중심(조준점), top=머리 쪽. dd 로 미래 깊이를 넣어 조준 보정에도 쓴다
+    function ePos(e, dd) {
+      const d = dd == null ? e.d : dd, k = depthK(d), s = D.w * e.sz * k * (1 + 0.14 * e.kick);
+      const y = D.farY + (D.groundY - D.farY) * d, half = D.w * (FAR_HALF + (NEAR_HALF - FAR_HALF) * d);
+      const x = D.w / 2 + e.u * half + Math.sin(D.now * 1.8 + e.ph) * D.w * 0.004 * k;
+      const lift = e.type === 'drone' ? s * 0.2 + Math.sin(D.now * 3 + e.ph) * s * 0.025 : 0;   // 드론은 바닥에서 떠서 이동
+      return { x, y, s, k, lift, cy: y - lift - s * 0.46, top: y - lift - s * 0.96 };
     }
-    function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
-    for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
+    function mkEnemy(d) {
+      const type = eTypes[Math.floor(Math.random() * eTypes.length)], hp = 2 + Math.floor(Math.random() * 2);
+      let u = 0; for (let t = 0; t < 6; t++) { u = (Math.random() * 2 - 1) * 0.7; if (!D.en.some(o => Math.abs(o.d - d) < 0.16 && Math.abs(o.u - u) < 0.3)) break; }   // 같은 자리에 겹쳐 나오지 않게
+      return { type, u, d, sz: (ESZ[type] || 0.16) * (0.93 + Math.random() * 0.14), col: (ENEMIES[type] || {}).color || '#fff', hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
+    }
+    function spawn() { if (D.en.length < 8) D.en.push(mkEnemy(0)); }
+    for (let i = 0; i < 4; i++) D.en.push(mkEnemy(0.12 + Math.random() * 0.6));
 
     // 캐릭터 그림 위치·크기 — 그리기와 총구 계산이 같은 값을 쓴다(어긋남 방지). 시트 한 칸(320)을 charS×charS 로, 발(cx, groundY)에 맞춰 그린다
     const muzzleOf = (c, col) => CharAnim.muzzle(c.a, cxOf(c.i), D.groundY, D.charS, col == null ? 1 : col);
     function pickTarget(c) {
       const cx = cxOf(c.i); let best = null, bs = -1e9;
       for (const e of D.en) {
-        if (e.dead || e.y < fireLine() || e.hp - e.pend <= 0) continue;                 // 사거리 밖 · 이미 죽을 예정인 적 제외(과잉 사격 방지)
-        const sc = e.y - Math.abs(exOf(e) - cx) * 0.35;                                 // 가깝고(아래) 자기 열에 가까운 적 우선
+        if (e.dead || e.d < 0.1 || e.hp - e.pend <= 0) continue;                        // 아직 안 보이는(바닥 끝) 적 · 이미 죽을 예정인 적 제외(과잉 사격 방지)
+        const sc = e.d * 100 - Math.abs(ePos(e).x - cx) / D.w * 38;                      // 가까이 온(깊이) · 자기 열에 가까운 적 우선
         if (sc > bs) { bs = sc; best = e; }
       }
       return best;
     }
     function shoot(c, e) {
-      const cx = cxOf(c.i), ex = exOf(e);
-      CharAnim.fire(c.a, ex < cx - 14 ? -1 : ex > cx + 14 ? 1 : 0);                      // 표적 쪽을 향해 f1→f2→f3
-      const m = muzzleOf(c, 1), dist = Math.hypot(ex - m.x, e.y - m.y);                 // 포탄은 발사 프레임(f1)의 총구에서
-      const dur = Math.min(0.32, Math.max(0.13, dist / (D.h * 1.8))), tx = ex, ty = e.y + fall() * dur;   // 낙하분만큼 앞을 조준
+      const cx = cxOf(c.i), p0 = ePos(e), ex = p0.x, T = D.w * 0.09;                    // 표적이 좌우로 충분히 벗어났을 때만 몸을 돌려 반전(자주 뒤집히면 깜빡여 보임)
+      CharAnim.fire(c.a, ex < cx - T ? -1 : ex > cx + T ? 1 : 0);                        // 표적 쪽을 향해 f1→f2→f3
+      const m = muzzleOf(c, 1), dist = Math.hypot(ex - m.x, p0.cy - m.y);               // 포탄은 발사 프레임(f1)의 총구에서
+      const dur = Math.min(0.32, Math.max(0.13, dist / (D.h * 1.8))), q = ePos(e, Math.min(1, e.d + speedOf(e) * dur));   // 걸어오는 만큼 앞을 조준
       const col = (CLASS[c.cls] || {}).color || '#ffe9a8';
       e.pend++;
-      D.pj.push({ x1: m.x, y1: m.y, x2: tx, y2: ty, t: 0, dur, e, col });
+      D.pj.push({ x1: m.x, y1: m.y, x2: q.x, y2: q.cy, t: 0, dur, e, col });
       D.fx.push({ k: 'muz', x: m.x, y: m.y, t: 1, col, ang: m.ang });                   // 섬광은 포신 방향(홈 연출은 무음)
     }
     function stepChar(c, dt) {
@@ -385,39 +403,45 @@ const Meta = (function () {
     function hitAt(p) {                                         // 포탄 도착: 이 순간에 피해·이펙트
       const e = p.e;
       if (e && !e.dead && D.en.indexOf(e) >= 0) {
+        const q = ePos(e);
         e.pend = Math.max(0, e.pend - 1); e.hp -= 1; e.hit = 0.2; e.kick = 1;
-        D.fx.push({ k: 'hit', x: exOf(e), y: e.y, t: 1, col: p.col });
-        if (e.hp <= 0) { e.dead = true; D.fx.push({ k: 'boom', x: exOf(e), y: e.y, t: 1, col: e.col, r: e.r }); }
+        D.fx.push({ k: 'hit', x: q.x, y: q.cy, t: 1, col: p.col, kk: q.k });
+        if (e.hp <= 0) { e.dead = true; D.fx.push({ k: 'boom', x: q.x, y: q.cy, t: 1, col: e.col, r: q.s * 0.23 }); }
       } else D.fx.push({ k: 'hit', x: p.x2, y: p.y2, t: 1, col: p.col, sm: true });
     }
     function step(dt) {
       D.now += dt;
-      if (Math.random() < dt * 1.3) spawn();
-      for (const e of D.en) { e.y += dt * fall(); e.hit = Math.max(0, e.hit - dt); e.kick = Math.max(0, e.kick - dt * 8); }
+      if (Math.random() < dt * 1.0) spawn();
+      for (const e of D.en) { e.d += dt * speedOf(e); e.hit = Math.max(0, e.hit - dt); e.kick = Math.max(0, e.kick - dt * 8); }
       D.cs.forEach(c => stepChar(c, dt));
       for (const p of D.pj) { p.t += dt / p.dur; if (p.t >= 1 && !p.done) { p.done = true; hitAt(p); } }
       D.pj = D.pj.filter(p => !p.done);
       for (const f of D.fx) f.t -= dt / FX_LIFE[f.k]; D.fx = D.fx.filter(f => f.t > 0);
-      D.en = D.en.filter(e => {                                 // 죽은 적 제거 · 캐릭터 앞까지 온 적은 조용히 소멸(겹침 방지)
+      D.en = D.en.filter(e => {                                 // 죽은 적 제거 · 캐릭터 줄까지 걸어온 적은 작게 터지며 소멸(캐릭터와 겹침 방지)
         if (e.dead) return false;
-        if (e.y >= D.groundY - D.charS * 0.2) { D.fx.push({ k: 'boom', x: exOf(e), y: e.y, t: 1, col: e.col, r: e.r, sm: true }); return false; }
+        if (e.d >= 0.95) { const q = ePos(e); D.fx.push({ k: 'boom', x: q.x, y: q.cy, t: 1, col: e.col, r: q.s * 0.23, sm: true }); return false; }
         return true;
       });
       D.cardT += dt; if (D.cardT > 2) { D.cardT = 0; renderIdleCard(); }
     }
 
     function drawEnemy(e) {
-      const U = D.U, x = exOf(e), y = e.y - e.kick * D.h * 0.008, r = e.r * (1 + 0.16 * e.kick);
-      const ef = EnemyAnim.frame(e, D.now, true);                  // 내려오는 중이라 걷기 프레임을 빠르게 재생
+      const p = ePos(e), a = Math.max(0, Math.min(1, e.d / 0.09)); if (a <= 0) return;   // 바닥 끝에서 서서히 나타남
+      const x = p.x, y = p.y, s = p.s, ty = p.top;
+      ctx.save();
+      ctx.globalAlpha = a * (p.lift ? 0.2 : 0.34); ctx.fillStyle = '#000';                       // 바닥 그림자(바닥 위를 걷는 느낌)
+      ctx.beginPath(); ctx.ellipse(x, y - s * 0.01, s * (p.lift ? 0.2 : 0.3), s * 0.07, 0, 0, 7); ctx.fill();
+      ctx.globalAlpha = a;
+      const ef = EnemyAnim.frame(e, D.now, true);                  // 걷는 중이라 걷기 프레임을 빠르게 재생
       if (ef) {
-        const s = r * 2.4;
-        drawCell(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, y - s / 2, s, s);
-        if (e.hit > 0) drawCellTint(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, y - s / 2, s, s, '#ffffff', Math.min(0.85, e.hit * 4));
-      } else { ctx.fillStyle = e.hit > 0.06 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
+        drawCell(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, ty, s, s);
+        if (e.hit > 0) drawCellTint(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, ty, s, s, '#ffffff', Math.min(0.85, e.hit * 4));
+      } else { ctx.fillStyle = e.hit > 0.06 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(x, p.cy, s * 0.3, 0, 7); ctx.fill(); }
       if (e.hp < e.mhp) {
-        const bw = r * 1.8, hbH = Math.max(2, D.h * 0.006), by = y - r - D.h * 0.014;
+        const bw = s * 0.55, hbH = Math.max(2, D.h * 0.006), by = ty - D.h * 0.01;
         ctx.fillStyle = '#0008'; ctx.fillRect(x - bw / 2, by, bw, hbH); ctx.fillStyle = '#ff6b6b'; ctx.fillRect(x - bw / 2, by, bw * Math.max(0, e.hp) / e.mhp, hbH);
       }
+      ctx.restore();
     }
     function drawChar(c) {
       const cx = cxOf(c.i), cy = D.groundY, s = D.charS, col = laneCol[c.i % 3], ry = Math.max(3, s * 0.08);
@@ -457,7 +481,7 @@ const Meta = (function () {
           ctx.translate(f.x, f.y); ctx.rotate(f.ang); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5 * U; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.7, 0); ctx.stroke();
         }
       } else if (f.k === 'hit') {                                                     // 타격: 발광 코어 + 방사 스파크
-        const R = (f.sm ? 16 : 26) * U, rr = R * (0.55 + fr * 0.75), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
+        const R = (f.sm ? 16 : 26) * U * (f.kk || 1), rr = R * (0.55 + fr * 0.75), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
         g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, f.col); g.addColorStop(1, f.col + '00');
         ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
         if (!FxSheet.hit(ctx, f.x, f.y, R * 3.2, fr, f.col)) {                        // 히트 스파크 시트(없으면 방사 선)
@@ -478,7 +502,7 @@ const Meta = (function () {
     }
     function render() {
       ctx.clearRect(0, 0, D.w, D.h);
-      for (const e of D.en) drawEnemy(e);
+      D.en.slice().sort((a, b) => a.d - b.d).forEach(drawEnemy);     // 먼 적부터(가까운 적이 위에 그려짐)
       D.cs.forEach(drawChar);
       for (const p of D.pj) drawShell(p);
       for (const f of D.fx) drawFx(f);
@@ -549,11 +573,19 @@ const Meta = (function () {
           + '<div class="sns-grow"><div class="sns-nm">' + p[1] + '</div><div class="sns-ds">' + p[2] + '</div></div>'
           + '<button class="sns-btn sm sub" disabled>준비 중</button></div></div>').join('');
   }
+  // 치트(자원 획득): 상점 어느 탭에서나 맨 아래에 — 크레딧·재료·보석·문서를 각각 +9999 (기존 치트창의 '화폐 전체 +9999'와 같은 동작)
+  let shopCheatUntil = 0;
+  function shopCheatCard() {
+    const done = Date.now() < shopCheatUntil;
+    return '<div class="shop-cheat"><span class="cheat-lbl">CHEAT</span>'
+      + '<button class="sns-btn' + (done ? ' done' : '') + '" data-shopcheat="1">' + (done ? '✔ 지급 완료 · ' : ui('ic_reward', '🎁') + ' 자원 획득 · ') + ['gold', 'mats', 'gems', 'docs'].map(uiCur).join('') + ' +9999</button></div>';
+  }
   function renderShop() {
     const el = $('shop-body'); if (!el) return;
     const tabs = [['gacha', 'ic_gacha', '🎰', '가챠'], ['doc', 'cur_docs', '📄', '문서'], ['pkg', 'ic_package', '💳', '패키지']];
     let h = '<div class="sns-tabs shoptabs">' + tabs.map(t => '<button class="sns-tab' + (shopTab === t[0] ? ' on' : '') + '" data-stab="' + t[0] + '">' + uiIcon(t[1], t[2]) + ' ' + t[3] + '</button>').join('') + '</div>';
     h += shopTab === 'doc' ? shopDocBody() : shopTab === 'pkg' ? shopPkgBody() : shopGachaBody();
+    h += shopCheatCard();
     el.innerHTML = h;
   }
   function openGachaInfo() {
@@ -755,6 +787,11 @@ const Meta = (function () {
     // 상점 탭(서브탭: 가챠/문서/패키지)
     $('shop-body').onclick = (e) => {
       const st = e.target.closest('[data-stab]'); if (st) { shopTab = st.dataset.stab; renderShop(); return; }
+      if (e.target.closest('[data-shopcheat]')) {                                   // 치트: 자원 +9999 → 상단 재화 바와 상점 갱신, 버튼은 잠깐 '지급 완료'
+        shopCheatUntil = Date.now() + 1400; doCheat('cur'); if (typeof Sound !== 'undefined') Sound.play('charge');
+        setTimeout(() => { if (activeTab === 'shop') renderShop(); }, 1450);
+        return;
+      }
       const gi = e.target.closest('[data-gachainfo]'); if (gi) { openGachaInfo(); return; }
       const gc = e.target.closest('[data-gacha]');
       if (gc && !gc.disabled) {

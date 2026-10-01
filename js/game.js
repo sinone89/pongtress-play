@@ -1346,6 +1346,24 @@
     }
   }
 
+  // 포켓 줄 테두리(assets/bg/frame_pocket.png 900×140 중 불투명 영역 x173~726 · y42~96)를 9분할로 얇게 두른다.
+  // 원본 레일은 위 12px·아래 13px(전체 높이의 45%)라 그대로 늘리면 칸을 크게 가리므로, 레일 두께를 칸 높이의 6.5%(≥3px)로 줄이고 가운데(구멍)는 늘린다.
+  function drawPocketFrame(img, x, y, w, h) {
+    const SX = 173, SY = 42, CAPW = 20, TOP = 12, MIDH = 29, BOT = 13, RAILW = 513;     // 원본 조각 크기(마구리 폭 · 위 레일 · 가운데 · 아래 레일 · 레일 길이)
+    const t = Math.max(3, h * 0.065), tb = t * BOT / TOP, cw = Math.min(t * 1.3, w * 0.03), midH = Math.max(1, h - t - tb);
+    const rx = SX + CAPW + RAILW, by = SY + TOP + MIDH;
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, SX, SY, CAPW, TOP, x, y, cw, t);                       // 모서리 4
+    ctx.drawImage(img, rx, SY, CAPW, TOP, x + w - cw, y, cw, t);
+    ctx.drawImage(img, SX, by, CAPW, BOT, x, y + h - tb, cw, tb);
+    ctx.drawImage(img, rx, by, CAPW, BOT, x + w - cw, y + h - tb, cw, tb);
+    ctx.drawImage(img, SX + CAPW, SY, RAILW, TOP, x + cw, y, w - cw * 2, t);   // 위·아래 레일
+    ctx.drawImage(img, SX + CAPW, by, RAILW, BOT, x + cw, y + h - tb, w - cw * 2, tb);
+    ctx.drawImage(img, SX, SY + TOP, CAPW, MIDH, x, y + t, cw, midH);          // 양 끝 마구리(세로로 늘림)
+    ctx.drawImage(img, rx, SY + TOP, CAPW, MIDH, x + w - cw, y + t, cw, midH);
+    ctx.restore();
+  }
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const shk = anim.shake > 0.3;
@@ -1540,8 +1558,8 @@
       ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, cellH * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
       ctx.fillText(isC ? '◆' : isB ? '♥' : '×', x + pw / 2, cellY + cellH / 2 + Math.min(pw * 0.18, cellH * 0.18));
     }
-    const fpk = BgArt.ready('frame_pocket');       // 포켓 줄 금속 프레임(900×140 중 불투명 영역 173,42 554×55) — 양 끝 마구리는 원비율, 가운데만 늘린다
-    if (fpk) { const cap = Math.min(40 * (cellH / 55), g.w * 0.1); ctx.imageSmoothingEnabled = true; ctx.drawImage(fpk, 173, 42, 40, 55, g.x, cellY, cap, cellH); ctx.drawImage(fpk, 686, 42, 40, 55, g.x + g.w - cap, cellY, cap, cellH); ctx.drawImage(fpk, 213, 42, 473, 55, g.x + cap, cellY, g.w - cap * 2, cellH); }
+    const fpk = BgArt.ready('frame_pocket');       // 포켓 줄 금속 테두리(얇게 — 칸을 가리지 않는다)
+    if (fpk) drawPocketFrame(fpk, g.x, cellY, g.w, cellH);
     if (S.jack && S.phase === 'load') {                  // 움직이는 잭팟 포켓(×3)
       const jx = g.x + S.jack.x * g.w, jw = pw * 0.96, pul = 0.6 + 0.4 * Math.sin(performance.now() / 140);
       ctx.save(); ctx.globalCompositeOperation = 'lighter';

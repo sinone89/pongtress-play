@@ -613,7 +613,7 @@ const CharAnim = (function () {
   }
   // 시트 현재 칸을 발(x, feetY) 기준으로 size×size 에 그린다. 시트가 아직 없으면 정면 썸네일로 대신하고, 둘 다 없으면 false
   function draw(ctx, a, x, feetY, size) {
-    const k = size / CELL, fc = Math.abs(a.face) < 0.03 ? 0.03 : a.face;
+    const k = size / CELL, fc = Math.abs(a.face) < 0.22 ? (a.face < 0 ? -0.22 : 0.22) : a.face;   // 방향 전환 중에도 완전히 사라지지 않게 최소 폭 유지
     const sheet = CharArt.sprite(a.id, 'sheet');
     ctx.save(); ctx.translate(x, feetY); if (fc !== 1) ctx.scale(fc, 1);
     let ok = false;
