@@ -42,13 +42,6 @@ body {
   background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--amber));
   -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 10px #0009); }
 .tagline { margin: 8px 0 0; color: var(--ink); opacity: .85; text-shadow: 0 1px 4px #000; }
-/* 영문 로고 병기: 단말 상태 보고 스타일 한 줄 (타이틀 · 로그인 공통) */
-.logo-eng, #login .lg-eng { margin: 6px 0 0; font: 700 clamp(10px, 3.2vw, 14px)/1.2 ui-monospace, SFMono-Regular, Menlo, Consolas, 'Courier New', monospace;
-  letter-spacing: .24em; color: var(--cyan); text-shadow: 0 0 8px #46e6d055, 0 1px 4px #000; white-space: nowrap; }
-.logo-eng::before, #login .lg-eng::before { content: ""; display: inline-block; width: .6em; height: .6em; margin-right: .8em; border-radius: 50%;
-  background: var(--cyan); box-shadow: 0 0 8px var(--cyan); vertical-align: .05em; animation: engBlink 1.6s ease-in-out infinite; }
-@keyframes engBlink { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
-@media (prefers-reduced-motion: reduce) { .logo-eng::before, #login .lg-eng::before { animation: none; } }
 
 /* 방치형 홈 = 자동전투 연출 풀블리드(빈공간 없이 꽉 채움) */
 #lobby-main { position: relative; }
@@ -410,7 +403,6 @@ body {
 #login .lg-logo { font-size: 12cqw; letter-spacing: 0.6cqw; font-weight: 800; margin: 0;
   background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--amber));
   -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 10px #0009); }
-#login .lg-eng { font-size: 3.1cqw; margin: -3.4cqw 0 0; }
 #login .lg-tag { color: var(--muted); font-size: 3.4cqw; margin: -2cqw 0 2cqw; }
 #login .lg-box { display: flex; flex-direction: column; gap: 3cqw; width: 100%; max-width: 82cqw; }
 #login input { font-size: 4.4cqw; padding: 3.6cqw 4cqw; border-radius: 3cqw; border: 2px solid #ffffff26;
