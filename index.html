@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=137">
+  <link rel="stylesheet" href="css/game.css?v=138">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
@@ -33,6 +33,7 @@
     <!-- 타이틀(풀스크린 키아트 + 터치하여 시작) -->
     <section id="title" class="screen">
       <img id="title-art" src="assets/bg/bg_title.webp" alt="" onerror="this.style.display='none'">
+      <div id="title-hero" aria-hidden="true"></div>   <!-- 중앙 연출: 편성 캐릭터 CG가 서 있고 몇 초마다 바뀜(game.js initTitleHero) -->
       <div class="title-top">
         <h1 class="logo logo-wrap"><span class="logo-tx">PONGTRESS</span><img class="logo-im" alt="PONGTRESS" src="assets/logo.webp" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></h1>
         <p class="tagline">튕겨서 충전하는 로그라이크 핀볼</p>
@@ -155,10 +156,10 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=137"></script>
-  <script src="js/spritemeta.js?v=137"></script>
-  <script src="js/content.js?v=137"></script>
-  <script src="js/meta.js?v=137"></script>
-  <script src="js/game.js?v=137"></script>
+  <script src="js/audio.js?v=138"></script>
+  <script src="js/spritemeta.js?v=138"></script>
+  <script src="js/content.js?v=138"></script>
+  <script src="js/meta.js?v=138"></script>
+  <script src="js/game.js?v=138"></script>
 </body>
 </html>

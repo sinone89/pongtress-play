@@ -1747,8 +1747,16 @@
   }
 
   // ============ 루프 ============
+  // 스킬 사이드바 위치 동기화 — 항상 포켓 줄 위쪽 경계 아래에서 시작해 적 필드·방벽을 가리지 않는다.
+  // 전투→장전으로 돌아오는 레이아웃 전환 중(layoutT>0.3, 필드가 아직 큼)에는 숨겼다가 필드가 줄어들면 부드럽게 나타난다.
+  function syncSide() {
+    const side = $('battle-side'); if (!side || !S) return;
+    side.style.top = (layout().goal.y + 1) + 'px';
+    side.classList.toggle('away', (S.layoutT || 0) > 0.3);
+  }
   // 화면 연출 진행(이펙트·캐릭터/적 애니메이션) — 로직과 무관한 것만. 루프와 테스트 훅(tick)이 함께 쓴다
   function stepVisuals(d) {
+    syncSide();
     for (let i = anim.fx.length - 1; i >= 0; i--) { anim.fx[i].t -= d * 1.8; if (anim.fx[i].t <= 0) anim.fx.splice(i, 1); }   // 이펙트는 모든 phase에서 진행
     if (anim.shake > 0) anim.shake = Math.max(0, anim.shake - d * 40);
     for (let i = anim.floats.length - 1; i >= 0; i--) { anim.floats[i].t -= d * 1.05; if (anim.floats[i].t <= 0) anim.floats.splice(i, 1); }
@@ -1807,9 +1815,29 @@
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
 
+  // 타이틀 중앙 연출: 편성 캐릭터(없으면 레지나)의 CG가 플랫폼 위에 서 있고 몇 초마다 부드럽게 바뀐다. 발광 색 = 그 캐릭터의 클래스 색.
+  function initTitleHero() {
+    const box = $('title-hero'); if (!box) return;
+    let ids = (Meta.partySlots ? Meta.partySlots() : []).filter(Boolean);
+    if (!ids.length) ids = ['behemoth'];
+    box.replaceChildren();
+    const slides = ids.map((id) => {
+      const r = ROSTER.find(c => c.id === id), col = ((r && CLASS[r.cls]) || {}).color || '#46e6d0';
+      const el = document.createElement('div'); el.className = 'th'; el.style.setProperty('--g', col);
+      const im = document.createElement('img'); im.alt = ''; im.decoding = 'async'; im.draggable = false; im.src = CharArt.path(id, 'cg'); im.onerror = () => el.remove();
+      el.innerHTML = '<i class="th-glow"></i><i class="th-shadow"></i>'; el.append(im); box.append(el); return el;
+    });
+    let k = 0; slides[0].classList.add('on');
+    if (slides.length > 1) setInterval(() => {
+      if ($('title').hidden) return;            // 타이틀이 안 보이면 멈춤
+      slides[k].classList.remove('on'); k = (k + 1) % slides.length; slides[k].classList.add('on');
+    }, 4600);
+  }
+
   // ============ 와이어링 ============
   Meta.load();
   Meta.init({ onSortie: startRun });
+  initTitleHero();
   Sound.syncIcons();
   document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
   const enterLobby = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
