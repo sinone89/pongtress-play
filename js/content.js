@@ -3,7 +3,7 @@
  * 밸런스 수치는 여기 한곳. game.js 보다 먼저 로드된다.
  */
 const CFG = {
-  lanes: 3,                // 캐릭터 편성(성벽) 레인 수 — 골칸·포켓도 이 값 기준
+  lanes: 3,                // 캐릭터 편성(방벽) 레인 수 — 골칸·포켓도 이 값 기준
   fieldLanes: 6,           // 적 필드 열 수(캐릭터 레인과 분리). 공격은 레인 무관 맨 앞 타겟
   pegCols: 9,              // 조밀 격자 패턴의 열 수
   pegRows: 12,             // 조밀 격자 패턴의 행 수
@@ -38,7 +38,7 @@ const PEG_TYPES = {
   mult2:  { name: '증식×2', color: '#ffcf5c', shape: 'diamond',  size: 1.05, weight: 15, oneShot: true,  split: 1, label: '×2' },
   mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
   bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 0,  oneShot: false, boost: 1.28 },  // weight0=랜덤 스폰 제외(범퍼는 고정 장애물로 이전, 패시브/보상 설치만)
-  gold:   { name: '골드',   color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
+  gold:   { name: '크레딧', color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
   charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' },  // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
   // ── 아래는 랜덤 스폰 제외(weight 0): 스킬·적 간섭으로만 생성 ──
   bomb:   { name: '폭탄',   color: '#ff8a3a', shape: 'circle',   size: 1.25, weight: 0,  oneShot: true,  bomb: 0.16, label: '✹' },  // 맞으면 주변 페그 연쇄 폭발(스킬이 남김)
@@ -61,7 +61,7 @@ function makePeg(fx, fy, type) {
 function expToNext(level) { return 16 + level * 11; }
 
 // ── 캐릭터 (프로토타입: 처음부터 3명 배치. 편성/가챠는 다음 패스) ──
-// atk 공격력(발당 피해) · hp 체력(성벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
+// atk 공격력(발당 피해) · hp 체력(방벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
 const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' }, legendary: { name: '레전더리', color: '#ffce54' } };
 // 클래스 3종: 화력을 단일/광역으로 나누고, 힐·제어·버프를 지원으로 묶음
@@ -148,7 +148,7 @@ const GACHA = {
 const DOC_SHOP = { price: { rare: 2, epic: 5, legendary: 12 } };
 const MISSIONS = [
   { id: 'firstWin', name: '첫 승리', desc: '런 1회 클리어', stat: 'runsWon', goal: 1, reward: { gems: 150 } },
-  { id: 'kills60', name: '토벌대', desc: '적 60기 격파', stat: 'kills', goal: 60, reward: { gold: 300 } },
+  { id: 'kills60', name: '섬멸 작전', desc: '적 60기 격파', stat: 'kills', goal: 60, reward: { gold: 300 } },
   { id: 'floors12', name: '연전연승', desc: '전투 12회 클리어', stat: 'floors', goal: 12, reward: { gems: 100, mats: 80 } },
   { id: 'wins3', name: '삼전삼승', desc: '런 3회 클리어', stat: 'runsWon', goal: 3, reward: { gems: 200, docs: 20 } }
 ];
@@ -158,7 +158,7 @@ function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
     hp: 1 + (s - 1) * 0.65,     // 적/보스 체력 배수: S1=1 … S5=3.6
-    dmg: 1 + (s - 1) * 0.42,    // 적 공격 배수: S1=1 … S5=2.68 (성벽 압박)
+    dmg: 1 + (s - 1) * 0.42,    // 적 공격 배수: S1=1 … S5=2.68 (방벽 압박)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
   };
@@ -275,36 +275,36 @@ const COMBATS = [
 // 개편 원칙: 선택 시 '항상' 효과가 있어야 함(무효화 없음) + 판(페그/장애물)을 건드리지 않음(겹침 방지).
 //   → 골칸 개방/버프 칸(포켓 꽉 차면 무효)·증식판/범퍼 설치(페그 겹침)는 제거하고 순수 스탯 보상으로 교체.
 const REWARDS = [
-  { id: 'heal',  name: '🔧 수리',   desc: '성벽 HP +30',                  apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 30); } },
-  { id: 'atk',   name: '⚔️ 연마',   desc: '모든 캐릭터 공격력 +1',         apply: (S) => { S.atkBonus += 1; } },
-  { id: 'maxhp', name: '🏰 증축',   desc: '성벽 최대 HP +40 (+즉시 회복)', apply: (S) => { S.wallHpMax += 40; S.wallHp += 40; } },
-  { id: 'ball',  name: '➕ 증설',   desc: '이번 런 장전 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
-  { id: 'power', name: '🎯 정예화', desc: '모든 캐릭터 공격력 +2',         apply: (S) => { S.atkBonus += 2; } },
-  { id: 'fort',  name: '🛡 요새화', desc: '성벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
+  { id: 'heal',  name: '🔧 수리',      desc: '방벽 HP +30',                  apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 30); } },
+  { id: 'atk',   name: '🔩 화력 조정', desc: '모든 캐릭터 공격력 +1',         apply: (S) => { S.atkBonus += 1; } },
+  { id: 'maxhp', name: '🧱 방벽 보강', desc: '방벽 최대 HP +40 (+즉시 회복)', apply: (S) => { S.wallHpMax += 40; S.wallHp += 40; } },
+  { id: 'ball',  name: '➕ 탄창 증설', desc: '이번 런 장전 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
+  { id: 'power', name: '💥 화력 증폭', desc: '모든 캐릭터 공격력 +2',         apply: (S) => { S.atkBonus += 2; } },
+  { id: 'fort',  name: '🛡 요새화',    desc: '방벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
 ];
 
-// ═══════════════ 유물(렐릭) ═══════════════
-// 태그 5종(클래스 3 + 보드 2). 같은 태그 유물 3개 → 세트 보너스.
+// ═══════════════ 모듈(구 '유물/렐릭' — 표시명만 변경, 내부 id·상수명 RELICS 등은 그대로) ═══════════════
+// 태그 5종(클래스 3 + 보드 2). 같은 태그 모듈 3개 → 세트 보너스.
 const RELIC_TAGS = {
   precision: { name: '정밀', icon: '🎯', color: '#ff6b6b', cls: 'gunner',  set: '모든 사격 치명타 확률 +20%' },
   explosive: { name: '폭발', icon: '💥', color: '#ffb057', cls: 'cannon',  set: '모든 사격이 인접 적에게 20% 스플래시' },
-  guard:     { name: '수호', icon: '🛡', color: '#5ce0a0', cls: 'support', set: '성벽이 무너질 때 1회 HP 50%로 버팀' },
-  pinball:   { name: '핀볼', icon: '🔮', color: '#b58cff', cls: null,      set: '매 턴 첫 발사 볼의 콤보 보너스 ×2' },
-  harvest:   { name: '수확', icon: '💰', color: '#ffd93b', cls: null,      set: '모든 충전 착지 +1' }
+  guard:     { name: '방호', icon: '🛡', color: '#5ce0a0', cls: 'support', set: '방벽이 무너질 때 1회 HP 50%로 버팀' },
+  pinball:   { name: '핀볼', icon: '🟣', color: '#b58cff', cls: null,      set: '매 턴 첫 발사 볼의 콤보 보너스 ×2' },
+  harvest:   { name: '보급', icon: '📦', color: '#ffd93b', cls: null,      set: '모든 충전 착지 +1' }
 };
 const RELIC_SET_N = 3;
-// 유물: 같은 유물을 다시 고르면 Lv2 = 진화(이름·효과 변경). lv1/lv2 = 효과 파라미터.
+// 모듈: 같은 모듈을 다시 고르면 Lv2 = 개량(구 '진화' — 이름·효과 변경). lv1/lv2 = 효과 파라미터.
 const RELICS = {
-  // 🔮 핀볼
+  // 🎱 핀볼
   elastic:    { tag: 'pinball',   icon: '🟢', name: '탄성 코어', lv1: { desc: '장애물 범퍼에 맞으면 20% 확률로 충전볼 +1', p: 0.2 },
                 lv2: { name: '분열탄', desc: '장애물 범퍼에 맞으면 50% 확률로 충전볼 +1', p: 0.5 } },
   chain:      { tag: 'pinball',   icon: '⛓', name: '연쇄 반응', lv1: { desc: '한 볼로 10콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 10 },
                 lv2: { name: '연쇄 폭주', desc: '한 볼로 6콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 6 } },
-  multishot:  { tag: 'pinball',   icon: '🎱', name: '다중 발사', lv1: { desc: '매 턴 첫 발사 때 볼 2개 동시 발사', n: 2 },
+  multishot:  { tag: 'pinball',   icon: '🔫', name: '다중 발사', lv1: { desc: '매 턴 첫 발사 때 볼 2개 동시 발사', n: 2 },
                 lv2: { name: '삼연발', desc: '매 턴 첫 발사 때 볼 3개 동시 발사', n: 3 } },
-  // 💰 수확
-  midas:      { tag: 'harvest',   icon: '🪙', name: '황금 손', lv1: { desc: '골드 페그가 충전볼 +1 추가', balls: 1, gmul: 1 },
-                lv2: { name: '미다스', desc: '골드 페그: 골드 ×2 · 충전볼 +2', balls: 2, gmul: 2 } },
+  // 📦 보급
+  midas:      { tag: 'harvest',   icon: '🪙', name: '자원 회수기', lv1: { desc: '크레딧 페그가 충전볼 +1 추가', balls: 1, gmul: 1 },
+                lv2: { name: '대량 회수기', desc: '크레딧 페그: 크레딧 ×2 · 충전볼 +2', balls: 2, gmul: 2 } },
   overcharge: { tag: 'harvest',   icon: '⚡', name: '과충전', lv1: { desc: '증폭 페그 충전 ×3 → ×4', charge: 4 },
                 lv2: { name: '초과충전', desc: '증폭 페그 충전 ×5', charge: 5 } },
   lucky:      { tag: 'harvest',   icon: '🍀', name: '행운 포켓', lv1: { desc: '충전 칸 착지 시 15% 확률로 충전 ×3', p: 0.15 },
@@ -312,47 +312,47 @@ const RELICS = {
   // 🎯 정밀
   crit:       { tag: 'precision', icon: '🎯', name: '치명탄', lv1: { desc: '치명타 15% (피해 ×2)', p: 0.15, mult: 2 },
                 lv2: { name: '급소 사격', desc: '치명타 25% (피해 ×2.5)', p: 0.25, mult: 2.5 } },
-  pierce:     { tag: 'precision', icon: '🏹', name: '관통탄', lv1: { desc: '사격이 뒤 적 1명을 추가 관통(50% 피해)', n: 1, mult: 0.5 },
-                lv2: { name: '철갑탄', desc: '사격이 뒤 적 2명을 추가 관통(70% 피해)', n: 2, mult: 0.7 } },
-  focus:      { tag: 'precision', icon: '🔭', name: '저격 집중', lv1: { desc: '같은 적을 연속 타격할수록 피해 +10% (최대 5중첩)', per: 0.10 },
-                lv2: { name: '처형자', desc: '같은 적을 연속 타격할수록 피해 +15% (최대 5중첩)', per: 0.15 } },
+  pierce:     { tag: 'precision', icon: '📌', name: '관통탄', lv1: { desc: '사격이 뒤 적 1기를 추가 관통(50% 피해)', n: 1, mult: 0.5 },
+                lv2: { name: '철갑탄', desc: '사격이 뒤 적 2기를 추가 관통(70% 피해)', n: 2, mult: 0.7 } },
+  focus:      { tag: 'precision', icon: '🔭', name: '락온 사격', lv1: { desc: '같은 적을 연속 타격할수록 피해 +10% (최대 5중첩)', per: 0.10 },
+                lv2: { name: '풀 락온', desc: '같은 적을 연속 타격할수록 피해 +15% (최대 5중첩)', per: 0.15 } },
   // 💥 폭발
   shrapnel:   { tag: 'explosive', icon: '🧨', name: '파편탄', lv1: { desc: '적 처치 시 인접 적에게 처치 피해의 30%', mult: 0.3, rad: 1 },
                 lv2: { name: '유탄 파편', desc: '적 처치 시 주변 2칸 적에게 처치 피해의 50%', mult: 0.5, rad: 2 } },
   blast:      { tag: 'explosive', icon: '🎆', name: '연쇄 폭발', lv1: { desc: '광역 스킬 타격 수 +2', count: 2, mult: 1 },
                 lv2: { name: '대폭발', desc: '광역 스킬 타격 수 +4 · 피해 +20%', count: 4, mult: 1.2 } },
-  powder:     { tag: 'explosive', icon: '🛢', name: '화약고', lv1: { desc: '전투 시작 시 모든 적에게 (총 탄약 × 1) 피해', mult: 1 },
-                lv2: { name: '탄약고 폭발', desc: '전투 시작 시 모든 적에게 (총 탄약 × 2) 피해', mult: 2 } },
-  // 🛡 수호
-  steel:      { tag: 'guard',     icon: '🧱', name: '강철 성벽', lv1: { desc: '성벽 최대 HP +20% · 매 턴 5 회복', pct: 0.2, heal: 5 },
-                lv2: { name: '철옹성', desc: '성벽 최대 HP +35% · 매 턴 10 회복', pct: 0.35, heal: 10 } },
-  plate:      { tag: 'guard',     icon: '🔰', name: '장갑판', lv1: { desc: '성벽이 받는 피해 -20%', red: 0.2 },
-                lv2: { name: '철갑 성벽', desc: '성벽이 받는 피해 -35%', red: 0.35 } },
-  delay:      { tag: 'guard',     icon: '⏱', name: '전술 지연', lv1: { desc: '적이 전진할 때 10% 확률로 멈춤', p: 0.1 },
-                lv2: { name: '시간 왜곡', desc: '적이 전진할 때 20% 확률로 멈춤', p: 0.2 } }
+  powder:     { tag: 'explosive', icon: '🛢', name: '선제 포격', lv1: { desc: '전투 시작 시 모든 적에게 (총 탄약 × 1) 피해', mult: 1 },
+                lv2: { name: '집중 포화', desc: '전투 시작 시 모든 적에게 (총 탄약 × 2) 피해', mult: 2 } },
+  // 🛡 방호
+  steel:      { tag: 'guard',     icon: '🧱', name: '재생 방벽', lv1: { desc: '방벽 최대 HP +20% · 매 턴 5 회복', pct: 0.2, heal: 5 },
+                lv2: { name: '초재생 방벽', desc: '방벽 최대 HP +35% · 매 턴 10 회복', pct: 0.35, heal: 10 } },
+  plate:      { tag: 'guard',     icon: '🔰', name: '장갑판', lv1: { desc: '방벽이 받는 피해 -20%', red: 0.2 },
+                lv2: { name: '복합 장갑', desc: '방벽이 받는 피해 -35%', red: 0.35 } },
+  delay:      { tag: 'guard',     icon: '🔌', name: '전자 교란', lv1: { desc: '적이 전진할 때 10% 확률로 멈춤', p: 0.1 },
+                lv2: { name: 'EMP 펄스', desc: '적이 전진할 때 20% 확률로 멈춤', p: 0.2 } }
 };
-// 메타 해금: 처음엔 보드 태그(핀볼·수확) 전부 + 클래스 태그 1종씩(=첫 판부터 세트 가능).
-// 스테이지 첫 클리어마다 RELIC_UNLOCK_ORDER 순서로 2종씩 해금 → S3 첫 클리어 시 전 유물 해금.
+// 메타 해금: 처음엔 보드 태그(핀볼·보급) 전부 + 클래스 태그 1종씩(=첫 판부터 세트 가능).
+// 스테이지 첫 클리어마다 RELIC_UNLOCK_ORDER 순서로 2종씩 해금 → S3 첫 클리어 시 전 모듈 해금.
 const RELIC_START_UNLOCKED = ['elastic', 'chain', 'multishot', 'midas', 'overcharge', 'lucky', 'crit', 'shrapnel', 'steel'];
 const RELIC_UNLOCK_ORDER = ['pierce', 'blast', 'plate', 'focus', 'powder', 'delay'];
 
 // ═══════════════ 분기 맵(A안: 스테이지 안의 한 판) ═══════════════
-// 층 0 = 첫 전투, 층 1~4 = 갈림길(일반/엘리트/상점/휴식), 층 5 = 보스.
+// 층 0 = 첫 전투, 층 1~4 = 갈림길(일반/정예/상점/정비), 층 5 = 보스.
 const MAP_CFG = {
   floors: 6,
-  nodeTypes: { battle: { icon: '⚔', name: '전투' }, elite: { icon: '💀', name: '엘리트' }, shop: { icon: '🛒', name: '상점' },
-               rest: { icon: '⛺', name: '휴식' }, boss: { icon: '👑', name: '보스' } },
+  nodeTypes: { battle: { icon: '💥', name: '전투' }, elite: { icon: '💀', name: '정예' }, shop: { icon: '🛒', name: '상점' },
+               rest: { icon: '🔧', name: '정비' }, boss: { icon: '👾', name: '보스' } },
   weights: { battle: 48, elite: 18, shop: 16, rest: 18 }
 };
-// 노드별 전투 구성(웨이브 = 마릿수). 층이 깊을수록 커짐. 엘리트는 정예 적 1 포함 + 웨이브 증가.
+// 노드별 전투 구성(웨이브 = 마릿수). 층이 깊을수록 커짐. 정예 노드는 정예 적 1 포함 + 웨이브 증가.
 function nodeCombat(type, floor) {
   const base = 6 + floor * 2, mk = n => new Array(n).fill('x');
-  if (type === 'elite') return { name: '엘리트', elite: true, waves: [mk(base + 1), mk(base + 3), mk(base + 5)] };
+  if (type === 'elite') return { name: '정예', elite: true, waves: [mk(base + 1), mk(base + 3), mk(base + 5)] };
   return { name: '전투', waves: [mk(base), mk(base + 2), mk(base + 4)] };
 }
 const ELITE = { hpMul: 3.2, dmgMul: 1.8, expMul: 4, gold: 60 };   // 정예 적 배수·보상
 const SHOP_PRICE = { relic: 120, relicEvo: 150, heal: 60 };        // 상점(런 골드)
-const REST_HEAL = 0.4;                                             // 휴식: 최대 HP 40% 회복
+const REST_HEAL = 0.4;                                             // 정비: 최대 HP 40% 회복
 
 // ═══════════════ 스킬 → 다음 판 변화 / 적 → 판 간섭 ═══════════════
 // 스킬을 쓰면 다음 장전 판에 흔적을 남김(빌드·연계 재미). kind: 판에 추가할 페그 or 포켓 효과.
@@ -414,7 +414,7 @@ function openBlankTemp(S) {
   const cand = S.pockets.filter(p => p.type === 'blank' && lanesWithChar.has(p.lane));
   if (cand.length) cand[0].type = 'charge';
 }
-// 판에 페그 추가(보상·유물·스킬·적 간섭 공용). 반환: 추가된 페그 배열.
+// 판에 페그 추가(보상·모듈·스킬·적 간섭 공용). 반환: 추가된 페그 배열.
 //  - 모든 페그(터진 페그 포함 — 다음 턴 부활하므로)와 최소 간격 확보
 //  - 고정 장애물(범퍼/기둥)과 겹치지 않게 회피
 //  - opts.avoidLaunch: 중앙 발사열(fx 0.42~0.58) 회피(영구 반사체용 — 수직 발사 정면충돌 방지)

@@ -246,7 +246,7 @@ body {
 #battle-main { flex: 1; display: flex; min-height: 0; }
 #stage-wrap { position: relative; flex: 1; min-width: 0; min-height: 0; }
 #stage { display: block; width: 100%; height: 100%; touch-action: none; }
-/* 사이드바 = 포켓 행부터(자동버튼) 하단까지(스킬) 우측 24%. 캐릭터/성벽은 풀폭이라 그 위는 안 덮음. */
+/* 사이드바 = 포켓 행부터(자동버튼) 하단까지(스킬) 우측 24%. 캐릭터/방벽은 풀폭이라 그 위는 안 덮음. */
 #battle-side { position: absolute; right: 0; top: 28.5%; bottom: 0; width: 17%;
   display: flex; flex-direction: column; gap: 6px; padding: 4px 4px 8px 2px; }
 .side-toggles { display: flex; flex-direction: column; gap: 6px; flex: 0 0 auto; }
@@ -552,7 +552,7 @@ body {
 #tab-home { background-image: url('assets/bg/bg_lobby.png'), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
 #login { background-image: url('assets/bg/bg_login.png'), linear-gradient(180deg, #0d0b1ecc 0%, #0d0b1eee 55%, #0d0b1ef8 100%), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); background-size: cover, cover, cover; background-position: center; background-repeat: no-repeat; }
 
-/* ═══ 유물 바(전투 상단) ═══ */
+/* ═══ 모듈 바(전투 상단) ═══ */
 #combat { position: relative; }
 #relic-bar, #map-relics { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 1cqw; min-height: 6cqw; cursor: pointer; }
 .rb-it { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 6.6cqw; height: 6.6cqw; border-radius: 1.6cqw;
@@ -595,7 +595,7 @@ body {
 .map-node.reach .mn-nm { color: var(--amber); }
 @keyframes nodePulse { 0%,100% { box-shadow: 0 0 0 0 #ffcf5c66, 0 4px 12px #0008; transform: scale(1); } 50% { box-shadow: 0 0 0 8px #ffcf5c00, 0 4px 12px #0008; transform: scale(1.07); } }
 
-/* ═══ 유물 카드(보상·상점) ═══ */
+/* ═══ 모듈 카드(보상·상점) ═══ */
 .relic-card { text-align: left; }
 .rc-top { display: flex; align-items: center; gap: 1.6cqw; flex-wrap: wrap; }
 .rc-ic { display: inline-flex; align-items: center; justify-content: center; width: 8cqw; height: 8cqw; border-radius: 2cqw; background: #ffffff10; font-size: 5cqw; flex: 0 0 auto; }
@@ -603,7 +603,7 @@ body {
 .rc-tag { font-size: 2.6cqw; font-weight: 800; border: 1px solid; border-radius: 999px; padding: 0.3cqw 1.6cqw; }
 .rc-evo { font-size: 2.6cqw; font-weight: 900; color: #3a2a05; background: var(--amber); border-radius: 999px; padding: 0.3cqw 1.6cqw; }
 .relic-card .rc-desc { margin-top: 1.4cqw; }
-/* 상점·휴식 */
+/* 상점·정비 */
 .shop-list { display: flex; flex-direction: column; gap: 2cqw; margin: 3cqw 0; text-align: left; max-height: 58vh; overflow-y: auto; }
 .shop-item { display: flex; flex-direction: column; gap: 1.4cqw; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 3cqw; padding: 2.6cqw 3cqw; }
 .shop-item .rc-desc { font-size: 3.1cqw; color: var(--muted); }
@@ -612,7 +612,7 @@ body {
 .sh-gold { color: var(--amber); }
 .rest-opts { display: flex; flex-direction: column; gap: 2.4cqw; margin-top: 3cqw; }
 .reward-card:disabled { opacity: .45; cursor: default; }
-/* 유물 정보 */
+/* 모듈 정보 */
 .ri-row { display: flex; gap: 2cqw; align-items: flex-start; text-align: left; padding: 2cqw 0; border-bottom: 1px solid #ffffff12; }
 .ri-body b { font-size: 3.6cqw; }
 .ri-body .rc-desc { font-size: 3cqw; color: var(--muted); margin-top: 0.6cqw; }
@@ -623,7 +623,7 @@ body {
 .ri-set span { font-size: 2.6cqw; color: var(--muted); }
 #run-modal .modal-box { max-height: 90vh; overflow-y: auto; }
 
-/* ═══ 토스트(유물 획득·세트 완성) ═══ */
+/* ═══ 토스트(모듈 장착·세트 완성) ═══ */
 .toast { position: absolute; left: 50%; top: 14%; z-index: 80; transform: translate(-50%, -12px); opacity: 0; pointer-events: none;
   width: max-content; max-width: 86cqw; word-break: keep-all; text-align: center; font-size: 3.8cqw; font-weight: 800; color: #fff; padding: 2.4cqw 5cqw; border-radius: 3cqw;   /* width:max-content = left:50% 때문에 폭이 절반으로 줄어 글자 중간에서 줄바꿈되던 문제 방지 */
   background: rgba(14, 10, 28, .94); border: 2px solid var(--c, #ffcf5c); box-shadow: 0 8px 26px #000a, 0 0 18px color-mix(in srgb, var(--c, #ffcf5c) 40%, transparent);

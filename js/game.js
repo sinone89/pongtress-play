@@ -33,7 +33,7 @@
   }
 
   // ============ 레이아웃(phase별 영역 비율) ============
-  // 위→아래: 적 필드 / 성벽(캐릭터) / 골 포켓(성벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
+  // 위→아래: 적 필드 / 방벽(캐릭터) / 골 포켓(방벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
   // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
   const LOAD_FRAC = { field: .15, wall: .13, goal: .13, pins: .59 };   // 골칸 영역 확대(캐릭터 이름 라벨 공간)
   const BATTLE_FRAC = { field: .72, wall: .24, goal: .02, pins: .02 };
@@ -50,7 +50,7 @@
     let y = 0; const r = {};
     const boardW = W * (1 - SIDE_FR);   // 포켓·핀볼판은 우측 사이드바 폭만큼 좁힘(스킬 버튼 공간)
     r.field = { x: 0, y, w: W, h: H * f.field }; y += r.field.h;   // 적 필드=풀폭
-    r.wall = { x: 0, y, w: W, h: H * f.wall }; y += r.wall.h;      // 캐릭터·성벽=풀폭(우측 빈공간 없음)
+    r.wall = { x: 0, y, w: W, h: H * f.wall }; y += r.wall.h;      // 캐릭터·방벽=풀폭(우측 빈공간 없음)
     r.goal = { x: 0, y, w: boardW, h: H * f.goal }; y += r.goal.h;  // 포켓=보드폭(우측=자동버튼)
     r.pins = { x: 0, y, w: boardW, h: H * f.pins };
     return r;
@@ -299,7 +299,7 @@
       const type = (c && sub < golN) ? 'charge' : 'blank';
       S.pockets.push({ lane, type });
     }
-    // 버프 칸(보상): 꽝칸 일부를 버프(성벽 회복) 칸으로
+    // 버프 칸(보상): 꽝칸 일부를 버프(방벽 회복) 칸으로
     let bb = S.buffBonus || 0;
     for (const p of S.pockets) { if (bb <= 0) break; if (p.type === 'blank') { p.type = 'buff'; bb--; } }
   }
@@ -320,7 +320,7 @@
     for (const p of S.pegs) p.alive = true;   // 특수·일반 페그 턴마다 부활
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = []; S.launchedThisTurn = 0; S.turnMaxCombo = 0;
-    const heal = rv('steel', 'heal');          // 강철 성벽: 매 턴 회복
+    const heal = rv('steel', 'heal');          // 재생 방벽: 매 턴 회복
     if (heal && S.wallHp < S.wallHpMax && S._turns) { S.wallHp = Math.min(S.wallHpMax, S.wallHp + heal); anim.floats.push({ x: W / 2, y: layout().wall.y + 14, text: '🧱+' + heal, color: '#5ce0a0', t: 1, ld: true }); }
     applyBoardEffects();                        // 스킬 흔적 + 적 간섭(이번 턴 판 변화)
     $('c-phase').textContent = '장전';
@@ -528,13 +528,13 @@
     if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 페그 연쇄 폭발
     convertPeg(p, def, px, py);
   }
-  // 페그 → 충전볼 변환(일반1 · ×2→2 · ×5→5 · 골드 · 증폭). 유물(황금 손·과충전) 반영. 페그는 턴마다 부활.
+  // 페그 → 충전볼 변환(일반1 · ×2→2 · ×5→5 · 골드 · 증폭). 모듈(자원 회수기·과충전) 반영. 페그는 턴마다 부활.
   function convertPeg(p, def, px, py) {
     let n = 1 + (def.split || 0), charge = def.charge || 1;
     if (def.gold) {
       const g = def.gold * (rv('midas', 'gmul') || 1);
       S.gold = (S.gold || 0) + g; n += rv('midas', 'balls') || 0;
-      anim.floats.push({ x: px, y: py, text: '+' + g + 'G', color: def.color, t: 1, ld: true });
+      anim.floats.push({ x: px, y: py, text: '+' + g + '🪙', color: def.color, t: 1, ld: true });
     }
     if (def.charge > 1) {
       charge = rv('overcharge', 'charge') || def.charge;
@@ -559,7 +559,7 @@
     }
     if (popped) { addCombo(b, popped, px, py); anim.floats.push({ x: px, y: py - 14, text: '💥 ' + popped + '연쇄!', color: '#ff8a3a', t: 1.1, big: true, ld: true }); }
   }
-  // 콤보: 발사볼 1개가 연속으로 맞힌 페그·장애물 수. COMBO_STEP마다 보너스 충전볼(핀볼 세트: 첫 볼 ×2). 연쇄 반응 유물.
+  // 콤보: 발사볼 1개가 연속으로 맞힌 페그·장애물 수. COMBO_STEP마다 보너스 충전볼(핀볼 세트: 첫 볼 ×2). 연쇄 반응 모듈.
   function addCombo(b, k, x, y) {
     if (!b || b.harvest) return;
     b.combo = (b.combo || 0) + k;
@@ -589,7 +589,7 @@
     if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ld: true }); }
     if (pk && pk.type === 'charge') {
       const c = S.chars.find(ch => ch.lane === pk.lane);
-      let amt = (b.charge || 1) + (S.setsOn.harvest ? 1 : 0);                            // 수확 세트: +1
+      let amt = (b.charge || 1) + (S.setsOn.harvest ? 1 : 0);                            // 보급 세트: +1
       const lp = rv('lucky', 'p'); if (lp && Math.random() < lp) { amt *= 3; anim.floats.push({ x: px, y: g.y - 22, text: '🍀 ×3', color: '#7ef29a', t: 1, ld: true }); }
       if (jack) amt *= JACKPOT_MUL;
       if (c) { c.ammo += amt; c.gauge += amt; renderSkills(); }
@@ -601,7 +601,7 @@
       Sound.play('charge');
       anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: '#6cf', t: 1, ld: true });
     } else if (jack) {                            // 꽝 칸이라도 잭팟이면 골드
-      S.gold = (S.gold || 0) + 10; anim.floats.push({ x: px, y: g.y + 10, text: '+10G', color: '#ffd93b', t: 1, ld: true });
+      S.gold = (S.gold || 0) + 10; anim.floats.push({ x: px, y: g.y + 10, text: '+10🪙', color: '#ffd93b', t: 1, ld: true });
     }
   }
 
@@ -628,11 +628,11 @@
       // 일반 공격: 탄환 수만큼
       for (let k = 0; k < c.ammo; k++) S.shotQueue.push({ lane: c.lane, dmg: charDmg(c) });
     }
-    // 화약고: 전투 시작 시 모든 적에게 (총 탄약 × 배수) 피해
+    // 선제 포격: 전투 시작 시 모든 적에게 (총 탄약 × 배수) 피해
     const pm = rv('powder', 'mult');
     if (pm && S.enemies.length) {
       const ammo = S.chars.reduce((s, c) => s + c.ammo, 0), dmg = Math.round(ammo * pm);
-      if (dmg > 0) { for (const e of S.enemies.slice()) hitEnemy(e, { dmg, fx: 'aoe', sub: true, powder: true }); anim.floats.push({ x: W / 2, y: layout().field.y + 30, text: '🛢 화약고 -' + dmg, color: '#ffb057', t: 1.3, big: true }); anim.shake = Math.max(anim.shake, 8); }
+      if (dmg > 0) { for (const e of S.enemies.slice()) hitEnemy(e, { dmg, fx: 'aoe', sub: true, powder: true }); anim.floats.push({ x: W / 2, y: layout().field.y + 30, text: '🛢 선제 포격 -' + dmg, color: '#ffb057', t: 1.3, big: true }); anim.shake = Math.max(anim.shake, 8); }
     }
     // 탄환이 많으면 볼리(한 번에 여러 발) + 간격 단축으로 전투 총 시간을 battleWindow 근처로 유지
     const q = S.shotQueue.reduce((s, x) => s + (x.skill ? (x.sk.kind === 'extraShots' ? x.sk.shots : x.sk.kind === 'aoe' ? (x.sk.shots || 3) : x.sk.kind === 'bigHit' ? 1 : 0) : 1), 0);   // 스킬 사격 수 추정 포함
@@ -655,7 +655,7 @@
       anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + amt, color: '#6cf', t: 1.2, big: true });
       Sound.play('charge');
     }
-    else if (sk.kind === 'aoe') {   // 광역: 앞 N명 동시 타격(연쇄 폭발 유물: 타격 수·피해 증가)
+    else if (sk.kind === 'aoe') {   // 광역: 앞 N명 동시 타격(연쇄 폭발 모듈: 타격 수·피해 증가)
       const cnt = (sk.count || 4) + (rv('blast', 'count') || 0), m = (sk.mult || 1.3) * (rv('blast', 'mult') || 1) * mul;
       for (let k = 0; k < (sk.shots || 3); k++) S.shotQueue.push({ lane: c.lane, dmg: Math.round(charDmg(c) * m), aoe: cnt, big: true, fx: 'aoe' });
     }
@@ -749,7 +749,7 @@
   function hitEnemy(e, shot) {
     if (S.enemies.indexOf(e) < 0) return;                                                     // 이미 처치됨(연쇄 중복 방지)
     let dmg = shot.dmg, crit = false;
-    if (!shot.sub && rv('focus', 'per')) {                                                    // 저격 집중: 같은 적 연속 타격 중첩
+    if (!shot.sub && rv('focus', 'per')) {                                                    // 락온 사격: 같은 적 연속 타격 중첩
       if (S.focusId === e) S.focusStack = Math.min(5, (S.focusStack || 0) + 1); else { S.focusId = e; S.focusStack = 0; }
       dmg *= 1 + S.focusStack * rv('focus', 'per');
     }
@@ -796,7 +796,7 @@
     Sound.play('kill');
     { const kp = enemyPos(e); anim.fx.push({ type: 'boom', x: kp.x, y: kp.y, t: 1, color: e.color || '#ffcf5c', sm: !e.isBoss && !e.elite }); if (e.isBoss || e.elite) anim.shake = Math.max(anim.shake, 12); }   // 처치 폭발
     gainExp(e.exp);
-    if (e.elite) { S.gold = (S.gold || 0) + ELITE.gold; const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 24, text: '정예 격파! +' + ELITE.gold + 'G', color: '#ffd93b', t: 1.3, big: true }); }
+    if (e.elite) { S.gold = (S.gold || 0) + ELITE.gold; const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 24, text: '정예 격파! +' + ELITE.gold + '🪙', color: '#ffd93b', t: 1.3, big: true }); }
     if (rv('shrapnel', 'mult') && shot && !shot.shrap) {                                     // 파편탄: 처치 피해 일부를 주변에
       const d = Math.max(1, Math.round((dmg || shot.dmg || 0) * rv('shrapnel', 'mult'))), rad = rv('shrapnel', 'rad') || 1;
       for (const t of S.enemies.slice()) if (Math.abs(t.lane - e.lane) <= rad && Math.abs(t.row - e.row) <= rad) hitEnemy(t, { dmg: d, sub: true, splash: true, shrap: true, fx: 'rapid' });
@@ -842,7 +842,7 @@
     const red = rv('plate', 'red') || 0, dp = rv('delay', 'p') || 0;
     for (const e of S.enemies.slice()) {
       if (e.stun > 0) { e.stun--; continue; }   // 기절(스킬) — 이번 턴 전진 스킵
-      if (dp && !e.isBoss && Math.random() < dp) { const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 14, text: '⏱', color: '#8cf', t: 0.9 }); continue; }   // 전술 지연
+      if (dp && !e.isBoss && Math.random() < dp) { const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 14, text: '⏱', color: '#8cf', t: 0.9 }); continue; }   // 전자 교란(EMP)
       const isCharge = charge && e === boss;
       e.row -= (e.speed || 1) + (isCharge ? 2 : 0);   // 빠른 적(하운드)은 2칸, 타이탄 돌진 +2칸
       if (e.row < 0) {
@@ -850,14 +850,14 @@
         S.wallHp -= dmg;
         Sound.play('wall');
         anim.floats.push({ x: W * (0.2 + Math.random() * 0.6), y: layout().wall.y + 20, text: '-' + dmg, color: '#ff6b6b', t: 1.2, big: true });
-        anim.fx.push({ type: 'wallhit', t: 1 }); anim.fx.push({ type: 'flash', t: 1, color: '#ff2a2a', a: 0.28 }); anim.shake = Math.max(anim.shake, e.isBoss ? 18 : 12);   // 성벽 피격
+        anim.fx.push({ type: 'wallhit', t: 1 }); anim.fx.push({ type: 'flash', t: 1, color: '#ff2a2a', a: 0.28 }); anim.shake = Math.max(anim.shake, e.isBoss ? 18 : 12);   // 방벽 피격
         if (e.isBoss) { e.row = boss_retreatRow(); }   // 보스는 큰 피해 후 뒤로
         else { const i = S.enemies.indexOf(e); if (i >= 0) S.enemies.splice(i, 1); }
       }
     }
-    if (S.wallHp <= 0 && S.setsOn.guard && !S.guardUsed) {   // 수호 세트: 1회 버팀
+    if (S.wallHp <= 0 && S.setsOn.guard && !S.guardUsed) {   // 방호 세트: 1회 버팀
       S.guardUsed = true; S.wallHp = Math.round(S.wallHpMax * 0.5);
-      anim.floats.push({ x: W / 2, y: layout().wall.y, text: '🛡 수호 발동! 성벽 50%', color: '#5ce0a0', t: 1.6, big: true }); anim.shake = Math.max(anim.shake, 8);
+      anim.floats.push({ x: W / 2, y: layout().wall.y, text: '🛡 방호 발동! 방벽 50%', color: '#5ce0a0', t: 1.6, big: true }); anim.shake = Math.max(anim.shake, 8);
     }
     if (S.wallHp <= 0) { S.wallHp = 0; loseRun(); return; }
     // 드론 모함(정지형): 매 턴 경비봇 사출
@@ -922,12 +922,12 @@
   }
 
   // ============ 보상 ============
-  // 레벨업 보상: 짝수 레벨 = 유물 3택, 홀수 레벨 = 스탯 3택(빌드 밀도)
+  // 레벨업 보상: 짝수 레벨 = 모듈 3택, 홀수 레벨 = 스탯 3택(빌드 밀도)
   function showReward() {
     const lvl = S.rewardQueue[0];
     const next = () => { S.rewardQueue.shift(); S.pendingRewards = S.rewardQueue.length; syncHud(); if (S.rewardQueue.length > 0) showReward(); else advanceEnemies(); };
     const pendingText = S.rewardQueue.length > 1 ? '남은 보상 ' + S.rewardQueue.length + '개' : '';   // 안내 문구 없이 '남은 개수'만
-    if (lvl % 2 === 0) { showRelicPick({ title: '레벨 ' + lvl + ' · 유물', sub: pendingText, evoChance: 0.4 }, next); return; }
+    if (lvl % 2 === 0) { showRelicPick({ title: '레벨 ' + lvl + ' · 모듈', sub: pendingText, evoChance: 0.4 }, next); return; }
     const box = $('reward-choices'); box.replaceChildren();
     const pool = REWARDS.slice(); const pick = [];
     for (let i = 0; i < 3 && pool.length; i++) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
@@ -942,18 +942,18 @@
     $('reward').hidden = false;
   }
 
-  // ============ 유물 ============
+  // ============ 모듈 ============
   const rl = (id) => (S && S.relics && S.relics[id]) || 0;                              // 보유 레벨 0/1/2
   function rv(id, key) { const lv = rl(id); if (!lv) return 0; const d = RELICS[id]; return ((lv >= 2 ? d.lv2 : d.lv1) || {})[key] || 0; }
   function relicName(id, lv) { const d = RELICS[id]; return (lv >= 2 && d.lv2.name) ? d.lv2.name : d.name; }
   function relicPool() { const u = (Meta.unlockedRelics ? Meta.unlockedRelics() : Object.keys(RELICS)); return u.filter(id => RELICS[id]); }
-  // 후보 k개: 태그 가중치(편성 클래스·보유 태그) + 진화 후보(보장/확률)
+  // 후보 k개: 태그 가중치(편성 클래스·보유 태그) + 개량 후보(보장/확률)
   function relicOffer(k, opts) {
     opts = opts || {};
     const pool = relicPool().filter(id => rl(id) < 2);
     const clsCount = {}; for (const c of S.chars) clsCount[c.ref.cls] = (clsCount[c.ref.cls] || 0) + 1;
     const ownTag = {}; for (const id in S.relics) ownTag[RELICS[id].tag] = 1;
-    // 가중치: 클래스 씨앗 + 보유 태그(세트 유도). 이미 가진 Lv1 유물은 ×0.45(진화는 전용 칸이 담당 → 새 유물 위주로 폭 넓히기)
+    // 가중치: 클래스 씨앗 + 보유 태그(세트 유도). 이미 가진 Lv1 모듈은 ×0.45(개량는 전용 칸이 담당 → 새 모듈 위주로 폭 넓히기)
     const w = (id) => { const t = RELIC_TAGS[RELICS[id].tag]; return (1 + (t.cls ? (clsCount[t.cls] || 0) : 0.5) + (ownTag[RELICS[id].tag] ? 1 : 0)) * (rl(id) === 1 ? 0.45 : 1); };
     const out = [], evo = pool.filter(id => rl(id) === 1);
     if (evo.length && (opts.guaranteeEvo || Math.random() < (opts.evoChance || 0))) out.push(evo[Math.floor(Math.random() * evo.length)]);
@@ -969,14 +969,14 @@
     const d = RELICS[id], lv = rl(id), evo = lv === 1, T = RELIC_TAGS[d.tag];
     const L = evo ? d.lv2 : d.lv1;
     return '<div class="rc-top"><span class="rc-ic">' + uiIcon('relic_' + id, d.icon) + '</span><span class="rc-name">' + (evo ? d.lv2.name : d.name) + '</span>'
-      + '<span class="rc-tag" style="color:' + T.color + ';border-color:' + T.color + '66">' + T.icon + ' ' + T.name + '</span>' + (evo ? '<span class="rc-evo">★ 진화</span>' : '') + '</div>'
+      + '<span class="rc-tag" style="color:' + T.color + ';border-color:' + T.color + '66">' + T.icon + ' ' + T.name + '</span>' + (evo ? '<span class="rc-evo">★ 개량</span>' : '') + '</div>'
       + '<div class="rc-desc">' + L.desc + '</div>';
   }
   function showRelicPick(opts, done) {
     const ids = relicOffer(3, opts);
     if (!ids.length) { done && done(); return; }
     const box = $('reward-choices'); box.replaceChildren();
-    $('reward-title').textContent = opts.title || '유물 획득'; $('reward-sub').textContent = opts.sub || '';
+    $('reward-title').textContent = opts.title || '모듈 획득'; $('reward-sub').textContent = opts.sub || '';
     ids.forEach(id => {
       const b = document.createElement('button'); b.className = 'reward-card relic-card';
       b.innerHTML = relicCardHTML(id);
@@ -985,7 +985,7 @@
     });
     $('reward').hidden = false;
   }
-  // 유물 획득: Lv+1(최대 2) → 즉시 효과(강철 성벽 HP) → 세트 체크 → HUD
+  // 모듈 획득: Lv+1(최대 2) → 즉시 효과(재생 방벽 HP) → 세트 체크 → HUD
   function gainRelic(id) {
     const d = RELICS[id]; if (!d) return;
     const before = rl(id); if (before >= 2) return;
@@ -994,8 +994,8 @@
       const pct = (lv >= 2 ? d.lv2.pct : d.lv1.pct) - (before ? d.lv1.pct : 0), add = Math.round(S.wallBase * pct);
       S.wallHpMax += add; S.wallHp += add;
     }
-    toast((lv >= 2 ? '★ 진화! ' : '유물 획득 · ') + d.icon + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play('level');
-    // 세트: 같은 태그 유물 RELIC_SET_N개
+    toast((lv >= 2 ? '★ 개량! ' : '모듈 장착 · ') + d.icon + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play('level');
+    // 세트: 같은 태그 모듈 RELIC_SET_N개
     const cnt = {}; for (const k in S.relics) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
     for (const t in cnt) if (cnt[t] >= RELIC_SET_N && !S.setsOn[t]) {
       S.setsOn[t] = true;
@@ -1017,21 +1017,21 @@
     const cnt = {}; for (const k of ids) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
     let h = ids.map(id => '<span class="rb-it' + (rl(id) >= 2 ? ' evo' : '') + '" title="' + relicName(id, rl(id)) + '">' + uiIcon('relic_' + id, RELICS[id].icon) + (rl(id) >= 2 ? '<i>★</i>' : '') + '</span>').join('');
     h += Object.keys(cnt).map(t => '<span class="rb-set' + (S.setsOn[t] ? ' on' : '') + '" style="--c:' + RELIC_TAGS[t].color + '">' + RELIC_TAGS[t].icon + Math.min(cnt[t], RELIC_SET_N) + '/' + RELIC_SET_N + '</span>').join('');
-    el.innerHTML = h;                                   // 유물이 없으면 빈 채로 두고 CSS(:empty)로 숨김 — 안내 문구 없음
+    el.innerHTML = h;                                   // 모듈이 없으면 빈 채로 두고 CSS(:empty)로 숨김 — 안내 문구 없음
     const mr = $('map-relics'); if (mr) mr.innerHTML = h;
   }
   function openRelicInfo() {
     const box = $('run-modal-box'), ids = Object.keys(S.relics);
     const cnt = {}; for (const k of ids) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
-    box.innerHTML = '<h2>보유 유물</h2>'
-      + (ids.length ? ids.map(id => { const d = RELICS[id], lv = rl(id), T = RELIC_TAGS[d.tag]; return '<div class="ri-row"><span class="rc-ic">' + uiIcon('relic_' + id, d.icon) + '</span><div class="ri-body"><b>' + relicName(id, lv) + (lv >= 2 ? ' ★' : '') + '</b> <span class="rc-tag" style="color:' + T.color + ';border-color:' + T.color + '66">' + T.icon + T.name + '</span><div class="rc-desc">' + (lv >= 2 ? d.lv2 : d.lv1).desc + '</div></div></div>'; }).join('') : '<p class="muted">아직 유물이 없어요.</p>')
+    box.innerHTML = '<h2>보유 모듈</h2>'
+      + (ids.length ? ids.map(id => { const d = RELICS[id], lv = rl(id), T = RELIC_TAGS[d.tag]; return '<div class="ri-row"><span class="rc-ic">' + uiIcon('relic_' + id, d.icon) + '</span><div class="ri-body"><b>' + relicName(id, lv) + (lv >= 2 ? ' ★' : '') + '</b> <span class="rc-tag" style="color:' + T.color + ';border-color:' + T.color + '66">' + T.icon + T.name + '</span><div class="rc-desc">' + (lv >= 2 ? d.lv2 : d.lv1).desc + '</div></div></div>'; }).join('') : '<p class="muted">아직 모듈이 없어요.</p>')
       + '<div class="ri-sets">' + Object.keys(RELIC_TAGS).map(t => { const T = RELIC_TAGS[t], n = cnt[t] || 0; return '<div class="ri-set' + (S.setsOn[t] ? ' on' : '') + '" style="--c:' + T.color + '"><b>' + T.icon + ' ' + T.name + ' ' + Math.min(n, RELIC_SET_N) + '/' + RELIC_SET_N + '</b><span>' + T.set + '</span></div>'; }).join('') + '</div>'
       + '<button class="btn primary" data-close="1">닫기</button>';
     $('run-modal').hidden = false;
   }
 
   // ============ 승패 · 노드 진행 ============
-  // 전투 노드 클리어: 유물 3택(진화 1칸 보장) → 맵. 무한 모드 보스 → 다음 막.
+  // 전투 노드 클리어: 모듈 3택(개량 1칸 보장) → 맵. 무한 모드 보스 → 다음 막.
   function winCombat() {
     S.floorsCleared = (S.floorsCleared || 0) + 1;
     S.phase = 'map';
@@ -1045,7 +1045,7 @@
   function extraText(e) {
     let t = '';
     if (e.unlocked) t += ' · 스테이지 ' + e.unlocked + ' 해금!';
-    if (e.relicsUnlocked && e.relicsUnlocked.length) t += ' · 유물 해금: ' + e.relicsUnlocked.map(id => RELICS[id].icon + RELICS[id].name).join(', ');
+    if (e.relicsUnlocked && e.relicsUnlocked.length) t += ' · 모듈 해금: ' + e.relicsUnlocked.map(id => RELICS[id].icon + RELICS[id].name).join(', ');
     if (e.record) t += ' · 🏆 신기록!';
     if (e.dailyReward) t += ' · 일일 보상 💎' + e.dailyReward;
     return t;
@@ -1059,7 +1059,7 @@
     if (S.over) return; S.over = true;
     const e = Meta.onRunEnd(runInfo(false));
     const where = S.mode === 'endless' ? '무한 ' + (S.loop + 1) + '막 ' + (S.combatIndex + 1) + '층' : runLabel();
-    endResult(S.mode === 'endless' ? '원정 종료' : '패배', where + '에서 성벽이 무너졌습니다. 전투 ' + S.floorsCleared + '회 돌파 · 점수 ' + runScore(false) + ' · ' + earnedText(e) + extraText(e));
+    endResult(S.mode === 'endless' ? '작전 종료' : '패배', where + '에서 방벽이 붕괴했습니다. 전투 ' + S.floorsCleared + '회 돌파 · 점수 ' + runScore(false) + ' · ' + earnedText(e) + extraText(e));
   }
   function endResult(title, body) {
     $('map').hidden = true; $('run-modal').hidden = true; $('reward').hidden = true;
@@ -1068,12 +1068,12 @@
   }
 
   // ============ 분기 맵(A안) ============
-  // 층0=전투 → 층1~4 갈림길(전투/엘리트/상점/휴식) → 층5=보스. 일반 모드는 판마다 맵이 다름, 일일 도전은 시드 고정.
+  // 층0=전투 → 층1~4 갈림길(전투/정예/상점/정비) → 층5=보스. 일반 모드는 판마다 맵이 다름, 일일 도전은 시드 고정.
   function genMap() {
     const seed = S.mode === 'daily' ? ((S.seedBase || 1) + (S.loop || 0) * 104729) : ((Math.random() * 4294967295) >>> 0);
     const rng = makeRng(seed), F = MAP_CFG.floors, W8 = MAP_CFG.weights;
     const pick = (f) => {
-      if (f === 1) return 'battle';                              // 1층은 전투만(초반 휴식·상점은 의미 없음)
+      if (f === 1) return 'battle';                              // 1층은 전투만(초반 정비·상점은 의미 없음)
       const ent = Object.keys(W8);
       const tot = ent.reduce((s, t) => s + W8[t], 0); let r = rng() * tot;
       for (const t of ent) { r -= W8[t]; if (r <= 0) return t; }
@@ -1087,7 +1087,7 @@
     }
     const mids = floors.slice(2, F - 1).reduce((a, r) => a.concat(r), []);
     const force = (list, type) => { const c = list.filter(n => n.type === 'battle'); if (c.length) c[Math.floor(rng() * c.length)].type = type; };
-    if (!floors[F - 2].some(n => n.type === 'rest')) floors[F - 2][Math.floor(rng() * floors[F - 2].length)].type = 'rest';   // 보스 직전 휴식 보장
+    if (!floors[F - 2].some(n => n.type === 'rest')) floors[F - 2][Math.floor(rng() * floors[F - 2].length)].type = 'rest';   // 보스 직전 정비 보장
     if (!mids.some(n => n.type === 'elite')) force(mids, 'elite');
     if (!floors.slice(1, F - 1).some(r => r.some(n => n.type === 'shop'))) force(mids, 'shop');
     for (let f = 0; f < F - 1; f++) {                          // 연결: 가까운 노드끼리(모든 노드 진입/진출 보장)
@@ -1139,7 +1139,7 @@
     else if (n.type === 'shop') { showMap(); openShop(); }
     else if (n.type === 'rest') { showMap(); openRest(); }
   }
-  // 상점: 런 골드로 유물·진화·회복 구매(쓴 골드는 런 종료 정산에서 빠짐 → 선택의 무게)
+  // 상점: 런 골드로 모듈·개량·회복 구매(쓴 골드는 런 종료 정산에서 빠짐 → 선택의 무게)
   function openShop() {
     const key = S.mapPos.f + '-' + S.mapPos.i;
     if (!S.shop || S.shop.key !== key) S.shop = { key, relics: relicOffer(3, { evoChance: 0.5 }), sold: {}, healed: false };
@@ -1149,28 +1149,28 @@
       const evo = rl(id) === 1, price = evo ? SHOP_PRICE.relicEvo : SHOP_PRICE.relic, sold = sh.sold[id] || rl(id) >= 2;
       h += '<div class="shop-item' + (sold ? ' sold' : '') + '">' + relicCardHTML(id) + '<button class="btn sm" data-buy="' + id + '"' + (sold || g < price ? ' disabled' : '') + '>' + (sold ? '구매 완료' : '🪙 ' + price) + '</button></div>';
     }
-    h += '<div class="shop-item"><div class="rc-top"><span class="rc-ic">🩹</span><span class="rc-name">성벽 수리</span></div><div class="rc-desc">성벽 HP +30%</div><button class="btn sm" data-buy="heal"' + (sh.healed || g < SHOP_PRICE.heal ? ' disabled' : '') + '>' + (sh.healed ? '구매 완료' : '🪙 ' + SHOP_PRICE.heal) + '</button></div>';
+    h += '<div class="shop-item"><div class="rc-top"><span class="rc-ic">🔧</span><span class="rc-name">방벽 수리</span></div><div class="rc-desc">방벽 HP +30%</div><button class="btn sm" data-buy="heal"' + (sh.healed || g < SHOP_PRICE.heal ? ' disabled' : '') + '>' + (sh.healed ? '구매 완료' : '🪙 ' + SHOP_PRICE.heal) + '</button></div>';
     h += '</div><button class="btn primary" data-leave="1">떠나기</button>';
     $('run-modal-box').innerHTML = h; $('run-modal').hidden = false;
   }
   function shopBuy(what) {
     const sh = S.shop; if (!sh) return;
-    if (what === 'heal') { if (sh.healed || S.gold < SHOP_PRICE.heal) return; S.gold -= SHOP_PRICE.heal; sh.healed = true; S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * 0.3)); toast('🩹 성벽 수리 +30%', '#6cf'); }
+    if (what === 'heal') { if (sh.healed || S.gold < SHOP_PRICE.heal) return; S.gold -= SHOP_PRICE.heal; sh.healed = true; S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * 0.3)); toast('🔧 방벽 수리 +30%', '#6cf'); }
     else { const evo = rl(what) === 1, price = evo ? SHOP_PRICE.relicEvo : SHOP_PRICE.relic; if (sh.sold[what] || S.gold < price) return; S.gold -= price; sh.sold[what] = true; gainRelic(what); }
     Sound.play('charge'); openShop();
   }
-  // 휴식: 회복 또는 단련(보유 유물 1개 진화) 중 택1
+  // 정비: 수리 또는 개량(보유 모듈 1개를 Lv2로) 중 택1
   function openRest() {
     const lv1 = Object.keys(S.relics).filter(id => rl(id) === 1);
-    let h = '<h2>⛺ 휴식</h2><div class="rest-opts">'
-      + '<button class="reward-card" data-rest="heal"><div class="rc-name">💤 휴식</div><div class="rc-desc">성벽 HP +' + Math.round(REST_HEAL * 100) + '% 회복 (현재 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + ')</div></button>';
-    h += lv1.length ? lv1.map(id => '<button class="reward-card relic-card" data-rest="evo:' + id + '">' + '<div class="rc-top"><span class="rc-name">⚒ 단련 → ' + RELICS[id].lv2.name + '</span></div><div class="rc-desc">' + RELICS[id].lv2.desc + '</div></button>').join('')
-      : '<button class="reward-card" disabled><div class="rc-name">⚒ 단련</div><div class="rc-desc">진화할 유물이 없어요(Lv1 유물 필요)</div></button>';
+    let h = '<h2>🔧 정비</h2><div class="rest-opts">'
+      + '<button class="reward-card" data-rest="heal"><div class="rc-name">🔧 수리</div><div class="rc-desc">방벽 HP +' + Math.round(REST_HEAL * 100) + '% 회복 (현재 ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + ')</div></button>';
+    h += lv1.length ? lv1.map(id => '<button class="reward-card relic-card" data-rest="evo:' + id + '">' + '<div class="rc-top"><span class="rc-name">⚙️ 개량 → ' + RELICS[id].lv2.name + '</span></div><div class="rc-desc">' + RELICS[id].lv2.desc + '</div></button>').join('')
+      : '<button class="reward-card" disabled><div class="rc-name">⚙️ 개량</div><div class="rc-desc">개량할 모듈이 없어요(Lv1 모듈 필요)</div></button>';
     h += '</div>';
     $('run-modal-box').innerHTML = h; $('run-modal').hidden = false;
   }
   function restPick(v) {
-    if (v === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * REST_HEAL)); toast('💤 휴식 · 성벽 회복', '#6cf'); Sound.play('charge'); }
+    if (v === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * REST_HEAL)); toast('🔧 정비 · 방벽 회복', '#6cf'); Sound.play('charge'); }
     else if (v.indexOf('evo:') === 0) gainRelic(v.slice(4));
     $('run-modal').hidden = true; showMap();
   }
@@ -1230,7 +1230,7 @@
     const y = r.y + (CFG.fieldRows - 1 - e.row + 0.5) * (r.h / CFG.fieldRows);
     return { x, y };
   }
-  // 성벽 위 캐릭터(발사 주체) 위치
+  // 방벽 위 캐릭터(발사 주체) 위치
   function charPos(c) {
     const r = layout().wall; const laneW = r.w / CFG.lanes;
     return { x: r.x + (c.lane + 0.5) * laneW, y: r.y + r.h / 2 - 4 };
@@ -1297,7 +1297,7 @@
     // 필드 배경
     if (bgField) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgField, fr.x, fr.y, fr.w, fr.h); ctx.restore(); }
     else { ctx.fillStyle = '#ffffff08'; ctx.fillRect(fr.x, fr.y, fr.w, fr.h); }
-    // 위험 지대(맨 아래 행 = 성벽 접점) 강조 → 적이 다가옴을 인지
+    // 위험 지대(맨 아래 행 = 방벽 접점) 강조 → 적이 다가옴을 인지
     ctx.fillStyle = '#ff5b5b16'; ctx.fillRect(fr.x, fr.y + fr.h - cellH, fr.w, cellH);
     // 전진 칸 격자(레인 세로 + 행 가로)
     ctx.strokeStyle = '#ffffff16'; ctx.lineWidth = 1; ctx.beginPath();
@@ -1351,7 +1351,7 @@
         ctx.fillStyle = urgent ? '#ffd0d0' : '#ffe9a8'; ctx.fillText(label, tx, ty + 1); ctx.restore();
       }
     }
-    // 성벽(캐릭터 방어선)
+    // 방벽(캐릭터 방어선)
     const wr = r.wall, cw = wr.w / CFG.lanes;
     if (bgWall) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgWall, wr.x, wr.y, wr.w, wr.h); ctx.restore(); }
     else { ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h); }
@@ -1361,7 +1361,7 @@
     for (const c of S.chars) {
       const fire = c.fireT || 0;
       const x = wr.x + (c.lane + 0.5) * cw;
-      const feetY = wr.y + wr.h * 0.72 - fire * 4;      // 발치를 성벽 HP바 위로(겹침 방지)
+      const feetY = wr.y + wr.h * 0.72 - fire * 4;      // 발치를 방벽 HP바 위로(겹침 방지)
       // 레인색 발판(캐릭터↔같은색 골칸 매칭 인지용)
       ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = laneHex(c.lane);
       ctx.beginPath(); ctx.ellipse(x, feetY, cw * 0.34, Math.max(4, wr.h * 0.06), 0, 0, 7); ctx.fill(); ctx.restore();
@@ -1379,7 +1379,7 @@
         ctx.fillStyle = '#ffcf5c'; ctx.font = 'bold ' + Math.round(bh * 0.72) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('×' + c.ammo, bx + bw / 2, by + bh / 2 + 1); ctx.textBaseline = 'alphabetic';
       }
     }
-    // 성벽 HP 바(두껍게 + 큰 글자)
+    // 방벽 HP 바(두껍게 + 큰 글자)
     const hbH = Math.max(8, Math.round(wr.h * 0.16)), hbY = wr.y + wr.h - hbH - 3, hbW = wr.w - 16;
     ctx.fillStyle = '#0007'; ctx.fillRect(wr.x + 8, hbY, hbW, hbH);
     ctx.fillStyle = '#46e6d0'; ctx.fillRect(wr.x + 8, hbY, hbW * Math.max(0, S.wallHp / S.wallHpMax), hbH);
@@ -1522,9 +1522,9 @@
     // 스킬 임팩트 이펙트(종류별)
     for (const f of anim.fx) {
       const t = Math.max(0, Math.min(1, f.t));
-      if (f.type === 'flash') {                                 // 화면 전체 섬광(대형 스킬·성벽 피격)
+      if (f.type === 'flash') {                                 // 화면 전체 섬광(대형 스킬·방벽 피격)
         ctx.globalAlpha = t * (f.a || 0.35); ctx.fillStyle = f.color || '#fff'; ctx.fillRect(0, 0, W, H);
-      } else if (f.type === 'wallhit') {                        // 성벽 피격: 붉은 충격 띠 + 균열선
+      } else if (f.type === 'wallhit') {                        // 방벽 피격: 붉은 충격 띠 + 균열선
         const wr = r.wall, g2 = ctx.createLinearGradient(0, wr.y, 0, wr.y + wr.h);
         g2.addColorStop(0, 'rgba(255,40,40,0)'); g2.addColorStop(0.5, 'rgba(255,60,60,' + (0.65 * t).toFixed(3) + ')'); g2.addColorStop(1, 'rgba(255,40,40,0)');
         ctx.fillStyle = g2; ctx.fillRect(0, wr.y - wr.h * 0.15, W, wr.h * 1.3);
@@ -1675,7 +1675,7 @@
       for (let i = anim.shots.length - 1; i >= 0; i--) { anim.shots[i].t += d * 4.6; if (anim.shots[i].t >= 1.15) anim.shots.splice(i, 1); }
       for (const c of S.chars) if (c.fireT > 0) c.fireT = Math.max(0, c.fireT - d * 4);
       for (const e of S.enemies) if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 3.2);
-      if (S.phase !== 'map' && S.pockets.length) draw();   // 맵(상점·휴식 포함) 중엔 캔버스 갱신 불필요
+      if (S.phase !== 'map' && S.pockets.length) draw();   // 맵(상점·정비 포함) 중엔 캔버스 갱신 불필요
     }
     requestAnimationFrame(loop);
   }
@@ -1725,7 +1725,7 @@
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
   $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
-  // 맵·상점·휴식·유물 정보
+  // 맵·상점·정비·모듈 정보
   $('map-body').onclick = (e) => { const b = e.target.closest('[data-node]'); if (!b || b.disabled || !S) return; const [f, i] = b.dataset.node.split('-').map(Number); enterNode(f, i); };
   $('map-relics').onclick = () => { if (S) openRelicInfo(); };
   $('relic-bar').onclick = () => { if (S) openRelicInfo(); };
@@ -1734,7 +1734,7 @@
     const buy = e.target.closest('[data-buy]'); if (buy && !buy.disabled) { shopBuy(buy.dataset.buy); return; }
     const rest = e.target.closest('[data-rest]'); if (rest && !rest.disabled) { restPick(rest.dataset.rest); return; }
     if (e.target.closest('[data-leave]')) { $('run-modal').hidden = true; showMap(); return; }
-    if (e.target.closest('[data-close]') || e.target === $('run-modal')) {   // 유물 정보 닫기(상점·휴식은 선택 필요)
+    if (e.target.closest('[data-close]') || e.target === $('run-modal')) {   // 모듈 정보 닫기(상점·정비은 선택 필요)
       const inShopRest = $('run-modal-box').querySelector('[data-buy],[data-rest]');
       if (!inShopRest) $('run-modal').hidden = true;
     }
@@ -1752,7 +1752,7 @@
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
     get S() { return S; }, get anim() { return anim; }, get idle() { return Meta.idleDebug ? Meta.idleDebug() : null; }, startRun, launchBall, enterBattle, CFG,
-    showMap, enterNode, gainRelic, relicOffer, genMap, applyBoardEffects, advanceEnemies,
+    showMap, enterNode, gainRelic, relicOffer, genMap, applyBoardEffects, advanceEnemies, showReward, showRelicPick, openShop, openRest, openRelicInfo, loseRun,
     setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(1.3, CFG.pegStep)); },
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     render() { if (S) draw(); }
@@ -1780,7 +1780,7 @@
         if (!$('result').hidden) { done('result:' + $('result-title').textContent); return; }
         if (mode === 'endless' && S.loop >= maxLoop) { done('loop' + S.loop); return; }
         if (!$('reward').hidden) { const b = document.querySelector('#reward-choices .reward-card'); if (b) b.click(); return; }
-        if (!$('run-modal').hidden) {                       // 상점: 살 수 있는 첫 유물 → 떠나기 / 휴식: 첫 선택
+        if (!$('run-modal').hidden) {                       // 상점: 살 수 있는 첫 모듈 → 떠나기 / 정비: 첫 선택
           const box = $('run-modal-box'), buy = box.querySelector('[data-buy]:not([disabled])'), rest = box.querySelector('[data-rest]:not([disabled])');
           if (buy) { buy.click(); return; } if (rest) { rest.click(); return; }
           const lv = box.querySelector('[data-leave],[data-close]'); if (lv) lv.click(); return;

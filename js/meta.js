@@ -48,17 +48,17 @@ const Meta = (function () {
     Object.keys(M.owned).forEach(id => { if (!ROSTER.some(c => c.id === id)) delete M.owned[id]; });
     while (M.party.length < 3) M.party.push(null);
     M.party = M.party.slice(0, 3).map(id => (id && M.owned[id]) ? id : null);
-    // 유물 해금·모드·기록(전방호환)
+    // 모듈 해금·모드·기록(전방호환)
     if (!Array.isArray(M.relicsUnlocked)) M.relicsUnlocked = RELIC_START_UNLOCKED.slice();
     M.relicsUnlocked = M.relicsUnlocked.filter(id => RELICS[id]);
     M.clearedStages = M.clearedStages || {};
-    delete M.startRelic;                                   // 시작 유물 기능 제거 — 구 세이브에 남은 선택값 정리
+    delete M.startRelic;                                   // 시작 모듈 기능 제거 — 구 세이브에 남은 선택값 정리
     if (!MODES[M.runMode]) M.runMode = 'normal';
     M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
     M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
     save();
   }
-  // ── 유물 해금 / 출격 옵션(모드·일일 시드) ──
+  // ── 모듈 해금 / 출격 옵션(모드·일일 시드) ──
   function unlockedRelics() { return (M && M.relicsUnlocked) ? M.relicsUnlocked.slice() : RELIC_START_UNLOCKED.slice(); }
   function todayKey() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function dateSeed(key) { let h = 2166136261; for (const ch of key) { h ^= ch.charCodeAt(0); h = Math.imul(h, 16777619); } return h >>> 0; }
@@ -193,7 +193,7 @@ const Meta = (function () {
     if (r.won) M.stats.runsWon += 1;
     if (r.won && mode === 'normal') {
       if ((r.stage || 1) >= M.maxStage && M.maxStage < STAGE_MAX) { M.maxStage = Math.min(STAGE_MAX, (r.stage || 1) + 1); unlocked = M.maxStage; }
-      if (!M.clearedStages[r.stage]) {            // 스테이지 첫 클리어 → 유물 2종 해금
+      if (!M.clearedStages[r.stage]) {            // 스테이지 첫 클리어 → 모듈 2종 해금
         M.clearedStages[r.stage] = true;
         relicsUnlocked = RELIC_UNLOCK_ORDER.filter(id => M.relicsUnlocked.indexOf(id) < 0).slice(0, 2);
         M.relicsUnlocked = M.relicsUnlocked.concat(relicsUnlocked);
@@ -212,7 +212,7 @@ const Meta = (function () {
 
   // ═══════════ 로비 UI ═══════════
   function rarTag(rar) { const R = RARITY[rar] || RARITY.common; return '<span class="rar" style="color:' + R.color + '">' + R.name + '</span>'; }
-  function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => ({ gold: '🪙', mats: '🔩', gems: '💎', docs: '📜', shards: '🔷' }[k] + v)).join(' '); }
+  function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => ({ gold: '🪙', mats: '🔩', gems: '💎', docs: '📄', shards: '🔷' }[k] + v)).join(' '); }
 
   function renderBar() {
     $('cur-gold').textContent = M.currencies.gold;
@@ -243,7 +243,7 @@ const Meta = (function () {
     const mode = M.runMode || 'normal';
     const ms = $('mode-select');                  // 모드: 일반 / 일일 도전 / 무한
     if (ms) {
-      const tabs = [['normal', '⚔', '일반'], ['daily', '📅', '일일 도전'], ['endless', '♾', '무한']];
+      const tabs = [['normal', '💥', '일반'], ['daily', '📅', '일일 도전'], ['endless', '♾', '무한']];
       // 설명 문구 없이 '기록·보상 상태'만 표시 (없으면 줄 자체를 만들지 않음)
       const parts = [];
       if (mode === 'daily') {
@@ -539,13 +539,13 @@ const Meta = (function () {
     rars.forEach(rar => {
       const list = ROSTER.filter(c => c.rarity === rar); if (!list.length) return;
       const R = RARITY[rar] || {}, g = RAR_G[rar] || 'g-n', price = DOC_SHOP.price[rar];
-      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 <span class="sns-sub">· 개당 📜' + price + '</span></div>';
+      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 <span class="sns-sub">· 개당 📄' + price + '</span></div>';
       h += list.map(c => {
         const owned = !!M.owned[c.id], can = owned && M.currencies.docs >= price;
         return '<div class="sns-card' + (owned ? '' : ' locked') + '"><div class="sns-row">'
           + '<div class="shop-ico">' + (owned ? '<img src="' + CharArt.path(c.id, 'load') + '" alt="" onerror="this.remove()">' : '<span class="lock-ic">🔒</span>') + '</div>'
           + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? '🔷 보유 조각 ' + (M.shards[c.id] || 0) : '요원 미보유') + '</div></div>'
-          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? '📜' + price : '미보유') + '</button>'
+          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? '📄' + price : '미보유') + '</button>'
           + '</div></div>';
       }).join('');
     });
@@ -559,7 +559,7 @@ const Meta = (function () {
   }
   function renderShop() {
     const el = $('shop-body'); if (!el) return;
-    const tabs = [['gacha', 'ic_gacha', '🎰', '가챠'], ['doc', 'cur_docs', '📜', '문서'], ['pkg', 'ic_package', '💳', '패키지']];
+    const tabs = [['gacha', 'ic_gacha', '🎰', '가챠'], ['doc', 'cur_docs', '📄', '문서'], ['pkg', 'ic_package', '💳', '패키지']];
     let h = '<div class="sns-tabs shoptabs">' + tabs.map(t => '<button class="sns-tab' + (shopTab === t[0] ? ' on' : '') + '" data-stab="' + t[0] + '">' + uiIcon(t[1], t[2]) + ' ' + t[3] + '</button>').join('') + '</div>';
     h += shopTab === 'doc' ? shopDocBody() : shopTab === 'pkg' ? shopPkgBody() : shopGachaBody();
     el.innerHTML = h;
@@ -595,14 +595,14 @@ const Meta = (function () {
   function renderCheat() {
     const box = $('cheat-box');
     box.innerHTML = '<h2>치트 · 디버그</h2>'
-      + '<p class="muted">🪙' + M.currencies.gold + ' 🔩' + M.currencies.mats + ' 💎' + M.currencies.gems + ' 📜' + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
+      + '<p class="muted">🪙' + M.currencies.gold + ' 🔩' + M.currencies.mats + ' 💎' + M.currencies.gems + ' 📄' + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
       + '<div class="cd-btns">'
       + '<button class="btn" data-cheat="cur">화폐 전체 +9999</button>'
       + '<button class="btn" data-cheat="unlock">전 캐릭터 획득</button>'
       + '<button class="btn" data-cheat="shards">모든 조각 +999</button>'
       + '<button class="btn" data-cheat="max">전 캐릭터 Lv·★ 최대</button>'
       + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
-      + '<button class="btn" data-cheat="relics">전 유물 해금</button>'
+      + '<button class="btn" data-cheat="relics">전 모듈 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
@@ -636,14 +636,14 @@ const Meta = (function () {
   function renderLobby() { renderBar(); renderTab(); }
 
   // ── 캐릭터 상세 모달 (스틸앤샷式: 프레임 초상화 + 정보 + 스킬 + 레벨업/승급 탭) ──
-  const PEG_NM = { mult2: '×2 증식', mult5: '×5 증식', bumper: '범퍼', attack: '공격', gold: '골드' };
+  const PEG_NM = { mult2: '×2 증식', mult5: '×5 증식', bumper: '범퍼', attack: '공격', gold: '크레딧' };
   function skillText(sk) {
     switch (sk.kind) {
       case 'bigHit': return '맨 앞 적에게 공격력 ×' + sk.mult + ' 강타';
       case 'extraShots': return '이번 턴 추가 ' + sk.shots + '발 사격';
-      case 'aoe': return '앞 ' + sk.count + '명에게 광역 포격 (공격 ×' + (sk.mult || 1) + ')';
-      case 'heal': return '성벽 HP +' + sk.amount + ' 회복';
-      case 'stun': return '앞 ' + sk.count + '명 ' + (sk.turns || 1) + '턴 기절';
+      case 'aoe': return '앞 ' + sk.count + '기에게 광역 포격 (공격 ×' + (sk.mult || 1) + ')';
+      case 'heal': return '방벽 HP +' + sk.amount + ' 회복';
+      case 'stun': return '앞 ' + sk.count + '기 ' + (sk.turns || 1) + '턴 기절';
       case 'addPeg': return '핀볼판에 ' + (PEG_NM[sk.peg] || sk.peg) + ' 페그 +' + sk.n;
       case 'addBall': return '전투 시작 장전 볼 +' + sk.n;
       case 'closeBlank': return '전투 시작 시 꽝 포켓 ' + sk.n + '칸 개방';
@@ -666,7 +666,7 @@ const Meta = (function () {
     const gcls = RAR_G[b.rarity] || 'g-n';
     let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">★</span>';
     // 현재 → 다음 스탯 비교 박스 + 성장 액션(스틸앤샷式)
-    const STAT = [['⚔', '공격', 'atk'], ['🛡', '체력', 'hp'], ['🎯', '골칸', 'gol']];
+    const STAT = [['💥', '공격', 'atk'], ['🛡', '체력', 'hp'], ['🎯', '골칸', 'gol']];
     const cur = statAt(id, o.level, o.star);
     let box6, box7, actLabel, actAttr, actEnabled;
     if (cdTab === 'promote') {
