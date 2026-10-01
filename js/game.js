@@ -840,11 +840,21 @@
       }
     }
     const red = rv('plate', 'red') || 0, dp = rv('delay', 'p') || 0;
-    for (const e of S.enemies.slice()) {
+    // 전진: 방벽에 가까운 적부터 한 칸씩 — 앞칸이 비어야 나아가고, 막히면 비어 있는 옆 앞칸으로 비켜 가며, 그래도 막히면 멈춘다(같은 칸에 겹치지 않음)
+    const marchOrder = S.enemies.slice().sort((a, b) => (a.row - b.row) || (a.lane - b.lane));
+    for (const e of marchOrder) {
       if (e.stun > 0) { e.stun--; continue; }   // 기절(스킬) — 이번 턴 전진 스킵
       if (dp && !e.isBoss && Math.random() < dp) { const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 14, text: '⏱', color: '#8cf', t: 0.9 }); continue; }   // 전자 교란(EMP)
       const isCharge = charge && e === boss;
-      e.row -= (e.speed || 1) + (isCharge ? 2 : 0);   // 빠른 적(하운드)은 2칸, 타이탄 돌진 +2칸
+      let steps = (e.speed || 1) + (isCharge ? 2 : 0);   // 빠른 적(하운드)은 2칸, 타이탄 돌진 +2칸
+      while (steps-- > 0) {
+        if (e.row <= 0) { e.row = -1; break; }                       // 방벽 도달
+        const nr = e.row - 1;
+        if (cellFree(e.lane, nr, e)) { e.row = nr; continue; }
+        const sides = [e.lane - 1, e.lane + 1].filter(l => l >= 0 && l < CFG.fieldLanes && cellFree(l, nr, e));
+        if (!sides.length) break;                                    // 앞이 막혀 제자리
+        e.lane = sides[Math.floor(Math.random() * sides.length)]; e.row = nr;
+      }
       if (e.row < 0) {
         const dmg = Math.round(e.dmg * (isCharge ? 1.5 : 1) * (1 - red));
         S.wallHp -= dmg;
@@ -855,6 +865,7 @@
         else { const i = S.enemies.indexOf(e); if (i >= 0) S.enemies.splice(i, 1); }
       }
     }
+    resolveOverlaps();   // 보스 후퇴 등으로 칸이 겹쳤으면 비켜 세움
     if (S.wallHp <= 0 && S.setsOn.guard && !S.guardUsed) {   // 방호 세트: 1회 버팀
       S.guardUsed = true; S.wallHp = Math.round(S.wallHpMax * 0.5);
       anim.floats.push({ x: W / 2, y: layout().wall.y, text: '🛡 방호 발동! 방벽 50%', color: '#5ce0a0', t: 1.6, big: true }); anim.shake = Math.max(anim.shake, 8);
@@ -872,21 +883,52 @@
   }
 
   function boss_retreatRow() { return Math.min(CFG.fieldRows - 1, Math.round(CFG.fieldRows / 2)); }
+
+  // ── 칸 점유(겹침 방지): 레인×행 칸마다 적은 1기만 ──
+  function cellFree(lane, row, ignore) { for (const x of S.enemies) if (x !== ignore && x.lane === lane && x.row === row) return false; return true; }
+  // 새 적 등장 칸: 가장 위 행부터 레인 순서대로 빈 칸(minRow 미만은 쓰지 않음). 자리가 없으면 null
+  function spawnCell(prefLane, minRow) {
+    const lo = minRow == null ? CFG.spawnMinRow : minRow;
+    for (let r = CFG.fieldRows - 1; r >= lo; r--) for (let k = 0; k < CFG.fieldLanes; k++) { const l = (prefLane + k) % CFG.fieldLanes; if (cellFree(l, r)) return { lane: l, row: r }; }
+    return null;
+  }
+  // 기준 칸에서 가장 가까운 빈 칸 — 같은 레인 뒤쪽(위) > 옆 레인 > 앞쪽(방벽 쪽) 순으로 선호
+  function nearestFree(lane, row, isFree) {
+    let best = null, bestD = Infinity;
+    for (let r = 0; r < CFG.fieldRows; r++) for (let l = 0; l < CFG.fieldLanes; l++) {
+      if (!isFree(l, r)) continue;
+      const dr = r - row, d = Math.abs(l - lane) * 1.1 + (dr >= 0 ? dr * 0.8 : -dr * 1.6);
+      if (d < bestD) { bestD = d; best = { lane: l, row: r }; }
+    }
+    return best;
+  }
+  // 겹친 적을 가까운 빈 칸으로 비켜 세운다(보스 → 방벽에 가까운 적 순으로 칸을 차지하고 나머지가 비킴)
+  function resolveOverlaps() {
+    const order = S.enemies.slice().sort((a, b) => ((b.isBoss ? 1 : 0) - (a.isBoss ? 1 : 0)) || (a.row - b.row) || (a.lane - b.lane));
+    const taken = new Set(), movers = [];
+    for (const e of order) { if (e.row < 0) continue; const k = e.lane + ',' + e.row; if (taken.has(k)) movers.push(e); else taken.add(k); }
+    for (const e of movers) { const c = nearestFree(e.lane, e.row, (l, r) => !taken.has(l + ',' + r)); if (c) { e.lane = c.lane; e.row = c.row; taken.add(c.lane + ',' + c.row); } }
+  }
+
   function summonAdd() {                        // 드론 모함 경비봇 사출
     if (!S.bossDef || S.enemies.length >= 22) return;
-    const def = ENEMIES[S.bossDef.addType || 'sentry'], lane = Math.floor(Math.random() * CFG.fieldLanes), hp = Math.round(def.hp * S.scale.hp);
-    S.enemies.push({ type: S.bossDef.addType || 'sentry', name: def.name, lane, row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
+    const cell = spawnCell(Math.floor(Math.random() * CFG.fieldLanes), CFG.fieldRows - 2);   // 맨 위 두 행의 빈 칸에만 등장
+    if (!cell) return;
+    const def = ENEMIES[S.bossDef.addType || 'sentry'], lane = cell.lane, hp = Math.round(def.hp * S.scale.hp);
+    S.enemies.push({ type: S.bossDef.addType || 'sentry', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
   }
 
   function spawnWave() {
     const w = S.waves.shift(); if (!w) return;
-    w.forEach((_, k) => {
+    let placed = 0;
+    for (let k = 0; k < w.length; k++) {
+      const cell = spawnCell(k % CFG.fieldLanes); if (!cell) break;   // 빈 칸에만 등장(앞 웨이브와 겹치지 않음)
       const type = pickEnemyType(S.stage), def = ENEMIES[type];   // 종류는 스테이지 풀에서 (웨이브 길이=마릿수)
-      const lane = k % CFG.fieldLanes;
-      const row = CFG.fieldRows - 1 - Math.floor(k / CFG.fieldLanes);
       const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type, name: def.name, lane, row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
-    });
+      S.enemies.push({ type, name: def.name, lane: cell.lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
+      placed++;
+    }
+    if (placed < w.length) S.waves.unshift(new Array(w.length - placed).fill('x'));   // 자리가 모자라면 남은 수는 다음 턴에 마저 등장
   }
 
   function spawnBoss() {
@@ -904,7 +946,7 @@
     while (e.thHit < b.thresholds.length && frac <= b.thresholds[e.thHit]) {
       e.thHit++;
       if (b.kind === 'titan') {   // 돌격형: 과열 정지(후퇴 + 스턴)
-        e.row = Math.min(CFG.fieldRows - 1, e.row + b.retreat); e.stun = b.stunTurns;
+        e.row = Math.min(CFG.fieldRows - 1, e.row + b.retreat); e.stun = b.stunTurns; resolveOverlaps();   // 뒤로 물러난 자리에 있던 적은 비켜 세움
         anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '과열!', color: '#ffcf5c', t: 1.2 });
       } else if (b.kind === 'swarm') {   // 분리형: 슬러지 분리
         splitSwarm(e, b.splitCount);
@@ -915,9 +957,11 @@
   function splitSwarm(e, n) {
     const def = ENEMIES.sludge;
     for (let i = 0; i < (n || 2) && S.enemies.length < 26; i++) {
-      const lane = Math.max(0, Math.min(CFG.fieldLanes - 1, e.lane + (i - Math.floor(n / 2))));
+      const want = Math.max(0, Math.min(CFG.fieldLanes - 1, e.lane + (i - Math.floor(n / 2))));
+      const cell = nearestFree(want, e.row, (l, r) => cellFree(l, r)); if (!cell) break;   // 분리체도 빈 칸에 (겹침 없음)
+      const lane = cell.lane;
       const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type: 'sludge', name: def.name, lane, row: e.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0 });
+      S.enemies.push({ type: 'sludge', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0 });
     }
   }
 

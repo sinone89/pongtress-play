@@ -630,6 +630,11 @@ body {
 .ri-set b { display: block; font-size: 3cqw; color: var(--c); }
 .ri-set span { font-size: 2.6cqw; color: var(--muted); }
 #run-modal .modal-box { max-height: 90vh; overflow-y: auto; }
+/* 모듈 선택·상점·정비 팝업: 가로 폭 확장(여백 축소) + 단어 단위 줄바꿈 — 설명 글이 글자 중간에서 끊기지 않게 */
+#reward.modal, #run-modal.modal { padding: 2.4cqw; }
+#reward .modal-box, #run-modal .modal-box { max-width: 96cqw; padding: 3.4cqw 3cqw; max-height: 92vh; overflow-y: auto; }   /* 글자가 크게 설정된 기기에서 화면보다 길어지면 스크롤 */
+#reward .reward-card, #run-modal .reward-card { padding: 3cqw; }
+.reward-card .rc-desc, .shop-item .rc-desc, .ri-body .rc-desc { word-break: keep-all; overflow-wrap: break-word; text-wrap: pretty; }
 
 /* ═══ 토스트(모듈 장착·세트 완성) ═══ */
 .toast { position: absolute; left: 50%; top: 14%; z-index: 80; transform: translate(-50%, -12px); opacity: 0; pointer-events: none;
