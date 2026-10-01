@@ -53,7 +53,12 @@ const Sound = (function () {
   };
 
   function play(name) { if (muted) return; ensure(); if (sfx[name]) sfx[name](); }
-  function syncIcons() { document.querySelectorAll('.mute-icon').forEach(el => el.textContent = muted ? '🔇' : '🔊'); }
+  function syncIcons() {   // 음소거 버튼: ic_sound / ic_mute 이미지(content.js 의 uiIcon 이 로드된 뒤부터), 없으면 이모지
+    document.querySelectorAll('.mute-icon').forEach(el => {
+      const fb = muted ? '🔇' : '🔊';
+      if (typeof uiIcon === 'function') el.innerHTML = uiIcon(muted ? 'ic_mute' : 'ic_sound', fb, 'width:1.15em;height:1.15em'); else el.textContent = fb;
+    });
+  }
   function setMuted(m) { muted = m; try { localStorage.setItem('pongtress_muted', m ? '1' : '0'); } catch (e) {} if (master) master.gain.value = m ? 0 : 0.5; syncIcons(); }
   function toggle() { ensure(); resume(); setMuted(!muted); }
 

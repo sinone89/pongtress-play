@@ -32,7 +32,7 @@ body {
 #title { align-items: center; justify-content: space-between; padding: 0; position: relative; cursor: pointer; overflow: hidden; }
 #title-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; z-index: 0; }
 #title::after { content: ""; position: absolute; inset: 0; z-index: 1;
-  background: linear-gradient(180deg, #0d0b1ecc 0%, #0d0b1e55 30%, #0d0b1e55 60%, #0d0b1ef2 100%); }
+  background: linear-gradient(180deg, #0d0b1e88 0%, #0d0b1e22 30%, #0d0b1e22 62%, #0d0b1ed8 100%); }
 .title-top { position: relative; z-index: 2; text-align: center; padding: 64px 24px 0; width: 100%; }
 .title-btm { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 10px;
   padding: 0 24px calc(40px + env(safe-area-inset-bottom)); width: 100%; }
@@ -41,7 +41,7 @@ body {
 .logo { margin: 0; font-size: clamp(38px, 13vw, 68px); letter-spacing: 3px; font-weight: 800;
   background: linear-gradient(90deg, var(--cyan), var(--magenta), var(--amber));
   -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 3px 10px #0009); }
-.tagline { margin: 8px 0 0; color: var(--ink); opacity: .85; text-shadow: 0 1px 4px #000; }
+.tagline { margin: 8px 0 0; color: #fff; opacity: .95; font-weight: 700; text-shadow: 0 1px 3px #000, 0 0 10px #000c, 0 0 18px #000a; }   /* 배경 그림 위에서도 읽히게 이중 그림자 */
 
 /* 방치형 홈 = 자동전투 연출 풀블리드(빈공간 없이 꽉 채움) */
 #lobby-main { position: relative; }
@@ -300,6 +300,10 @@ body {
 .uic.ok > .uic-fb { display: none; }
 .uic.ok > .uic-im { display: block; }
 .cur .uic, .tabbtn .uic { width: 1.15em; height: 1.15em; }
+.sns-tab .uic { width: 1.35em; height: 1.35em; }       /* 상점 서브탭(가챠/문서/패키지) */
+.mute-btn .uic { width: 1.15em; height: 1.15em; }      /* 음소거 버튼 */
+.acct-btn .uic { width: 1.2em; height: 1.2em; }        /* 계정 버튼 */
+.mi-reward .uic { width: 1.1em; height: 1.1em; }
 
 /* 상단 통화 칩 */
 #lobby-top { gap: 1.6cqw; padding: 3cqw 3.4cqw; padding-top: max(3cqw, env(safe-area-inset-top)); font-size: 3.7cqw; }
@@ -548,9 +552,16 @@ body {
 
 /* ═══ 배경 이미지 슬롯 (파일 있으면 적용, 없으면 그라데이션 폴백) ═══
    background-image 목록의 이미지가 404면 그 레이어만 비고 아래 그라데이션이 그대로 보임 */
-#combat { background: url('assets/bg/bg_battle.png') center/cover no-repeat; }   /* 404 → 투명 → #app 그라데이션 */
-#tab-home { background-image: url('assets/bg/bg_lobby.png'), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
-#login { background-image: url('assets/bg/bg_login.png'), linear-gradient(180deg, #0d0b1ecc 0%, #0d0b1eee 55%, #0d0b1ef8 100%), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); background-size: cover, cover, cover; background-position: center; background-repeat: no-repeat; }
+#combat { background: url('../assets/bg/bg_battle.webp') center/cover no-repeat; }   /* 파일이 없으면 투명 → #app 그라데이션 */
+#tab-home { background-image: url('../assets/bg/bg_lobby.webp'), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
+#login { background-image: linear-gradient(180deg, #0d0b1e55 0%, #0d0b1e88 50%, #0d0b1ec8 100%), url('../assets/bg/bg_login.webp'), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); background-size: cover, cover, cover; background-position: center; background-repeat: no-repeat; }   /* 위에서부터: 가독성용 어둡힘 → 배경 → 폴백 그라데이션 */
+
+/* 로고 이미지(assets/logo.webp) — 불러오면 글자 로고 대신 표시 */
+.logo-wrap .logo-im { display: none; }
+.logo-wrap.ok .logo-im { display: block; width: 100%; height: auto; margin: 0 auto; }
+.logo-wrap.ok .logo-tx { display: none; }
+.title-top .logo-wrap.ok { background: none; filter: drop-shadow(0 4px 14px #000b); width: min(88%, 430px); margin: 0 auto; }
+#login .lg-logo.ok { background: none; filter: drop-shadow(0 4px 12px #000b); width: min(82%, 380px); margin: 0; }
 
 /* ═══ 모듈 바(전투 상단) ═══ */
 #combat { position: relative; }

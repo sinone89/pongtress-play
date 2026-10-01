@@ -88,7 +88,7 @@ const Meta = (function () {
   }
   const RAR_G = { common: 'g-n', rare: 'g-r', epic: 'g-e', legendary: 'g-l' };   // 등급 배너 클래스
   // UI 아이콘은 content.js 전역 uiIcon(name, emoji, style) 사용
-  function clsIcon(cls) { const c = CLASS[cls] || {}; return uiIcon('cls_' + cls, c.icon || '🔫'); }
+  function clsIcon(cls) { const c = CLASS[cls] || {}; return ui('cls_' + cls, c.icon || '🔫'); }
   function partySlots() { return M.party.slice(0, 3); }        // [id|null ×3]
   function ownedIds() { return Object.keys(M.owned); }
   function stage() { return M.stage; }
@@ -212,7 +212,7 @@ const Meta = (function () {
 
   // ═══════════ 로비 UI ═══════════
   function rarTag(rar) { const R = RARITY[rar] || RARITY.common; return '<span class="rar" style="color:' + R.color + '">' + R.name + '</span>'; }
-  function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => ({ gold: '🪙', mats: '🔩', gems: '💎', docs: '📄', shards: '🔷' }[k] + v)).join(' '); }
+  function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => uiCur(k) + v).join(' '); }
 
   function renderBar() {
     $('cur-gold').textContent = M.currencies.gold;
@@ -227,7 +227,7 @@ const Meta = (function () {
     let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="sc-st' + (owned && s <= o.star ? ' on' : '') + '">★</span>';
     return '<button class="stchar' + (owned ? '' : ' locked') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '">'
       + '<div class="sc-top"><div class="sc-grade ' + g + '">' + R.name + '</div><div class="sc-star">' + stars + '</div></div>'
-      + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()">'
+      + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()">'
       +   (owned ? '<span class="sc-lv">Lv.' + o.level + '</span>' : '<span class="sc-lv locked">미보유</span>')
       +   (opts.inParty ? '<span class="onbadge">편성</span>' : '')
       + '</div>'
@@ -243,13 +243,13 @@ const Meta = (function () {
     const mode = M.runMode || 'normal';
     const ms = $('mode-select');                  // 모드: 일반 / 일일 도전 / 무한
     if (ms) {
-      const tabs = [['normal', '💥', '일반'], ['daily', '📅', '일일 도전'], ['endless', '♾', '무한']];
+      const tabs = [['normal', ui('ic_battle', '💥'), '일반'], ['daily', ui('ic_timer', '📅'), '일일 도전'], ['endless', '♾', '무한']];
       // 설명 문구 없이 '기록·보상 상태'만 표시 (없으면 줄 자체를 만들지 않음)
       const parts = [];
       if (mode === 'daily') {
         const rec = M.dailyRec && M.dailyRec.date === todayKey() ? M.dailyRec : { best: 0, rewarded: false };
         if (rec.best) parts.push('오늘 최고 <b>' + rec.best + '</b>점');
-        if (!rec.rewarded) parts.push('첫 클리어 💎' + MODES.daily.reward.gems);
+        if (!rec.rewarded) parts.push('첫 클리어 ' + uiCur('gems') + MODES.daily.reward.gems);
       } else if (mode === 'endless' && M.endlessBest.score > 0) {
         parts.push('최고 <b>' + (M.endlessBest.loop + 1) + '막 ' + M.endlessBest.floors + '전투</b> (' + M.endlessBest.score + '점)');
       }
@@ -263,7 +263,7 @@ const Meta = (function () {
       let h = '<div class="ss-btns">';
       for (let s = 1; s <= STAGE_MAX; s++) {
         const locked = s > M.maxStage, sel = s === M.stage;
-        h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? '🔒' : s) + '</button>';
+        h += '<button class="ss-btn' + (sel ? ' sel' : '') + (locked ? ' locked' : '') + '" data-stage="' + s + '"' + (locked ? ' disabled' : '') + '>' + (locked ? ui('ic_lock', '🔒') : s) + '</button>';
       }
       ss.innerHTML = h + '</div>';
     }
@@ -275,7 +275,7 @@ const Meta = (function () {
         if (id) {
           const c = leveledDef(id), b = base(id), R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n';
           d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
-            + '<div class="ls-img"><img src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()"></div>'
+            + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()"></div>'
             + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
         } else d.innerHTML = '<span class="lane-empty">–</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
         box.append(d);
@@ -297,14 +297,14 @@ const Meta = (function () {
   function renderIdleCard() {
     const el = $('idle-reward'); if (!el) return;
     const p = idlePending(), hh = Math.floor(p.mins / 60), mm = Math.floor(p.mins % 60), has = (p.gold + p.mats) > 0;
-    el.innerHTML = '<div class="il-top"><b>⏳ 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분</span></div>'
-      + '<div class="il-row"><span class="il-amt">🪙 ' + p.gold + '  🔩 ' + p.mats + '</span>'
+    el.innerHTML = '<div class="il-top"><b>' + ui('ic_idle', '⏳') + ' 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분</span></div>'
+      + '<div class="il-row"><span class="il-amt">' + uiCur('gold') + ' ' + p.gold + '  ' + uiCur('mats') + ' ' + p.mats + '</span>'
       + '<button class="sns-btn sm" data-idle="claim"' + (has ? '' : ' disabled') + '>받기</button></div>';
   }
 
   // ── 방치 홈 자동전투 연출(코스메틱) ──
-  // 캐릭터가 '장전(정면 대기 포즈) → 점사(사격 포즈) → 재장전'을 반복한다.
-  // 포탄은 실측한 총구(MUZZLE)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
+  // 캐릭터가 '재장전(정면 대기·재장전 동작) → 돌아서서 점사(뒷모습 조준·발사 프레임) → 다시 정면'을 반복한다 — 전투와 같은 CharAnim.
+  // 포탄은 실측한 총구(SHEET_META)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
   let _idleRAF = 0, _idleDbg = null;
   function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }
   function idleDebug() { return _idleDbg; }
@@ -313,12 +313,13 @@ const Meta = (function () {
     const ctx = cv.getContext('2d'); const party = partySlots().filter(Boolean);
     const laneCol = ['#46e6d0', '#ffcf5c', '#ff5db1'];
     const eTypes = Object.keys(ENEMIES);                                 // 전투와 같은 적 6종·색(이미지 있으면 EnemyArt 매칭)
-    const FX_LIFE = { muz: 0.14, hit: 0.26, boom: 0.5 };
+    const FX_LIFE = { muz: 0.17, hit: 0.28, boom: 0.55 };
+    CharArt.preload(party, ['sheet', 'thumb']);                          // 편성 시트는 미리 받아 둔다(없으면 정면 썸네일 → 원형 순으로 폴백)
     // 모든 치수를 캔버스 크기(D.w/D.h) 비례로 — 현재 UI(프레임 폭) 확대에 맞춰 자동 스케일
     const D = { w: 0, h: 0, U: 1, en: [], pj: [], fx: [], cs: [], cardT: 0, cardH: 0, groundY: 0, charS: 0, now: 0 };
     D.cs = party.map((id, i) => {
       const t = 0.5 + i * 0.55 + Math.random() * 0.4;                    // 캐릭터마다 시작 시점을 어긋나게(동시 사격 방지)
-      return { id, i, cls: (base(id) || {}).cls, st: 'ready', t, rl: t, burst: 0, cd: 0, hold: 0, recoil: 0, sw: 0, ph: Math.random() * 6.28 };
+      return { id, i, cls: (base(id) || {}).cls, st: 'ready', t, rl: t, burst: 0, cd: 0, hold: 0, a: CharAnim.create(id) };
     });
     function fit() {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -342,50 +343,43 @@ const Meta = (function () {
     function spawn() { if (D.en.length < 9) D.en.push(mkEnemy(-D.h * 0.04)); }
     for (let i = 0; i < 5; i++) D.en.push(mkEnemy(Math.random() * D.groundY * 0.55));
 
-    // 스프라이트 변환 — 그리기와 총구 좌표 계산이 같은 값을 쓴다(어긋남 방지)
-    function pose(c) {
-      const s = D.charS, pop = c.sw > 0 ? c.sw / 0.16 : 0;
-      const bob = c.st === 'ready' ? Math.sin(D.now * 2.4 + c.ph) * s * 0.010 : 0;     // 대기 중 숨쉬기
-      return { sx: 1 + 0.05 * pop, sy: 1 - 0.09 * pop, kx: -s * 0.045 * c.recoil, ky: bob + s * 0.012 * c.recoil };
-    }
-    function muzzle(c) {                                                                // 사격 스프라이트의 총구 섬광 중심(월드 좌표)
-      const s = D.charS, p = pose(c), a = muzzleAnchor(c.id);
-      return { x: cxOf(c.i) + p.kx + p.sx * (a[0] - 0.5) * s, y: D.groundY + p.ky + p.sy * (a[1] - 0.9) * s };
-    }
+    // 캐릭터 그림 위치·크기 — 그리기와 총구 계산이 같은 값을 쓴다(어긋남 방지). 시트 한 칸(320)을 charS×charS 로, 발(cx, groundY)에 맞춰 그린다
+    const muzzleOf = (c, col) => CharAnim.muzzle(c.a, cxOf(c.i), D.groundY, D.charS, col == null ? 1 : col);
     function pickTarget(c) {
-      const m = muzzle(c); let best = null, bs = -1e9;
+      const cx = cxOf(c.i); let best = null, bs = -1e9;
       for (const e of D.en) {
         if (e.dead || e.y < fireLine() || e.hp - e.pend <= 0) continue;                 // 사거리 밖 · 이미 죽을 예정인 적 제외(과잉 사격 방지)
-        const sc = e.y - Math.abs(exOf(e) - m.x) * 0.35;                                // 가깝고(아래) 자기 열에 가까운 적 우선
+        const sc = e.y - Math.abs(exOf(e) - cx) * 0.35;                                 // 가깝고(아래) 자기 열에 가까운 적 우선
         if (sc > bs) { bs = sc; best = e; }
       }
       return best;
     }
     function shoot(c, e) {
-      c.recoil = 1;
-      const m = muzzle(c), ex = exOf(e), dist = Math.hypot(ex - m.x, e.y - m.y);
+      const cx = cxOf(c.i), ex = exOf(e);
+      CharAnim.fire(c.a, ex < cx - 14 ? -1 : ex > cx + 14 ? 1 : 0);                      // 표적 쪽을 향해 f1→f2→f3
+      const m = muzzleOf(c, 1), dist = Math.hypot(ex - m.x, e.y - m.y);                 // 포탄은 발사 프레임(f1)의 총구에서
       const dur = Math.min(0.32, Math.max(0.13, dist / (D.h * 1.8))), tx = ex, ty = e.y + fall() * dur;   // 낙하분만큼 앞을 조준
       const col = (CLASS[c.cls] || {}).color || '#ffe9a8';
       e.pend++;
       D.pj.push({ x1: m.x, y1: m.y, x2: tx, y2: ty, t: 0, dur, e, col });
-      D.fx.push({ k: 'muz', x: m.x, y: m.y, t: 1, col, ang: Math.atan2(ty - m.y, tx - m.x) });   // 홈 연출은 무음(원래 동작 유지)
+      D.fx.push({ k: 'muz', x: m.x, y: m.y, t: 1, col, ang: m.ang });                   // 섬광은 포신 방향(홈 연출은 무음)
     }
     function stepChar(c, dt) {
-      c.recoil = Math.max(0, c.recoil - dt * 6.5);
-      if (c.sw > 0) c.sw = Math.max(0, c.sw - dt);
-      if (c.st === 'ready') {                                   // 재장전 중: 시간이 다 되면 표적이 있을 때 사격 자세로
+      CharAnim.update(c.a, dt);
+      if (c.st === 'ready') {                                   // 재장전 중(정면): 시간이 다 되면 표적이 있을 때 돌아서서 사격 자세로
         c.t -= dt;
-        if (c.t <= 0 && pickTarget(c)) { c.st = 'fire'; c.sw = 0.16; c.burst = 2 + Math.floor(Math.random() * 3); c.cd = 0.05; c.hold = 0; }
-      } else if (c.burst > 0) {                                 // 점사 중: 일정 간격으로 발사
+        if (c.t <= 0 && pickTarget(c)) { c.st = 'fire'; c.burst = 2 + Math.floor(Math.random() * 3); c.cd = 0.05; c.hold = 0; CharAnim.toAim(c.a, 0); }
+      } else if (c.burst > 0) {                                 // 점사 중: 다 돌아선 뒤 일정 간격으로 발사
+        if (!CharAnim.isAimed(c.a)) return;
         c.cd -= dt;
         if (c.cd <= 0) {
           const e = pickTarget(c);
-          if (e) { shoot(c, e); c.burst--; c.cd = 0.22 + Math.random() * 0.08; } else c.burst = 0;   // 표적이 없으면 점사 종료
-          if (c.burst <= 0) c.hold = 0.28;
+          if (e) { shoot(c, e); c.burst--; c.cd = 0.25 + Math.random() * 0.08; } else c.burst = 0;   // 표적이 없으면 점사 종료
+          if (c.burst <= 0) c.hold = 0.32;
         }
-      } else {                                                  // 점사 후 잠깐 자세 유지 → 재장전
+      } else {                                                  // 점사 후 잠깐 자세 유지 → 정면으로 돌아서 재장전 동작
         c.hold -= dt;
-        if (c.hold <= 0) { c.st = 'ready'; c.sw = 0.16; c.rl = 1.0 + Math.random() * 0.8; c.t = c.rl; }
+        if (c.hold <= 0) { c.st = 'ready'; c.rl = 1.0 + Math.random() * 0.8; c.t = c.rl; CharAnim.toIdle(c.a, true); }
       }
     }
     function hitAt(p) {                                         // 포탄 도착: 이 순간에 피해·이펙트
@@ -414,10 +408,11 @@ const Meta = (function () {
 
     function drawEnemy(e) {
       const U = D.U, x = exOf(e), y = e.y - e.kick * D.h * 0.008, r = e.r * (1 + 0.16 * e.kick);
-      const espr = (typeof EnemyArt !== 'undefined') ? EnemyArt.ready(e.type) : null;
-      if (espr) {
-        const s = r * 2.4; ctx.imageSmoothingEnabled = true; ctx.drawImage(espr, x - s / 2, y - s / 2, s, s);
-        if (e.hit > 0) { ctx.save(); ctx.globalAlpha = Math.min(1, e.hit * 4); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.restore(); }
+      const ef = EnemyAnim.frame(e, D.now, true);                  // 내려오는 중이라 걷기 프레임을 빠르게 재생
+      if (ef) {
+        const s = r * 2.4;
+        drawCell(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, y - s / 2, s, s);
+        if (e.hit > 0) drawCellTint(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, x - s / 2, y - s / 2, s, s, '#ffffff', Math.min(0.85, e.hit * 4));
       } else { ctx.fillStyle = e.hit > 0.06 ? '#ffffff' : e.col; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); }
       if (e.hp < e.mhp) {
         const bw = r * 1.8, hbH = Math.max(2, D.h * 0.006), by = y - r - D.h * 0.014;
@@ -425,7 +420,7 @@ const Meta = (function () {
       }
     }
     function drawChar(c) {
-      const cx = cxOf(c.i), cy = D.groundY, s = D.charS, p = pose(c), col = laneCol[c.i % 3], ry = Math.max(3, s * 0.08);
+      const cx = cxOf(c.i), cy = D.groundY, s = D.charS, col = laneCol[c.i % 3], ry = Math.max(3, s * 0.08);
       ctx.save(); ctx.globalAlpha = 0.35; ctx.fillStyle = col;                       // 레인색 발판
       ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, ry, 0, 0, 7); ctx.fill(); ctx.restore();
       if (c.st === 'ready') {                                                         // 재장전 진행 링(가득 차면 발사 준비 완료)
@@ -433,14 +428,7 @@ const Meta = (function () {
         ctx.save(); ctx.strokeStyle = col; ctx.globalAlpha = 0.95; ctx.lineWidth = Math.max(2, s * 0.03); ctx.lineCap = 'round';
         ctx.beginPath(); ctx.ellipse(cx, cy, s * 0.3, ry, 0, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.001, pr)); ctx.stroke(); ctx.restore();
       }
-      const want = c.st === 'fire' ? 'fire' : 'load';
-      const spr = (typeof CharArt !== 'undefined') ? (CharArt.sprite(c.id, want) || CharArt.sprite(c.id, want === 'fire' ? 'load' : 'fire')) : null;
-      if (!spr) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.12, 0, 7); ctx.fill(); return; }
-      ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
-      ctx.save(); ctx.translate(cx + p.kx, cy + p.ky); ctx.scale(p.sx, p.sy);
-      ctx.drawImage(spr, -s / 2, -s * 0.9, s, s);
-      if (c.sw > 0) { ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = 0.4 * (c.sw / 0.16); ctx.drawImage(spr, -s / 2, -s * 0.9, s, s); }   // 자세 전환 순간 번쩍
-      ctx.restore();
+      if (!CharAnim.draw(ctx, c.a, cx, cy, s)) { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(cx, cy - s * 0.4, s * 0.12, 0, 7); ctx.fill(); }   // 시트·썸네일이 없으면 원형 폴백
     }
     function drawShell(p) {
       const U = D.U, tt = Math.min(1, p.t), x = p.x1 + (p.x2 - p.x1) * tt, y = p.y1 + (p.y2 - p.y1) * tt;
@@ -448,8 +436,7 @@ const Meta = (function () {
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       const gr = ctx.createLinearGradient(bx, by, x, y); gr.addColorStop(0, p.col + '00'); gr.addColorStop(1, p.col);
       ctx.globalAlpha = 0.75; ctx.strokeStyle = gr; ctx.lineWidth = 6 * U; ctx.lineCap = 'round'; ctx.beginPath(); ctx.moveTo(bx, by); ctx.lineTo(x, y); ctx.stroke();
-      const shell = (typeof FxArt !== 'undefined') ? FxArt.ready('shell') : null;
-      if (shell) { ctx.globalAlpha = 1; ctx.translate(x, y); ctx.rotate(Math.atan2(p.y2 - p.y1, p.x2 - p.x1) + Math.PI / 2); ctx.drawImage(shell, -hr * 1.3, -hr * 1.3, hr * 2.6, hr * 2.6); }
+      if (tt < 1 && FxArt.ready('shell')) { ctx.restore(); ctx.save(); FxSheet.shell(ctx, x, y, Math.atan2(p.y2 - p.y1, p.x2 - p.x1), hr * 2.3, D.now); }   // 탄체는 불투명(가산 합성 X)
       else {
         const rg = ctx.createRadialGradient(x, y, 0, x, y, hr); rg.addColorStop(0, '#ffffff'); rg.addColorStop(0.35, p.col); rg.addColorStop(1, p.col + '00');
         ctx.globalAlpha = 1; ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(x, y, hr, 0, 7); ctx.fill();
@@ -461,9 +448,10 @@ const Meta = (function () {
       const U = D.U, t = Math.max(0, f.t), fr = 1 - t;
       ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.lineCap = 'round';
       if (f.k === 'muz') {                                                            // 총구 섬광
-        const muz = (typeof FxArt !== 'undefined') ? FxArt.ready('muzzle') : null, R = D.charS * 0.16 * (0.6 + fr * 0.5);
-        if (muz) { ctx.globalAlpha = t; ctx.translate(f.x, f.y); ctx.rotate(f.ang + Math.PI / 2); ctx.drawImage(muz, -R * 1.2, -R * 1.2, R * 2.4, R * 2.4); }
-        else {
+        const R = D.charS * 0.16 * (0.6 + fr * 0.5);
+        ctx.globalCompositeOperation = 'source-over';
+        if (!FxSheet.muzzle(ctx, f.x, f.y, f.ang, D.charS * 0.46, fr, f.col)) {      // 섬광 시트(포신 방향·클래스 색 착색) — 없으면 방사형 버스트
+          ctx.globalCompositeOperation = 'lighter';
           const g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, R); g.addColorStop(0, '#ffffff'); g.addColorStop(0.45, f.col); g.addColorStop(1, f.col + '00');
           ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, R, 0, 7); ctx.fill();
           ctx.translate(f.x, f.y); ctx.rotate(f.ang); ctx.strokeStyle = '#fff'; ctx.lineWidth = 2.5 * U; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 1.7, 0); ctx.stroke();
@@ -472,9 +460,13 @@ const Meta = (function () {
         const R = (f.sm ? 16 : 26) * U, rr = R * (0.55 + fr * 0.75), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
         g.addColorStop(0, '#ffffff'); g.addColorStop(0.3, f.col); g.addColorStop(1, f.col + '00');
         ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
-        ctx.strokeStyle = f.col; ctx.lineWidth = 2.5 * U;
-        for (let i = 0; i < 6; i++) { const a = i * 1.047 + f.x * 0.02, d0 = R * (0.35 + fr * 0.9), d1 = d0 + R * 0.5; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * d0, f.y + Math.sin(a) * d0); ctx.lineTo(f.x + Math.cos(a) * d1, f.y + Math.sin(a) * d1); ctx.stroke(); }
-      } else {                                                                        // 처치 폭발: 화염구 + 충격 링 + 파편
+        if (!FxSheet.hit(ctx, f.x, f.y, R * 3.2, fr, f.col)) {                        // 히트 스파크 시트(없으면 방사 선)
+          ctx.strokeStyle = f.col; ctx.lineWidth = 2.5 * U;
+          for (let i = 0; i < 6; i++) { const a = i * 1.047 + f.x * 0.02, d0 = R * (0.35 + fr * 0.9), d1 = d0 + R * 0.5; ctx.beginPath(); ctx.moveTo(f.x + Math.cos(a) * d0, f.y + Math.sin(a) * d0); ctx.lineTo(f.x + Math.cos(a) * d1, f.y + Math.sin(a) * d1); ctx.stroke(); }
+        }
+      } else if (FxArt.ready('boom')) {                                               // 처치 폭발: 폭발 시트 8프레임
+        ctx.globalCompositeOperation = 'source-over'; FxSheet.boom(ctx, f.x, f.y, (f.sm ? 0.9 : 1.7) * f.r * 5.2, fr);
+      } else {                                                                        // 처치 폭발(폴백): 화염구 + 충격 링 + 파편
         const R0 = (f.sm ? 0.9 : 1.7) * f.r * 1.8, rr = R0 * (0.4 + fr * 0.9), g = ctx.createRadialGradient(f.x, f.y, 0, f.x, f.y, rr);
         g.addColorStop(0, '#ffffff'); g.addColorStop(0.35, f.col); g.addColorStop(0.7, f.col + '66'); g.addColorStop(1, f.col + '00');
         ctx.globalAlpha = t; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(f.x, f.y, rr, 0, 7); ctx.fill();
@@ -498,7 +490,7 @@ const Meta = (function () {
       const dt = Math.min(0.05, (now - last) / 1000); last = now; step(dt); render();
       _idleRAF = requestAnimationFrame(frame);
     }
-    _idleDbg = { D, step, render, fit, muzzle, stop: idleStop };   // 검증용(수동 스텝·좌표 확인)
+    _idleDbg = { D, step, render, fit, muzzle: muzzleOf, stop: idleStop };   // 검증용(수동 스텝·좌표 확인)
     _idleRAF = requestAnimationFrame(frame);
   }
 
@@ -510,10 +502,10 @@ const Meta = (function () {
         const c = leveledDef(id), b = base(id), R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n';
         d.dataset.char = id;
         d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
-          + '<button class="ls-x" data-un="' + lane + '">✕</button>'
-          + '<div class="ls-img"><img src="' + CharArt.path(id, 'load') + '" alt="" onerror="this.remove()"></div>'
+          + '<button class="ls-x" data-un="' + lane + '">' + ui('ic_close', '✕') + '</button>'
+          + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()"></div>'
           + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
-      } else d.innerHTML = '<span class="lane-empty">＋</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
+      } else d.innerHTML = '<span class="lane-empty">' + uiIcon('ic_add', '＋', 'width:1.2em;height:1.2em') + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
       slots.append(d);
     });
     const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
@@ -524,12 +516,12 @@ const Meta = (function () {
   function shopGachaBody() {
     const free = freeAvailable();
     return '<div class="gbanner">'
-      + '<button class="gb-info" data-gachainfo="1">❔</button>'          // 확률은 ❔ 팝업에서만 표시(배너에 중복 표기 안 함)
-      + '<div class="gb-t">🎫 상시 배너</div>'
+      + '<button class="gb-info" data-gachainfo="1">' + ui('ic_info', '❔') + '</button>'          // 확률은 ⓘ 팝업에서만 표시(배너에 중복 표기 안 함)
+      + '<div class="gb-t">' + ui('ic_ticket', '🎫') + ' 상시 배너</div>'
       + (free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
       + '<div class="gb-btns">'
-      +   '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '">단일 ' + (free ? '무료' : '💎' + GACHA.cost1) + '</button>'
-      +   '<button class="sns-btn" data-gacha="10">10연 💎' + GACHA.cost10 + '</button>'
+      +   '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '">단일 ' + (free ? '무료' : uiCur('gems') + GACHA.cost1) + '</button>'
+      +   '<button class="sns-btn" data-gacha="10">10연 ' + uiCur('gems') + GACHA.cost10 + '</button>'
       + '</div></div>';
   }
   function shopDocBody() {
@@ -539,20 +531,20 @@ const Meta = (function () {
     rars.forEach(rar => {
       const list = ROSTER.filter(c => c.rarity === rar); if (!list.length) return;
       const R = RARITY[rar] || {}, g = RAR_G[rar] || 'g-n', price = DOC_SHOP.price[rar];
-      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 <span class="sns-sub">· 개당 📄' + price + '</span></div>';
+      h += '<div class="sns-h"><span class="g-tag ' + g + '">' + R.name + '</span> 조각 <span class="sns-sub">· 개당 ' + uiCur('docs') + price + '</span></div>';
       h += list.map(c => {
         const owned = !!M.owned[c.id], can = owned && M.currencies.docs >= price;
         return '<div class="sns-card' + (owned ? '' : ' locked') + '"><div class="sns-row">'
-          + '<div class="shop-ico">' + (owned ? '<img src="' + CharArt.path(c.id, 'load') + '" alt="" onerror="this.remove()">' : '<span class="lock-ic">🔒</span>') + '</div>'
-          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? '🔷 보유 조각 ' + (M.shards[c.id] || 0) : '요원 미보유') + '</div></div>'
-          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? '📄' + price : '미보유') + '</button>'
+          + '<div class="shop-ico">' + (owned ? '<img src="' + CharArt.path(c.id, 'thumb') + '" alt="" onerror="this.remove()">' : '<span class="lock-ic">' + uiIcon('ic_lock', '🔒', 'width:1.3em;height:1.3em') + '</span>') + '</div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? uiCur('shards') + ' 보유 조각 ' + (M.shards[c.id] || 0) : '요원 미보유') + '</div></div>'
+          + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? uiCur('docs') + price : '미보유') + '</button>'
           + '</div></div>';
       }).join('');
     });
     return h;
   }
   function shopPkgBody() {
-    return [['💎', '보석 패키지', '💎 100 / 550 / 1200'], ['🚫', '광고 제거', '전면 광고 제거 + 보너스'], ['📅', '주간 패스', '매일 보석 · 재화 지급']]
+    return [[uiIcon('cur_gems', '💎', 'width:100%;height:100%'), '보석 패키지', uiCur('gems') + ' 100 / 550 / 1200'], [uiIcon('ic_package', '🚫', 'width:100%;height:100%'), '광고 제거', '전면 광고 제거 + 보너스'], [uiIcon('ic_ticket', '📅', 'width:100%;height:100%'), '주간 패스', '매일 보석 · 재화 지급']]
         .map(p => '<div class="sns-card"><div class="sns-row"><div class="shop-ico emoji">' + p[0] + '</div>'
           + '<div class="sns-grow"><div class="sns-nm">' + p[1] + '</div><div class="sns-ds">' + p[2] + '</div></div>'
           + '<button class="sns-btn sm sub" disabled>준비 중</button></div></div>').join('');
@@ -566,9 +558,9 @@ const Meta = (function () {
   }
   function openGachaInfo() {
     const box = $('gacha-modal-box');
-    box.innerHTML = '<h2>🎰 가챠 확률</h2>'
+    box.innerHTML = '<h2>' + ui('ic_gacha', '🎰') + ' 가챠 확률</h2>'
       + '<div class="gi-rates">' + GACHA.rates.slice().reverse().map(r => { const R = RARITY[r.rarity] || {}, g = RAR_G[r.rarity] || 'g-n'; return '<div class="gi-row"><span class="g-tag ' + g + '">' + R.name + '</span><b>' + r.w + '%</b></div>'; }).join('') + '</div>'
-      + '<div class="gi-guide"><div class="gi-g"><b>🔷 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
+      + '<div class="gi-guide"><div class="gi-g"><b>' + uiCur('shards') + ' 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
       + '<button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -578,9 +570,9 @@ const Meta = (function () {
     list.innerHTML = MISSIONS.map(m => {
       const p = missionProgress(m), done = p >= m.goal, claimed = !!M.claimed[m.id];
       const pct = Math.min(100, 100 * p / m.goal);
-      const label = claimed ? '수령 완료' : done ? '🎁 수령' : '진행 중';
+      const label = claimed ? '수령 완료' : done ? ui('ic_reward', '🎁') + ' 수령' : '진행 중';
       return '<div class="sns-card"><div class="sns-row" style="align-items:flex-start">'
-        + '<div class="sns-ico">🎯</div>'
+        + '<div class="sns-ico">' + uiIcon('ic_mission', '🎯', 'width:100%;height:100%') + '</div>'
         + '<div class="sns-grow">'
         +   '<div class="sns-nm">' + m.name + ' <span class="mi-reward">' + fmtCost(m.reward) + '</span></div>'
         +   '<div class="sns-ds">' + m.desc + ' (' + p + '/' + m.goal + ')</div>'
@@ -666,7 +658,7 @@ const Meta = (function () {
     const gcls = RAR_G[b.rarity] || 'g-n';
     let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">★</span>';
     // 현재 → 다음 스탯 비교 박스 + 성장 액션(스틸앤샷式)
-    const STAT = [['💥', '공격', 'atk'], ['🛡', '체력', 'hp'], ['🎯', '골칸', 'gol']];
+    const STAT = [[ui('stat_atk', '💥'), '공격', 'atk'], [ui('stat_hp', '🛡'), '체력', 'hp'], [ui('stat_gol', '🎯'), '골칸', 'gol']];
     const cur = statAt(id, o.level, o.star);
     let box6, box7, actLabel, actAttr, actEnabled;
     if (cdTab === 'promote') {
@@ -675,7 +667,7 @@ const Meta = (function () {
       box6 = '<div class="sc-t">현재 ★' + o.star + '</div>' + STAT.map(s => '<div class="sc-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + cur[s[2]] + '</b></div>').join('') + '<div class="sc-row"><span>레벨 상한</span><b>' + cap + '</b></div>';
       box7 = maxStar ? '<div class="nx-max">최고 성급 ★' + GROWTH.starMax + '</div>'
         : '<div class="sc-t">승급 → ★' + (o.star + 1) + '</div>' + STAT.map(s => '<div class="nx-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + nx[s[2]] + '</b></div>').join('') + '<div class="nx-row"><span>레벨 상한</span><b>' + (GROWTH.levelCapByStar[o.star + 1] || cap) + '</b></div>';
-      actLabel = maxStar ? '성급 최대' : '✨ 승급 · 🔷' + pr.shards + ' 🔩' + pr.mats;
+      actLabel = maxStar ? '성급 최대' : ui('ic_promote', '✨') + ' 승급 · ' + uiCur('shards') + pr.shards + ' ' + uiCur('mats') + pr.mats;
       actAttr = 'data-promote="' + id + '"';
     } else {
       const nx = statAt(id, Math.min(cap, o.level + 1), o.star), cost = GROWTH.levelUpCost(o.level);
@@ -683,7 +675,7 @@ const Meta = (function () {
       box6 = '<div class="sc-t">현재 능력치</div>' + STAT.map(s => '<div class="sc-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + cur[s[2]] + '</b></div>').join('');
       box7 = maxLv ? '<div class="nx-max">레벨 상한 도달</div>'
         : '<div class="sc-t">다음 Lv.' + (o.level + 1) + '</div>' + STAT.map(s => '<div class="nx-row"><span>' + s[0] + ' ' + s[1] + '</span><b>' + nx[s[2]] + (nx[s[2]] !== cur[s[2]] ? '' : '') + '</b></div>').join('');
-      actLabel = maxLv ? '레벨 최대' : '⬆️ 레벨업 · 🪙' + cost;
+      actLabel = maxLv ? '레벨 최대' : ui('ic_levelup', '⬆️') + ' 레벨업 · ' + uiCur('gold') + cost;
       actAttr = 'data-lvup="' + id + '"';
     }
     box.innerHTML =
@@ -697,7 +689,7 @@ const Meta = (function () {
       + '<div class="cd-irow"><div class="cd-ival cd-clsval" style="color:' + cl.color + '">' + clsIcon(b.cls) + ' ' + cl.name + ' · ' + (b.weapon || '') + '</div></div>'
       + '</div></div>'
       + '<div class="cd-statcol">'
-      + '<div class="cd-tabs"><button class="cd-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">⬆️ 레벨업</button><button class="cd-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">✨ 승급</button></div>'
+      + '<div class="cd-tabs"><button class="cd-tab' + (cdTab === 'lvup' ? ' on' : '') + '" data-cdtab="lvup">' + ui('ic_levelup', '⬆️') + ' 레벨업</button><button class="cd-tab' + (cdTab === 'promote' ? ' on' : '') + '" data-cdtab="promote">' + ui('ic_promote', '✨') + ' 승급</button></div>'
       + '<div class="cd-cmp"><div class="cd-cur">' + box6 + '</div><div class="cd-arrow">→</div><div class="cd-next">' + box7 + '</div></div>'
       + '</div>'
       + '<div class="cd-skills">'
@@ -705,7 +697,7 @@ const Meta = (function () {
       + '<div class="cd-skill"><div class="cd-sk-h"><b>' + b.passive.name + '</b><span class="cd-sk-tag pas">패시브</span></div><div class="cd-sk-d">' + skillText(b.passive) + '</div></div>'
       + '</div>'
       + '<div class="cd-bot">'
-      + '<button class="btn cd-place ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : '🪧 편성') + '</button>'
+      + '<button class="btn cd-place ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : ui('ic_place', '🪧') + ' 편성') + '</button>'
       + '<button class="btn cd-action" ' + actAttr + (actEnabled ? '' : ' disabled') + '>' + actLabel + '</button>'
       + '</div>'
       + '<button class="cd-x" data-close="1">닫기</button>';
@@ -716,7 +708,7 @@ const Meta = (function () {
   function showGachaResult(res) {
     const box = $('gacha-modal-box');
     box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res">'
-      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'load') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
+      + res.map(r => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + '"><img class="gr-cg" src="' + CharArt.path(r.id, 'thumb') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag">' + (r.isNew ? 'NEW' : '조각+' + GACHA.dupShards) + '</span></div>'; }).join('')
       + '</div><button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -728,7 +720,7 @@ const Meta = (function () {
     const lgBtn = $('lg-login'); if (lgBtn) lgBtn.onclick = submitLogin;
     const lgId = $('lg-id'); if (lgId) lgId.addEventListener('keydown', e => { if (e.key === 'Enter') { const p = $('lg-pw'); if (p) p.focus(); } });
     const lgPw = $('lg-pw'); if (lgPw) lgPw.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-    const acct = $('acct-btn'); if (acct) { acct.textContent = curAcct ? ('👤 ' + curAcct) : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }
+    const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? (ui('ic_account', '👤') + ' ' + curAcct.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]))) : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }
     if (needsLogin()) showLogin();
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };

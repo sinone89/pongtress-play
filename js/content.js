@@ -394,6 +394,11 @@ const JACKPOT_MUL = 3, JACKPOT_SPEED = 1.1;   // 속도 = 초당 포켓 칸 수
 
 // UI 아이콘(DOM): assets/ui/<name>.png 있으면 이모지 대체, 없으면 이모지 폴백(spr-box)
 function uiIcon(name, emoji, style) { return '<span class="uic"' + (style ? (' style="' + style + '"') : '') + '><span class="uic-fb">' + emoji + '</span><img class="uic-im" alt="" src="assets/ui/' + name + '.png" onload="this.parentNode.classList.add(\'ok\')" onerror="this.remove()"></span>'; }
+// 글줄 속 작은 아이콘(글자 높이 ≈1.15em). 재화는 cur_* 이름을 그대로: ui('cur_gold','🪙')
+function ui(name, emoji) { return uiIcon(name, emoji, 'width:1.15em;height:1.15em;vertical-align:-0.2em'); }
+const UI_CUR = { gold: ['cur_gold', '🪙'], mats: ['cur_mats', '🔩'], gems: ['cur_gems', '💎'], docs: ['cur_docs', '📄'], shards: ['cur_shard', '🔷'] };
+const uiCur = (k) => ui(UI_CUR[k][0], UI_CUR[k][1]);   // 재화 키(gold/mats/gems/docs/shards) → 아이콘
+const tagIc = (t) => ui('tag_' + t, RELIC_TAGS[t].icon);   // 모듈 태그(precision/explosive/guard/pinball/harvest) 아이콘
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──
 // 골칸 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 골칸을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영
@@ -447,53 +452,253 @@ function addPegToBoard(S, type, n, opts) {
   return out;
 }
 
+// ══════════ 이미지 에셋 로더 · 스프라이트 시트 ══════════
+// 이미지가 없거나 로딩 중이면 null/false 를 돌려주고, 호출한 쪽이 도형·이모지로 폴백한다.
+function loadImg(src) {
+  const img = new Image();
+  img.decoding = 'async';
+  img.__ok = false;
+  img.onload = function () { img.__ok = img.naturalWidth > 0; };
+  img.onerror = function () { img.__ok = false; };
+  img.src = src;
+  return img;
+}
+
 // ── 캐릭터 아트 로더 ──
-// assets/char/<id>_<state>.png (state: cg | load | fire). 이미지가 있으면 사용, 없으면 게임이 폴백(원형/이모지).
+// assets/char/<id>_cg.webp(CG) · <id>_sheet.webp(애니메이션 시트 4×4) · <id>_thumb.webp(편성칩·상점·가챠용 정면 대기 컷)
 const CharArt = (function () {
   const cache = {};   // key '<id>_<state>' → Image
-  function path(id, state) { return 'assets/char/' + id + '_' + state + '.png'; }
-  function load(id, state) {
-    const k = id + '_' + state;
-    if (cache[k]) return cache[k];
-    const img = new Image();
-    img.decoding = 'async';
-    img.__ok = false;
-    img.onload = function () { img.__ok = img.naturalWidth > 0; };
-    img.onerror = function () { img.__ok = false; };
-    img.src = path(id, state);
-    cache[k] = img;
-    return img;
-  }
+  const SUF = { cg: '_cg', sheet: '_sheet', thumb: '_thumb' };
+  const norm = (state) => SUF[state] ? state : 'thumb';          // 구 'load'/'fire'(2장 스프라이트) 요청은 썸네일로
+  function path(id, state) { return 'assets/char/' + id + SUF[norm(state)] + '.webp'; }
+  function load(id, state) { const k = id + '_' + norm(state); return cache[k] || (cache[k] = loadImg(path(id, state))); }
   // 캔버스용: 로드 완료+성공이면 Image, 아니면 null
   function sprite(id, state) { const img = load(id, state); return (img.__ok && img.complete) ? img : null; }
-  return { path: path, load: load, sprite: sprite };
+  // 미리 받아 두기(편성 3인의 시트는 출격 직전에)
+  function preload(ids, states) { (ids || []).forEach(function (id) { if (id) (states || ['sheet']).forEach(function (s) { load(id, s); }); }); }
+  return { path: path, load: load, sprite: sprite, preload: preload };
 })();
 
-// ── 총구 앵커(실측) ──
-// 사격 스프라이트(assets/char/<id>_fire.png)에서 총구 섬광 중심의 위치를 [x, y] = 스프라이트 폭·높이 대비 비율로 기록.
-// 포탄·머즐 이펙트가 캐논 끝에서 나가도록 홈 연출·전투 모두 이 값을 쓴다. ⚠ 사격 스프라이트를 새로 그리면 다시 측정할 것.
-const MUZZLE = {
-  knight: [0.799, 0.223], archer: [0.836, 0.202], berserker: [0.885, 0.197], valkyrie: [0.882, 0.149],
-  grenadier: [0.821, 0.236], mortar: [0.838, 0.191], mage: [0.879, 0.178], behemoth: [0.885, 0.142],
-  guard: [0.831, 0.230], rogue: [0.830, 0.204], priest: [0.874, 0.179], seraph: [0.885, 0.182]
-};
-function muzzleAnchor(id) { return MUZZLE[id] || [0.85, 0.2]; }
-
 // ── 캔버스 이미지 로더(공통) ── 있으면 Image, 없으면 null(게임이 도형으로 폴백)
-function makeCanvasLoader(dir) {
+function makeCanvasLoader(dir, ext, exts) {
   const cache = {};
   function ready(name) {
     let img = cache[name];
-    if (!img) { img = new Image(); img.decoding = 'async'; img.__ok = false; img.onload = function () { img.__ok = img.naturalWidth > 0; }; img.onerror = function () { img.__ok = false; }; img.src = dir + name + '.png'; cache[name] = img; }
+    if (!img) { img = loadImg(dir + name + '.' + ((exts && exts[name]) || ext || 'png')); cache[name] = img; }
     return (img.__ok && img.complete) ? img : null;
   }
-  return { ready: ready };
+  function preload(names) { (names || []).forEach(ready); }
+  return { ready: ready, preload: preload };
 }
-// FX: assets/fx/<name>.png (muzzle/shell/boom). 있으면 사용, 없으면 절차적 렌더 폴백.
-const FxArt = makeCanvasLoader('assets/fx/');
-// 적/보스: assets/enemy/<id>.png (sentry/…, boss_titan/…). 없으면 색 원 폴백.
-const EnemyArt = makeCanvasLoader('assets/enemy/');
+// FX 시트: assets/fx/<name>.png — muzzle 512×128(4) · shell 256×128(2) · boom 1024×512(4×2) · hit_spark 512×128(4)
+const FxArt = makeCanvasLoader('assets/fx/', 'png');
+// 적/보스 시트: assets/enemy/<id>.webp — 일반 1024×256(4프레임) · 보스 2048×1024(행0 이동 4 + 행1 상태 프레임)
+const EnemyArt = makeCanvasLoader('assets/enemy/', 'webp');
 // 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
-const PegArt = makeCanvasLoader('assets/peg/');
-// 배경/영역 레이어: assets/bg/<name>.png (bg_field/bg_wall/bg_board/frame_pocket/bg_launcher…). 없으면 현행 도형 폴백.
-const BgArt = makeCanvasLoader('assets/bg/');
+const PegArt = makeCanvasLoader('assets/peg/', 'png');
+// 배경/영역 레이어: assets/bg/<name>.webp (bg_field/bg_wall/bg_board) · frame_pocket 만 png
+const BgArt = makeCanvasLoader('assets/bg/', 'webp', { frame_pocket: 'png' });
+
+// ── 시트 그리기 도구 ──
+// 큰 시트를 2배 이상 줄여 그리면 계단·반짝임이 생기므로, 절반(1/2, 1/4) 크기 사본을 한 번 만들어 거기서 샘플링한다.
+const SpriteMip = (function () {
+  const cache = new WeakMap();
+  function level(img, l) {
+    let a = cache.get(img); if (!a) { a = [img]; cache.set(img, a); }
+    for (let i = 1; i <= l; i++) {
+      if (a[i]) continue;
+      const p = a[i - 1], c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round((p.naturalWidth || p.width) / 2)); c.height = Math.max(1, Math.round((p.naturalHeight || p.height) / 2));
+      const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(p, 0, 0, c.width, c.height);
+      a[i] = c;
+    }
+    return a[l];
+  }
+  // need = (화면에 그릴 크기 ÷ 원본 크기). 0.5 이하면 한 단계(0.25 이하면 두 단계) 줄인 사본과 그 배율(f)을 돌려준다
+  function pick(img, need) { let l = 0; while (l < 2 && need * (2 << l) <= 1.0001) l++; return { src: l ? level(img, l) : img, f: 1 / (1 << l) }; }
+  return { pick: pick };
+})();
+function _devScale(ctx) { const m = ctx.getTransform ? ctx.getTransform() : null; return m ? (Math.hypot(m.c, m.d) || 1) : 1; }   // 세로축 배율(좌우 반전·섬광 회전의 영향을 받지 않음)
+// 시트의 한 칸(sx,sy,sw,sh = 원본 좌표)을 (dx,dy,dw,dh)에 그린다.
+function drawCell(ctx, img, sx, sy, sw, sh, dx, dy, dw, dh) {
+  const mp = SpriteMip.pick(img, (dw * _devScale(ctx)) / sw), f = mp.f;
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(mp.src, sx * f, sy * f, sw * f, sh * f, dx, dy, dw, dh);
+}
+// 같은 칸을 단색으로 덮어 그린다(피격 흰 번쩍임·기절 색조) — 스프라이트 실루엣 안쪽만 칠해진다.
+const _tintBuf = { c: null, g: null };
+function drawCellTint(ctx, img, sx, sy, sw, sh, dx, dy, dw, dh, color, alpha) {
+  const sc = _devScale(ctx), tw = Math.max(1, Math.ceil(dw * sc)), th = Math.max(1, Math.ceil(dh * sc)), t = _tintBuf;
+  if (!t.c) { t.c = document.createElement('canvas'); t.c.width = t.c.height = 128; t.g = t.c.getContext('2d'); }
+  if (t.c.width < tw || t.c.height < th) { t.c.width = Math.max(t.c.width, tw); t.c.height = Math.max(t.c.height, th); }   // 커질 때만 재할당
+  const g = t.g, mp = SpriteMip.pick(img, tw / sw), f = mp.f;
+  g.setTransform(1, 0, 0, 1, 0, 0); g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1; g.clearRect(0, 0, t.c.width, t.c.height);
+  g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+  g.drawImage(mp.src, sx * f, sy * f, sw * f, sh * f, 0, 0, tw, th);
+  g.globalCompositeOperation = 'source-atop'; g.globalAlpha = alpha; g.fillStyle = color; g.fillRect(0, 0, tw, th);
+  g.globalCompositeOperation = 'source-over'; g.globalAlpha = 1;
+  ctx.drawImage(t.c, 0, 0, tw, th, dx, dy, dw, dh);
+}
+
+// ── 캐릭터 애니메이션 ──
+// 시트 4×4(셀 320): 행0 idle(정면 3/4, 루프) · 행1 reload(1회, r3≡i0) · 행2 fire(뒷모습: f0 조준·f1 발사·f2 반동·f3 복귀) · 행3 turn(t0,t1 — 앞→뒤 순재생 / 뒤→앞 역재생)
+// 상태: idle → [toBack → aim → fire…] → toFront → idle.  발 중심(x)·총구 좌표는 js/spritemeta.js(SHEET_META, tools/measure-sheets.ps1 로 측정)
+const CharAnim = (function () {
+  const CELL = 320, FOOT_Y = 292;
+  const SEQ = {
+    idle:    { f: [[0, 0], [0, 1], [0, 2], [0, 3]], d: [1 / 6], loop: true },
+    reload:  { f: [[1, 0], [1, 1], [1, 2], [1, 3]], d: [0.09], next: 'idle' },
+    toBack:  { f: [[3, 0], [3, 1]], d: [0.075], next: 'aim' },
+    aim:     { f: [[2, 0]], d: [1], loop: true },
+    fire:    { f: [[2, 1], [2, 2], [2, 3]], d: [0.05, 0.08, 0.09], next: 'aim' },
+    toFront: { f: [[3, 1], [3, 0]], d: [0.075], next: 'idle' }
+  };
+  const dur = (s, i) => s.d[Math.min(i, s.d.length - 1)];
+  const FRONT = { idle: 1, reload: 1, toFront: 1 };           // 정면을 보고 있는 상태
+  function set(a, st, keep) { a.st = st; a.i = 0; if (!keep) a.t = 0; }
+  function create(id) {
+    const a = { id: id, st: 'idle', i: 0, t: 0, face: 1, faceT: 1, q: null, wait: 0, then: null };
+    a.i = Math.floor(Math.random() * 4); a.t = Math.random() * (1 / 6);            // 캐릭터마다 숨쉬기 위상을 어긋나게
+    return a;
+  }
+  function update(a, dt) {
+    if (a.wait > 0) { a.wait -= dt; if (a.wait <= 0 && a.then) { const n = a.then; a.then = null; set(a, n); } }   // 시차 대기 중에도 숨쉬기(idle)는 계속
+    let s = SEQ[a.st]; a.t += dt;
+    for (let guard = 0; guard < 8; guard++) {
+      const d = dur(s, a.i);
+      if (a.t < d) break;
+      a.t -= d;
+      if (a.i + 1 < s.f.length) a.i++;
+      else if (s.loop) a.i = (a.i + 1) % s.f.length;
+      else { const nx = a.q || s.next; a.q = null; set(a, nx, true); s = SEQ[a.st]; }
+    }
+    // 좌우 반전은 뒷모습(조준·발사)에서만 — 돌아서는 동작과 정면 자세는 항상 원본 방향(손이 바뀌어 보이는 것 방지). 방향이 바뀔 땐 몸을 휙 돌리듯 폭이 줄었다 펴진다
+    const wf = (a.st === 'aim' || a.st === 'fire') ? a.faceT : 1;
+    if (a.face !== wf) { const st = dt * 16; a.face = Math.abs(wf - a.face) <= st ? wf : a.face + Math.sign(wf - a.face) * st; }
+  }
+  // 정면 자세로: 뒷모습(조준·발사·돌아서는 중)이면 돌아서고, reload=true 면 돌아선 뒤 재장전 동작을 한 번 재생
+  function toIdle(a, reload) {
+    a.wait = 0; a.then = null;
+    if (a.st === 'aim' || a.st === 'fire') { set(a, 'toFront'); a.q = reload ? 'reload' : 'idle'; }
+    else if (a.st === 'toBack') { const i = a.i; set(a, 'toFront'); a.i = 1 - i; a.q = reload ? 'reload' : 'idle'; }   // 도는 중이면 그 지점에서 되감기
+    else if (a.st === 'toFront') a.q = reload ? 'reload' : 'idle';
+    else if (reload && a.st === 'idle') set(a, 'reload');
+  }
+  // 조준 자세로(뒷모습): delay 초 뒤에 돌기 시작(캐릭터별 시차)
+  function toAim(a, delay) {
+    if (!FRONT[a.st]) return;                                    // 이미 돌아섰거나 도는 중
+    if (a.st === 'toFront') { const i = a.i; set(a, 'toBack'); a.i = 1 - i; a.q = null; return; }
+    if (delay > 0) { a.wait = delay; a.then = 'toBack'; return; }
+    set(a, 'toBack');
+  }
+  // 발사 동작(f1→f2→f3→f0). dir = -1/+1: 목표가 있는 쪽을 바라보도록 좌우 반전(생략 시 현 방향 유지)
+  function fire(a, dir) {
+    if (dir) a.faceT = dir < 0 ? -1 : 1;
+    a.wait = 0; a.then = null;
+    if (FRONT[a.st]) { toAim(a, 0); a.q = 'fire'; return; }      // 아직 정면이면 돌아선 뒤 바로 발사
+    set(a, 'fire');
+  }
+  function reload(a) { if (a.st === 'idle') set(a, 'reload'); }
+  const isAimed = (a) => a.st === 'aim' || a.st === 'fire';
+  const isFront = (a) => !!FRONT[a.st] && !(a.wait > 0);
+  // 현재 칸 [행, 열]
+  function cell(a) { const s = SEQ[a.st]; return s.f[Math.min(a.i, s.f.length - 1)]; }
+  // 행별 발 중심 x(프레임 평균 — 프레임마다 피벗을 옮기면 몸이 출렁여 보임)
+  const pivCache = {};
+  function pivotX(id, row) {
+    const k = id + row; if (pivCache[k] !== undefined) return pivCache[k];
+    const m = (typeof SHEET_META !== 'undefined') && SHEET_META[id]; let v = 160;
+    if (m) { const n = row === 3 ? 2 : 4; let s = 0; for (let c = 0; c < n; c++) s += m.foot[row * 4 + c]; v = s / n; }
+    return (pivCache[k] = v);
+  }
+  // 시트 현재 칸을 발(x, feetY) 기준으로 size×size 에 그린다. 시트가 아직 없으면 정면 썸네일로 대신하고, 둘 다 없으면 false
+  function draw(ctx, a, x, feetY, size) {
+    const k = size / CELL, fc = Math.abs(a.face) < 0.03 ? 0.03 : a.face;
+    const sheet = CharArt.sprite(a.id, 'sheet');
+    ctx.save(); ctx.translate(x, feetY); if (fc !== 1) ctx.scale(fc, 1);
+    let ok = false;
+    if (sheet) { const rc = cell(a), r = rc[0], c = rc[1]; drawCell(ctx, sheet, c * CELL, r * CELL, CELL, CELL, -pivotX(a.id, r) * k, -FOOT_Y * k, size, size); ok = true; }
+    else { const th = CharArt.sprite(a.id, 'thumb'); if (th) { drawCell(ctx, th, 0, 0, 256, 256, -size * 0.5, -size * (FOOT_Y / CELL), size, size); ok = true; } }
+    ctx.restore(); return ok;
+  }
+  // 총구 좌표(캔버스 좌표) — col: 사격 프레임 0~3. 반환 ang = 포신 방향(라디안, 캔버스 좌표계: 0=오른쪽, 위쪽은 음수)
+  function muzzle(a, x, feetY, size, col) {
+    const m = (typeof SHEET_META !== 'undefined') && SHEET_META[a.id], k = size / CELL, f = a.faceT;
+    if (!m) return { x: x + f * size * 0.25, y: feetY - size * 0.7, ang: f > 0 ? -0.8 : -2.34 };
+    const z = m.muz[Math.max(0, Math.min(3, col | 0))], rad = z[2] * Math.PI / 180;
+    return { x: x + (z[0] - pivotX(a.id, 2)) * k * f, y: feetY + (z[1] - FOOT_Y) * k, ang: Math.atan2(-Math.sin(rad), Math.cos(rad) * f) };
+  }
+  return { create: create, update: update, toIdle: toIdle, toAim: toAim, fire: fire, reload: reload, isAimed: isAimed, isFront: isFront, draw: draw, muzzle: muzzle, cell: cell };
+})();
+
+// ── 적/보스 애니메이션 ──
+// 일반 적: 1024×256 = 이동 4프레임(제자리에선 느리게, 이동 중엔 빠르게 재생). 보스: 2048×1024 = 행0 이동 4 + 행1 상태 프레임
+//  titan[돌격 준비, 돌격, 과열 열림, 과열 정점] · swarm[분리 준비, 분리 폭발] · carrier[해치 열림, 투하]
+const EnemyAnim = (function () {
+  const POSE = {
+    titan:   { charge: [[0, 0.42], [1, 0.60]], overheat: [[2, 0.30], [3, 0.55]] },
+    swarm:   { split: [[0, 0.34], [1, 0.46]] },
+    carrier: { launch: [[0, 0.30], [1, 0.50]] }
+  };
+  const nameOf = (e) => e.isBoss ? 'boss_' + (e.kind || 'titan') : e.type;
+  // 상태 프레임 재생 시작(예: pose(e, 'charge')) — 보스 전용
+  function pose(e, name) { const s = e.isBoss && POSE[e.kind] && POSE[e.kind][name]; if (!s) return 0; let tot = 0; for (const f of s) tot += f[1]; e.pose = { seq: s, t0: performance.now() / 1000, total: tot }; return tot; }
+  // 현재 프레임 {img, sx, sy, sw, sh} (시트가 없으면 null). now = 초, moving = 이동 중 여부
+  function frame(e, now, moving) {
+    const img = EnemyArt.ready(nameOf(e)); if (!img) return null;
+    const boss = !!e.isBoss, cs = boss ? 512 : 256;
+    if (e.ph === undefined) e.ph = Math.random() * 4;
+    let row = 0, col;
+    const P = e.pose;
+    if (boss && P && now < P.t0 + P.total) {
+      let t = now - P.t0, c = P.seq[P.seq.length - 1][0];
+      for (const f of P.seq) { if (t < f[1]) { c = f[0]; break; } t -= f[1]; }
+      row = 1; col = c;
+    } else if (boss && e.kind === 'titan' && e.stun > 0) { row = 1; col = 2 + (Math.floor(now * 2.5) & 1); }   // 기절 = 과열 환기
+    else col = Math.floor(now * (moving ? 9 : 3) + e.ph) & 3;
+    return { img: img, sx: col * cs, sy: row * cs, sw: cs, sh: cs };
+  }
+  return { pose: pose, frame: frame, name: nameOf };
+})();
+
+// ── FX 시트 그리기 ── 시트가 없으면 false(호출한 쪽이 절차적 효과로 폴백)
+const FxTint = (function () {
+  const cache = {};
+  function get(name, color, alpha) {
+    const img = FxArt.ready(name); if (!img) return null;
+    const k = name + '|' + color + '|' + alpha; if (cache[k]) return cache[k];
+    const c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    const g = c.getContext('2d'); g.drawImage(img, 0, 0); g.globalCompositeOperation = 'source-atop'; g.globalAlpha = alpha; g.fillStyle = color; g.fillRect(0, 0, c.width, c.height);
+    return (cache[k] = c);
+  }
+  return { get: get };
+})();
+const FxSheet = {
+  // 총구 섬광(위쪽이 앞) — (x,y)=섬광 밑동, ang=포신 방향(라디안), size=칸 한 변(화면 px), p=진행 0→1, color=착색(클래스 색)
+  muzzle: function (ctx, x, y, ang, size, p, color) {
+    const img = FxArt.ready('muzzle'); if (!img) return false;
+    const src = (color && FxTint.get('muzzle', color, 0.5)) || img;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2);
+    drawCell(ctx, src, Math.min(3, Math.floor(p * 4)) * 128, 0, 128, 128, -size / 2, -size * (114 / 128), size, size);
+    ctx.restore(); return true;
+  },
+  // 포탄(위쪽이 탄두, 아래가 꼬리 불꽃) — (x,y)=탄체 중심, ang=비행 방향(라디안), tsec=시간(초, 꼬리 불꽃 2프레임 번갈아)
+  shell: function (ctx, x, y, ang, size, tsec) {
+    const img = FxArt.ready('shell'); if (!img) return false;
+    ctx.save(); ctx.translate(x, y); ctx.rotate(ang + Math.PI / 2);
+    drawCell(ctx, img, (Math.floor(tsec * 16) & 1) * 128, 0, 128, 128, -size / 2, -size * (57 / 128), size, size);
+    ctx.restore(); return true;
+  },
+  // 폭발(8프레임 4×2) — (x,y)=중심, p=진행 0→1
+  boom: function (ctx, x, y, size, p) {
+    const img = FxArt.ready('boom'); if (!img) return false;
+    const i = Math.min(7, Math.floor(p * 8));
+    drawCell(ctx, img, (i % 4) * 256, Math.floor(i / 4) * 256, 256, 256, x - size / 2, y - size / 2, size, size); return true;
+  },
+  // 히트 스파크(4프레임) — (x,y)=중심, p=진행 0→1, color=착색
+  hit: function (ctx, x, y, size, p, color) {
+    const img = FxArt.ready('hit_spark'); if (!img) return false;
+    const src = (color && FxTint.get('hit_spark', color, 0.6)) || img;
+    drawCell(ctx, src, Math.min(3, Math.floor(p * 4)) * 128, 0, 128, 128, x - size / 2, y - size / 2, size, size); return true;
+  }
+};
