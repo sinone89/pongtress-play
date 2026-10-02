@@ -32,11 +32,32 @@ const Meta = (function () {
     try { localStorage.removeItem(CUR_KEY); } catch (e) {}
     location.reload();
   }
+  // 계정 메뉴(상단 계정 버튼): 튜토리얼 다시 보기 / 로그아웃
+  function openAcctMenu() {
+    let m = $('acct-modal');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'acct-modal'; m.className = 'modal'; m.hidden = true;
+      m.innerHTML = '<div class="modal-box" id="acct-box"></div>';
+      $('app').appendChild(m);
+      m.onclick = (e) => {
+        if (e.target === m || e.target.closest('[data-close]')) { m.hidden = true; return; }
+        const b = e.target.closest('[data-acct]'); if (!b) return;
+        m.hidden = true;
+        if (b.dataset.acct === 'tut') { if (typeof Tutorial !== 'undefined') Tutorial.replay(); }
+        else if (b.dataset.acct === 'logout') logout();
+      };
+    }
+    $('acct-box').innerHTML = '<h2>' + uiIcon('ic_account', '👤', 'width:1.2em;height:1.2em;vertical-align:-0.2em') + ' ' + curAcct + '</h2>'
+      + '<div class="cd-btns"><button class="btn" data-acct="tut">' + ui('ic_info', '❔') + ' 튜토리얼 다시 보기</button><button class="btn" data-acct="logout">로그아웃</button></div>'
+      + '<button class="btn primary" data-close="1">닫기</button>';
+    m.hidden = false;
+  }
 
   // ── 저장/로드 ──
   function load() {
+    let fresh = false;                                                                  // 저장된 게 없어 새로 시작하는 계정인가(튜토리얼 자동 시작 여부)
     try { M = JSON.parse(localStorage.getItem(saveKey())); } catch (e) { M = null; }
-    if (!M || !M.owned) M = JSON.parse(JSON.stringify(META_START));
+    if (!M || !M.owned) { M = JSON.parse(JSON.stringify(META_START)); fresh = true; }
     // 전방호환 보정
     M.currencies = Object.assign({ gold: 0, mats: 0, gems: 0, docs: 0 }, M.currencies);
     M.shards = M.shards || {}; M.owned = M.owned || {}; M.stats = Object.assign({ runsWon: 0, kills: 0, floors: 0 }, M.stats);
@@ -56,6 +77,9 @@ const Meta = (function () {
     if (!MODES[M.runMode]) M.runMode = 'normal';
     M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
     M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
+    // 튜토리얼 진행(js/tutorial.js): 새 계정 = 처음부터 자동 시작 / 튜토리얼 도입 전부터 있던 계정 = 완료로 보고 한 번 '볼까요?' 제안
+    if (!M.tut || typeof M.tut !== 'object') M.tut = fresh ? { v: 1, at: 'welcome', done: false, offered: true, seen: {} } : { v: 1, at: 'welcome', done: true, offered: false, seen: {} };
+    if (!M.tut.seen || typeof M.tut.seen !== 'object') M.tut.seen = {};
     save();
   }
   // ── 모듈 해금 / 출격 옵션(모드·일일 시드) ──
@@ -674,6 +698,7 @@ const Meta = (function () {
       + '<button class="btn" data-cheat="relics">전 모듈 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
+      + '<button class="btn" data-cheat="tut">튜토리얼 다시 보기</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
       + '</div>'
       + '<button class="btn cd-close" data-close="1">닫기</button>';
@@ -688,6 +713,7 @@ const Meta = (function () {
     else if (k === 'stages') M.maxStage = STAGE_MAX;
     else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
     else if (k === 'freegacha') M.daily.freeGachaDate = '';
+    else if (k === 'tut') { $('cheat-modal').hidden = true; if (typeof Tutorial !== 'undefined') Tutorial.replay(); }
     else if (k === 'reset') { try { localStorage.removeItem(saveKey()); } catch (e) {} load(); }
     save(); renderCheat(); renderLobby();
   }
@@ -798,7 +824,7 @@ const Meta = (function () {
     const lgBtn = $('lg-login'); if (lgBtn) lgBtn.onclick = submitLogin;
     const lgId = $('lg-id'); if (lgId) lgId.addEventListener('keydown', e => { if (e.key === 'Enter') { const p = $('lg-pw'); if (p) p.focus(); } });
     const lgPw = $('lg-pw'); if (lgPw) lgPw.addEventListener('keydown', e => { if (e.key === 'Enter') submitLogin(); });
-    const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? uiIcon('ic_account', '👤', 'width:72%;height:72%') : ''; acct.title = curAcct ? ('계정: ' + curAcct + ' (누르면 로그아웃)') : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = logout; }   // 이름은 공간을 못 쓰므로 아이콘만 — 이름은 title 과 로그아웃 확인창에
+    const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? uiIcon('ic_account', '👤', 'width:72%;height:72%') : ''; acct.title = curAcct ? ('계정: ' + curAcct + ' (누르면 계정 메뉴)') : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = openAcctMenu; }   // 이름은 공간을 못 쓰므로 아이콘만 — 이름은 title 과 로그아웃 확인창에
     if (needsLogin()) showLogin();
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
     $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };

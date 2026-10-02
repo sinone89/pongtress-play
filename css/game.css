@@ -749,3 +749,30 @@ body {
 .mode-tabs { margin: 1cqw 0 1.6cqw; }
 .mode-info { font-size: 3cqw; color: var(--muted); margin: 0 0.5cqw 1cqw; line-height: 1.5; }
 .mode-info b { color: var(--amber); }
+
+/* ═══ 튜토리얼(js/tutorial.js) — 스포트라이트 + 가이드(루비) 말풍선, 스틸앤샷 방식 ═══ */
+#tut { position: absolute; inset: 0; z-index: 110; display: none; pointer-events: none; }
+#tut.show { display: block; }
+#tut .tut-block { position: absolute; background: rgba(8, 5, 16, .8); pointer-events: auto; }                         /* 짚은 곳 밖은 어둡게 + 터치 차단 */
+#tut #tut-shield { position: absolute; display: none; pointer-events: auto; }                                          /* 설명 단계: 구멍 위를 투명하게 덮어 실수로 누르지 않게 */
+#tut #tut-ring { position: absolute; display: none; border-radius: 3cqw; pointer-events: none; transition: left .16s, top .16s, width .16s, height .16s;
+  box-shadow: 0 0 0 .7cqw var(--amber), 0 0 6cqw 1.2cqw #ffcf5c88; animation: tutPulse 1.4s ease-in-out infinite; }
+@keyframes tutPulse { 0%, 100% { box-shadow: 0 0 0 .6cqw var(--amber), 0 0 4cqw .8cqw #ffcf5c77; } 50% { box-shadow: 0 0 0 1cqw var(--amber), 0 0 8cqw 2cqw #ffcf5ccc; } }
+#tut #tut-hand { position: absolute; left: 0; top: 0; width: 11cqw; height: 11cqw; margin: -1.4cqw 0 0 -3.6cqw; display: none; pointer-events: none; z-index: 2;
+  background: radial-gradient(circle at 36% 28%, #fff 0 18%, #ffffffcc 19% 38%, #ffcf5c99 39% 62%, #ffcf5c00 64%); border-radius: 50%; filter: drop-shadow(0 .8cqw 1.4cqw #000a); }   /* 손가락 대신 눌린 자국 모양의 빛 */
+#tut .tut-dlg { position: absolute; left: 50%; transform: translateX(-50%); width: 94cqw; display: flex; gap: 2.4cqw; align-items: flex-end; pointer-events: auto; z-index: 3; }
+#tut .tut-por { flex: 0 0 auto; width: 20cqw; height: 20cqw; border-radius: 4cqw; border: .7cqw solid var(--amber); background: #1a1330 no-repeat; background-size: 235%; background-position: 47% 7%;
+  box-shadow: 0 1.6cqw 4.4cqw #000b; }                                                                                   /* 루비 CG 얼굴 확대 */
+#tut .tut-body { flex: 1 1 auto; min-width: 0; background: linear-gradient(180deg, #251d3c, #191330); border: .6cqw solid var(--amber); border-radius: 4.2cqw; padding: 3cqw 3.6cqw 3.2cqw; box-shadow: 0 2cqw 5.6cqw #000c; }
+#tut .tut-name { color: var(--amber); font-weight: 800; font-size: 3.8cqw; margin-bottom: 1cqw; }
+#tut .tut-msg { color: var(--ink); font-size: 3.5cqw; line-height: 1.55; word-break: keep-all; overflow-wrap: break-word; }
+#tut .tut-msg b { color: var(--amber); }
+#tut .tut-msg .uic { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
+#tut .tut-tap { color: #a99fd6; font-size: 3cqw; margin-top: 1.4cqw; animation: tutBlink 1.5s ease-in-out infinite; }
+@keyframes tutBlink { 0%, 100% { opacity: 1; } 50% { opacity: .45; } }
+#tut .tut-row { display: flex; justify-content: flex-end; align-items: center; flex-wrap: wrap; gap: 1.8cqw; margin-top: 2.2cqw; }
+#tut .tut-row:empty { display: none; }
+#tut .tut-ask { flex: 1 1 100%; color: var(--muted); font-size: 3cqw; line-height: 1.45; text-align: right; }
+#tut .tut-skip { appearance: none; background: transparent; border: 1px solid #ffffff2e; color: var(--muted); font: inherit; font-size: 3.1cqw; font-weight: 700; padding: 1.8cqw 3.2cqw; border-radius: 2.6cqw; cursor: pointer; }
+#tut .tut-next { appearance: none; border: 0; background: linear-gradient(180deg, #ffe08a, var(--amber)); color: #3a2a05; font: inherit; font-size: 3.8cqw; font-weight: 800; padding: 2.2cqw 6cqw; border-radius: 2.8cqw; box-shadow: 0 .8cqw 0 #9c7c2c; cursor: pointer; }
+#tut .tut-next:active { transform: translateY(.5cqw); box-shadow: 0 .3cqw 0 #9c7c2c; }

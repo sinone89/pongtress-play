@@ -647,6 +647,7 @@
     S.battleTimer = 0;
     S.battleStage = 'intro';
     renderSkills();
+    if (typeof Tutorial !== 'undefined') Tutorial.event('battle');     // 튜토리얼: 전투 phase 첫 진입 설명(게임을 멈추고 띄움). 최상위 const 라 window.Tutorial 로는 안 보인다
   }
 
   function applyActive(c, sk, mul) {
@@ -1817,7 +1818,8 @@
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;
       if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
-      if (S.phase === 'load') stepBalls(d);
+      if (window.__tutPause) { /* 튜토리얼 설명 카드가 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
+      else if (S.phase === 'load') stepBalls(d);
       else if (S.phase === 'battle') { stepBattle(d); checkBossThreshold(); }
       stepVisuals(d);
       if (S.phase !== 'map' && S.pockets.length) draw();   // 맵(상점·정비 포함) 중엔 캔버스 갱신 불필요
@@ -1856,7 +1858,7 @@
     const sx = rect.width ? canvas.clientWidth / rect.width : 1, sy = rect.height ? canvas.clientHeight / rect.height : 1;
     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   }
-  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); Sound.resume(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
+  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); Sound.resume(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }   // 포인터 캡처: 조준 중 손가락/커서가 캔버스 밖(튜토리얼 막 등)으로 나가도 pointerup 을 받는다
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
   function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
 
@@ -1934,7 +1936,8 @@
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     // 화면 연출까지 한 걸음(rAF가 멈춘 숨은 탭에서 수동 진행용): layoutT 보간 포함
     step(dt) { if (!S || S.over) return; const tgt = S.layoutTarget || 0; if (S.layoutT !== tgt) { const st = dt / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + st) : Math.max(tgt, S.layoutT - st); } if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } stepVisuals(dt); },
-    render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos, renderSkills, showResult, renderEnemyBar
+    render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos, renderSkills, showResult, renderEnemyBar,
+    layout, launcher            // 튜토리얼이 캔버스 영역(적 필드·방벽·포켓·핀볼 판)을 짚어 주는 데 쓴다
   };
 
   // 헤드리스 자가 테스트: ?sim=1 로 런을 자동 진행하며 런타임 오류·상태를 #boot-error 에 남긴다.
