@@ -12,7 +12,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=143">
+  <link rel="stylesheet" href="css/game.css?v=144">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
@@ -51,6 +51,7 @@
         <span class="cur"><span class="uic"><span class="uic-fb">💎</span><img class="uic-im" alt="" src="assets/ui/cur_gems.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gems">0</b></span>
         <span class="cur"><span class="uic"><span class="uic-fb">📄</span><img class="uic-im" alt="" src="assets/ui/cur_docs.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-docs">0</b></span>
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
+        <button class="help-btn lobby-help" data-help="open" aria-label="도움말"><span class="uic"><span class="uic-fb">❔</span><img class="uic-im" alt="" src="assets/ui/ic_info.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></button>
         <button class="acct-btn" id="acct-btn"></button>
       </header>
       <main id="lobby-main">
@@ -108,6 +109,7 @@
         <span id="c-phase" class="c-phase">장전</span>
         <span id="c-level" class="c-level">Lv.1</span>
         <button class="mute-btn combat-mute"><span class="mute-icon">🔊</span></button>
+        <button class="help-btn combat-help" data-help="open" aria-label="도움말"><span class="uic"><span class="uic-fb">❔</span><img class="uic-im" alt="" src="assets/ui/ic_info.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></button>
         <div id="exp-bar"><div id="exp-fill"></div></div>
         <div id="relic-bar"></div>
         <div id="enemy-bar"></div>
@@ -161,11 +163,12 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=143"></script>
-  <script src="js/spritemeta.js?v=143"></script>
-  <script src="js/content.js?v=143"></script>
-  <script src="js/meta.js?v=143"></script>
-  <script src="js/game.js?v=143"></script>
-  <script src="js/tutorial.js?v=143"></script>
+  <script src="js/audio.js?v=144"></script>
+  <script src="js/spritemeta.js?v=144"></script>
+  <script src="js/content.js?v=144"></script>
+  <script src="js/meta.js?v=144"></script>
+  <script src="js/game.js?v=144"></script>
+  <script src="js/tutorial.js?v=144"></script>
+  <script src="js/help.js?v=144"></script>
 </body>
 </html>

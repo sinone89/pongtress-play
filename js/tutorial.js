@@ -85,7 +85,7 @@ const Tutorial = (function () {
       msg: '어서 오세요, 지휘관님! 저는 <b>루비</b>예요.<br>폭주한 병기군단에 맞서 <b>방벽</b>을 지켜 내는 게임이에요. 필요한 건 제가 하나씩 알려 드릴게요!',
       onEnter: () => goTab('home') },
     { id: 'wallet', ctx: 'lobby', kind: 'next',
-      msg: '먼저 위쪽 <b>재화</b>예요.<br>{gold}<b>크레딧</b>은 레벨업, {mats}<b>재료</b>는 승급, {gems}<b>보석</b>은 가챠, {docs}<b>문서</b>는 조각 교환에 써요.',
+      msg: '먼저 위쪽 <b>재화</b>예요.<br>{gold}<b>크레딧</b>은 레벨업, {mats}<b>재료</b>는 승급, {gems}<b>보석</b>은 가챠, {docs}<b>문서</b>는 조각 교환에 써요.<br>오른쪽 <b>?</b> 버튼은 <b>도움말</b> — 모르는 게 생기면 언제든 눌러 보세요!',
       target: () => $('lobby-top') },
     { id: 'home', ctx: 'lobby', kind: 'next', tab: 'home',
       msg: '<b>홈</b>에서는 편성한 캐릭터들이 알아서 싸우고 있어요.<br>출격하지 않아도 <b>방치 보상</b>이 쌓이니, 가끔 <b>[받기]</b>로 챙겨 주세요!',
@@ -175,7 +175,7 @@ const Tutorial = (function () {
       msg: '아래 <b>핀볼 판</b>에서 볼을 쏘아 포켓을 채워요. 볼은 페그에 맞아 <b>튕기며 위로</b> 올라가요. 색 있는 <b>특수 페그</b>는 맞으면 효과가 있고, 한 턴에 한 번만 터져요.',
       target: () => canvasRect('pins') },
     { id: 'peg-mult', ctx: 'run', kind: 'next', pause: true, ready: loadReady, skip: () => !pegRect(['mult5', 'mult2']),
-      msg: '금색 ◆ <b>증식 ×2</b>, 분홍 ★ <b>증식 ×5</b> — 맞히면 볼이 <b>분열</b>해서 포켓을 한꺼번에 채워요!',
+      msg: '마름모 ◆ <b>증식 ×2</b>, 별 ★ <b>증식 ×5</b> — 맞히면 볼이 <b>분열</b>해서 포켓을 한꺼번에 채워요!',
       target: () => pegRect(['mult5', 'mult2']) },
     { id: 'peg-other', ctx: 'run', kind: 'next', pause: true, ready: loadReady, skip: () => !pegRect(['charge', 'gold']),
       msg: '초록 ▲ <b>증폭</b>은 충전 ×3 볼, 노란 ⬡ <b>크레딧</b>은 상점에서 쓸 {gold}<b>크레딧</b>을 줘요. 판에 박힌 큰 <b>범퍼</b>는 볼을 세게 튕겨 내요.',
@@ -196,6 +196,9 @@ const Tutorial = (function () {
     { id: 'battle-intro', ctx: 'run', kind: 'next', pause: true, ready: () => { const s = run(); return !!s && s.phase === 'battle' && !vis('reward'); },
       msg: '<b>전투 시작!</b> 충전된 탄환만큼 캐릭터가 <b>자동으로 사격</b>해요. 표적은 <b>맨 앞 적</b>. 사격이 끝나면 적이 한 칸 전진하고 다시 장전 단계로 돌아가요 — 이걸 반복해 적을 모두 쓰러뜨리면 승리!',
       target: () => [canvasRect('field'), canvasRect('wall')] },
+    { id: 'help-intro', ctx: 'run', kind: 'next', pause: true, label: '알겠어요', ready: () => combatOn() && !vis('reward') && !vis('result') && !!q('.combat-help'),
+      msg: '모르는 게 생기면 위쪽 <b>?</b> 버튼 — <b>도움말</b>에서 규칙·페그·모듈·적 정보를 언제든 다시 볼 수 있어요. 전투 중에 열면 게임이 <b>멈춰요</b>!',
+      target: () => q('.combat-help') },
     { id: 'tour-end', ctx: 'run', kind: 'next', pause: true, label: '받기', ready: () => combatOn() && !vis('reward') && !vis('result'),
       msg: '여기까지가 기본이에요! 스킬·레벨 업 보상·모듈·상점·정비·보스는 <b>처음 만날 때마다</b> 제가 알려 드릴게요.<br>작은 선물도 드려요 — {gems}<b>보석 ' + REWARD.gems + '</b> · {gold}<b>크레딧 ' + REWARD.gold + '</b>!' }
   ];

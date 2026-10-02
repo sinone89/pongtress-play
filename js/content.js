@@ -399,6 +399,8 @@ function ui(name, emoji) { return uiIcon(name, emoji, 'width:1.15em;height:1.15e
 const UI_CUR = { gold: ['cur_gold', '🪙'], mats: ['cur_mats', '🔩'], gems: ['cur_gems', '💎'], docs: ['cur_docs', '📄'], shards: ['cur_shard', '🔷'] };
 const uiCur = (k) => ui(UI_CUR[k][0], UI_CUR[k][1]);   // 재화 키(gold/mats/gems/docs/shards) → 아이콘
 const tagIc = (t) => ui('tag_' + t, RELIC_TAGS[t].icon);   // 모듈 태그(precision/explosive/guard/pinball/harvest) 아이콘
+// 도움말 버튼(? 아이콘): [data-help] 는 js/help.js 가 문서 위임으로 연다 → 지도 머리말처럼 다시 그려지는 곳에도 그대로 쓸 수 있다(로비·전투 머리말은 index.html 에 같은 모양으로 직접 써 둠)
+const helpBtn = (cls) => '<button class="help-btn ' + cls + '" data-help="open" aria-label="도움말">' + uiIcon('ic_info', '❔') + '</button>';
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──
 // 골칸 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 골칸을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영

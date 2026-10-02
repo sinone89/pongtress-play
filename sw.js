@@ -2,7 +2,7 @@
 // 에셋(assets/…)은 요청될 때마다 캐시에 쌓이므로 목록에는 앱 셸만 둔다. 에셋이 크게 바뀌면 CACHE 이름을 올려 옛 캐시를 비운다.
 const CACHE = 'pongtress-v0-4';
 const ASSETS = [
-  './', './index.html', './css/game.css', './js/audio.js', './js/spritemeta.js', './js/content.js', './js/meta.js', './js/game.js', './js/tutorial.js', './manifest.json'
+  './', './index.html', './css/game.css', './js/audio.js', './js/spritemeta.js', './js/content.js', './js/meta.js', './js/game.js', './js/tutorial.js', './js/help.js', './manifest.json'
 ];
 self.addEventListener('install', (e) => {
   e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting()));

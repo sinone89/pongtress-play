@@ -1196,7 +1196,7 @@
     }));
     $('map-body').innerHTML = svg + nodes;
     $('map-head').innerHTML = '<b>' + (S.mode === 'endless' ? ui('ic_promote', '♾') + ' 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? ui('ic_timer', '📅') + ' 일일 도전' : '스테이지 ' + S.stage) + '</b>'
-      + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>';
+      + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>' + helpBtn('map-help');
     renderRelicBar();
     $('map').hidden = false;
   }
@@ -1818,7 +1818,7 @@
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;
       if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
-      if (window.__tutPause) { /* 튜토리얼 설명 카드가 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
+      if (window.__tutPause || window.__helpPause) { /* 튜토리얼 설명 카드·도움말 팝업이 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
       else if (S.phase === 'load') stepBalls(d);
       else if (S.phase === 'battle') { stepBattle(d); checkBossThreshold(); }
       stepVisuals(d);

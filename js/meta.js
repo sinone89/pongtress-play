@@ -250,7 +250,7 @@ const Meta = (function () {
     return (Math.floor(n / 1e7) / 10).toFixed(1) + '억';
   }
   function renderBar() {
-    for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); }
+    for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); el.parentNode.classList.toggle('lg', el.textContent.length >= 6); }   // "12.3만"처럼 6글자 이상이면 글자를 살짝 줄여 칩 안에 담는다
   }
 
   function charChip(id, opts) {
