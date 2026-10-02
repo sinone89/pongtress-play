@@ -168,10 +168,13 @@ const Meta = (function () {
     else { const slot = M.party.indexOf(null); if (slot >= 0) M.party[slot] = id; else return false; }
     save(); return true;
   }
-  // 드래그 배치: 지정 레인에 캐릭터 할당(다른 레인에 있으면 제거=상호배타). 비어있는 슬롯이면 그 자리에.
+  // 드래그 배치: 지정 레인에 캐릭터 할당(다른 레인에 있으면 거기서 빠짐=상호배타). 비어있는 슬롯이면 그 자리에.
+  // 이미 편성된 캐릭터를 다른 레인(점유 중)으로 끌면 두 캐릭터가 자리를 맞바꾼다.
   function assignPartySlot(lane, id) {
     if (lane < 0 || lane > 2 || !M.owned[id]) return false;
-    const prev = M.party.indexOf(id); if (prev >= 0) M.party[prev] = null;
+    const prev = M.party.indexOf(id), occupant = M.party[lane] || null;
+    if (prev === lane) return true;                              // 제자리에 놓음
+    if (prev >= 0) M.party[prev] = occupant;                     // 점유자가 있으면 내 원래 자리로, 없으면 그 칸은 빔
     M.party[lane] = id; save(); return true;
   }
   function clearPartySlot(lane) { if (lane >= 0 && lane <= 2) { M.party[lane] = null; save(); } }
@@ -232,7 +235,7 @@ const Meta = (function () {
     let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="sc-st' + (owned && s <= o.star ? ' on' : '') + '">★</span>';
     return '<button class="stchar' + (owned ? '' : ' locked') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '">'
       + '<div class="sc-top"><div class="sc-grade ' + g + '">' + R.name + '</div><div class="sc-star">' + stars + '</div></div>'
-      + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()">'
+      + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'thumb') + '" alt="" draggable="false" onerror="this.remove()">'
       +   (owned ? '<span class="sc-lv">Lv.' + o.level + '</span>' : '<span class="sc-lv locked">미보유</span>')
       +   (opts.inParty ? '<span class="onbadge">편성</span>' : '')
       + '</div>'
@@ -292,7 +295,7 @@ const Meta = (function () {
         if (id) {
           const c = leveledDef(id), b = base(id), R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n';
           d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
-            + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()"></div>'
+            + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" draggable="false" onerror="this.remove()"></div>'
             + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
         } else d.innerHTML = '<span class="lane-empty">–</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
         box.append(d);
@@ -544,12 +547,14 @@ const Meta = (function () {
         d.dataset.char = id;
         d.innerHTML = '<span class="ls-rlbl">' + (lane + 1) + '레인</span>'
           + '<button class="ls-x" data-un="' + lane + '">' + ui('ic_close', '✕') + '</button>'
-          + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" onerror="this.remove()"></div>'
+          + '<div class="ls-img"><img src="' + CharArt.path(id, 'thumb') + '" alt="" draggable="false" onerror="this.remove()"></div>'
           + '<div class="ls-nm"><span class="ls-g ' + g + '">' + R.name + '</span><span class="ls-nn">' + c.name + '</span></div>';
       } else d.innerHTML = '<span class="lane-empty">' + uiIcon('ic_add', '＋', 'width:1.2em;height:1.2em') + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
       slots.append(d);
     });
-    const list = $('owned-list'); list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
+    const list = $('owned-list'), keepTop = list.scrollTop;                       // 다시 그려도 보던 스크롤 위치를 유지
+    list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
+    list.scrollTop = keepTop;
     const oc = $('owned-count'); if (oc) oc.textContent = ROSTER.filter(c => M.owned[c.id]).length + '/' + ROSTER.length;
   }
 
@@ -780,8 +785,10 @@ const Meta = (function () {
     $('lane-slots').onclick = (e) => {
       const x = e.target.closest('[data-un]'); if (x) { clearPartySlot(+x.dataset.un); renderFormation(); return; }
     };
+    // 앱 안에서는 브라우저 기본 드래그(이미지 끌기)가 필요 없다 — 시작되면 pointercancel 이 나서 아래 드래그 편성이 끊긴다
+    document.addEventListener('dragstart', (e) => e.preventDefault());
     let fDrag = null;
-    const fmtSlotAt = (x, y) => { const els = document.querySelectorAll('#lane-slots [data-slot]'); for (const el of els) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return +el.dataset.slot; } return -1; };
+    const fmtSlotAt =(x, y) => { const els = document.querySelectorAll('#lane-slots [data-slot]'); for (const el of els) { const r = el.getBoundingClientRect(); if (x >= r.left && x <= r.right && y >= r.top && y <= r.bottom) return +el.dataset.slot; } return -1; };
     const fmtGhost = () => { let g = $('drag-ghost'); if (!g) { g = document.createElement('div'); g.id = 'drag-ghost'; document.body.appendChild(g); } return g; };
     const fmtHi = (x, y) => { const s = fmtSlotAt(x, y); document.querySelectorAll('#lane-slots [data-slot]').forEach(el => el.classList.toggle('drop-hi', +el.dataset.slot === s)); };
     const fmtClearHi = () => document.querySelectorAll('#lane-slots .drop-hi').forEach(el => el.classList.remove('drop-hi'));
@@ -831,9 +838,16 @@ const Meta = (function () {
       const lv = e.target.closest('[data-lvup]'), pr = e.target.closest('[data-promote]'), pt = e.target.closest('[data-party]');
       if (gt) { cdTab = gt.dataset.cdtab; openChar(cdId); }
       else if (nv && !nv.disabled) { cycleChar(+nv.dataset.cnav); }
-      else if (lv && !lv.disabled) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderBar(); if (typeof Sound !== 'undefined') Sound.play('level'); }
-      else if (pr && !pr.disabled) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderBar(); if (typeof Sound !== 'undefined') Sound.play('level'); }
-      else if (pt) { toggleParty(pt.dataset.party); openChar(pt.dataset.party); }
+      // 상태를 바꾸는 동작(레벨업·승급·편성)은 팝업 뒤의 로비 탭도 바로 다시 그린다(renderLobby) — 안 그러면 팝업을 닫아도 배치칸·Lv 가 탭을 옮겨야 갱신됨
+      else if (lv && !lv.disabled) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('level'); }
+      else if (pr && !pr.disabled) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('level'); }
+      else if (pt) {
+        const ok = toggleParty(pt.dataset.party); openChar(pt.dataset.party); renderLobby();
+        if (!ok) {                                                  // 배치칸 3개가 다 찬 상태에서 편성 → 말없이 무시하지 말고 버튼에 잠깐 알린다
+          const b = document.querySelector('#char-modal .cd-place');
+          if (b) { b.textContent = '배치칸이 가득 찼어요'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected && !$('char-modal').hidden) openChar(cdId); }, 1300); }
+        } else if (typeof Sound !== 'undefined') Sound.play('click');
+      }
     };
     $('gacha-modal').onclick = (e) => { if (e.target.dataset.close || e.target === $('gacha-modal')) $('gacha-modal').hidden = true; };
     // 치트: 좌하단 build 태그 탭
