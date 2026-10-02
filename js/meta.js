@@ -385,7 +385,7 @@ const Meta = (function () {
     const n = partySlots().filter(Boolean).length, warn = $('sortie-warn');
     const benched = ownedIds().filter(id => !inParty(id)).length;                     // 보유했지만 배치하지 않은 동료(자동 배치는 하지 않으므로 알려 준다)
     if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
-    else if (n < 3 && benched > 0) { warn.hidden = false; warn.textContent = '빈 레인이 있어요 — 편성 탭에서 동료를 배치해 보세요!'; $('btn-sortie').disabled = false; }
+    else if (n < 3 && benched > 0) { warn.hidden = false; warn.textContent = '빈 레인이 있어요. 편성 탭에서 동료를 배치해 보세요!'; $('btn-sortie').disabled = false; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
   }
 
@@ -650,7 +650,7 @@ const Meta = (function () {
     return '<div class="gbanner">'
       + '<button class="gb-info" data-gachainfo="1">' + ui('ic_info', '❔') + '</button>'          // 확률은 ⓘ 팝업에서만 표시(배너에 중복 표기 안 함)
       + '<div class="gb-t">' + ui('ic_ticket', '🎫') + ' 상시 배너</div>'
-      + (tutPull ? '<div class="gb-d"><b>첫 영입! 튜토리얼 뽑기 1회 무료</b></div>' : lock ? '<div class="gb-d">튜토리얼이 끝나면 열려요</div>' : free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
+      + (tutPull ? '<div class="gb-d"><b>첫 영입! 1회 무료</b></div>' : lock ? '<div class="gb-d">튜토리얼이 끝나면 열려요</div>' : free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
       + '<div class="gb-btns">'
       +   (tutPull ? '<button class="sns-btn" data-gacha="tutorial">튜토리얼 뽑기 · 무료</button>'
             : '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '"' + (lock ? ' disabled' : '') + '>단일 ' + (free ? '무료' : uiCur('gems') + GACHA.cost1) + '</button>')

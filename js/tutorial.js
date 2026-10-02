@@ -85,57 +85,57 @@ const Tutorial = (function () {
     // ── 챕터 1 · 첫 전투 (튜토리얼 전투 — 루비 1명) ──
     { id: 'c1-hello', ch: 1, ctx: 'run', kind: 'next', pause: true, label: '좋아요!', ready: loadReady,
       msg: '어서 와요, 지휘관님! 저는 <b>루비</b>예요. 먼저 한 판 같이 싸워 봐요!' },
-    { id: 'c1-aim', ch: 1, ctx: 'run', kind: 'do', ready: loadReady, tap: '끌어서 조준 → 손을 떼면 발사',
-      msg: '판을 <b>끌어서 조준</b>하고, 손을 떼면 <b>발사</b>!',
+    { id: 'c1-aim', ch: 1, ctx: 'run', kind: 'do', ready: loadReady, tap: '표시된 판 위에서 끌었다 놓아요',
+      msg: '<b>핀볼 판</b>을 <b>끌어서 조준</b>하고, 손을 떼면 <b>발사</b>돼요!',
       target: () => canvasRect('pins'), hand: aimHand(0.7), done: () => launched() >= 1 },
     { id: 'c1-pocket', ch: 1, ctx: 'run', kind: 'next', dim: false, label: '알겠어요',
       msg: '볼이 위쪽 <b>색 칸</b>에 들어가면 루비의 <b>탄환이 충전</b>돼요.',
       done: () => { const s = run(); return !s || (s.balls.length === 0 && launched() >= 1) || s.phase !== 'load'; } },
-    { id: 'c1-aim2', ch: 1, ctx: 'run', kind: 'do', ready: loadReady, tap: '한 번 더 쏴요',
-      msg: '<b>한 발 더!</b>', target: () => canvasRect('pins'), hand: aimHand(0.3),
+    { id: 'c1-aim2', ch: 1, ctx: 'run', kind: 'do', ready: loadReady, tap: '아까처럼 끌었다 놓아요',
+      msg: '<b>한 발 더</b> 쏴 봐요!', target: () => canvasRect('pins'), hand: aimHand(0.3),
       done: () => { const s = run(); return !s || s.launchesLeft <= 0 || s.phase !== 'load'; } },
     { id: 'c1-battle', ch: 1, ctx: 'run', kind: 'next', pause: true, ready: () => { const s = run(); return !!s && s.phase === 'battle' && !vis('reward'); },
-      msg: '충전한 만큼 루비가 <b>자동 사격</b>! 적을 다 쓰러뜨리면 승리예요.',
+      msg: '충전한 만큼 루비가 <b>자동으로 사격</b>해요! 적을 모두 쓰러뜨리면 승리예요.',
       target: () => [canvasRect('field'), canvasRect('wall')], onEnter: () => { T.fought = true; } },
     { id: 'c1-again', ch: 1, ctx: 'run', kind: 'next', dim: false, label: '알겠어요', ready: () => loadReady() && !!T.fought,
-      msg: '한 번 더 장전해요. 이번엔 <b>마음대로</b> 쏴 봐요!', done: () => { const s = run(); return !!s && s.over; } },
+      msg: '다시 <b>장전</b> 차례예요. 이번엔 <b>마음대로</b> 쏴 봐요!', done: () => { const s = run(); return !!s && s.over; } },
     { id: 'c1-win', ch: 1, ctx: 'run', kind: 'next', noSkip: false, label: '동료 만나러 가기', ready: () => { const s = run(); return !!s && !!s.tutorial && s.over; },
       msg: '<b>첫 승리!</b> 혼자서도 잘 싸우지만… <b>동료</b>가 있으면 더 든든하겠죠?',
       onLeave: () => { const g = game(); try { g && g.exitTutorialBattle(); } catch (e) {} const t = tut(); t.battle = true; persist(); T.fought = false; } },
 
     // ── 챕터 2 · 영입과 편성 ──
     { id: 'c2-shop', ch: 2, ctx: 'lobby', kind: 'do', tap: '아래 [상점] 탭을 눌러요',
-      msg: '이제 <b>동료</b>를 영입하러 가요! 아래 <b>[상점]</b> 탭!', target: () => navBtn('shop'), done: () => tabOn('shop') },
+      msg: '이제 <b>동료</b>를 영입하러 가요!', target: () => navBtn('shop'), done: () => tabOn('shop') },
     { id: 'c2-pull', ch: 2, ctx: 'lobby', kind: 'do', tab: 'shop', tap: '[튜토리얼 뽑기]를 눌러요', skip: () => reviewing() || !q('[data-gacha="tutorial"]'),
-      msg: '새 동료를 뽑아요. 오늘은 특별히 <b>무료</b>예요!', target: () => q('[data-gacha="tutorial"]'), done: () => vis('gacha-modal') },
+      msg: '<b>첫 뽑기</b>는 <b>무료</b>예요! 새 동료를 뽑아 봐요.', target: () => q('[data-gacha="tutorial"]'), done: () => vis('gacha-modal') },
     { id: 'c2-pull-r', ch: 2, ctx: 'lobby', kind: 'next', tab: 'shop', skip: () => !reviewing(),
-      msg: '<b>가챠</b>에서 새 동료를 뽑아요. 단일 {gems}100 · 10연 {gems}900! ⓘ를 누르면 <b>확률</b>이 나와요.', target: () => q('.gbanner') },
+      msg: '<b>가챠</b>에서 새 동료를 뽑아요. 비용은 단일 {gems}' + GACHA.cost1 + ', 10연 {gems}' + GACHA.cost10 + '이에요. <b>ⓘ</b> 버튼에서 <b>확률</b>도 볼 수 있어요.', target: () => q('.gbanner') },
     { id: 'c2-result', ch: 2, ctx: 'lobby', kind: 'do', modal: 'gacha-modal', tap: '[확인]을 눌러요', skip: () => reviewing() || !vis('gacha-modal'),
-      msg: '<b>' + charName(TUTORIAL.pullId) + '</b>가 합류했어요! <b>[확인]</b>을 눌러요.', target: () => $('gacha-modal-box'), done: () => !vis('gacha-modal') },
+      msg: '새 동료 <b>' + charName(TUTORIAL.pullId) + '</b>가 합류했어요!', target: () => $('gacha-modal-box'), done: () => !vis('gacha-modal') },
     { id: 'c2-nav-form', ch: 2, ctx: 'lobby', kind: 'do', tap: '아래 [편성] 탭을 눌러요',
-      msg: '이제 <b>[편성]</b> 탭에서 동료를 배치해요.', target: () => navBtn('formation'), done: () => tabOn('formation') },
-    { id: 'c2-place', ch: 2, ctx: 'lobby', kind: 'do', tab: 'formation', dlg: 'bottom', tap: '카드를 빈 레인으로 끌어다 놓아요',
+      msg: '이제 동료를 <b>편성</b>해서 전투에 내보내요!', target: () => navBtn('formation'), done: () => tabOn('formation') },
+    { id: 'c2-place', ch: 2, ctx: 'lobby', kind: 'do', tab: 'formation', dlg: 'bottom', tap: '카드를 끌어다 놓거나, 탭한 뒤 [편성]을 눌러요',
       skip: () => !q('#lane-slots .lane-slot.empty') || !q('#owned-list .stchar:not(.locked):not(.placed)'),
-      msg: '<b>' + charName(TUTORIAL.pullId) + '</b>를 <b>빈 레인으로 끌어다</b> 놓아요.<br>카드를 <b>탭</b>해서 <b>[편성]</b>을 눌러도 돼요.',
+      msg: '<b>' + charName(TUTORIAL.pullId) + '</b>를 <b>빈 레인</b>에 배치해요!',
       target: () => $('tab-formation'),
       hand: () => ({ from: q('#owned-list .stchar:not(.locked):not(.placed)'), to: q('#lane-slots .lane-slot.empty') }),
       onEnter: () => { T.placeFrom = partyCount(); }, done: () => partyCount() > (T.placeFrom || 0) },
     { id: 'c2-lanes', ch: 2, ctx: 'lobby', kind: 'next', tab: 'formation',
-      msg: '레인마다 <b>한 명</b>! 부대 <b>체력의 합</b>이 곧 <b>방벽 HP</b>예요.', target: () => $('lane-slots') },
+      msg: '레인마다 <b>한 명</b>씩 설 수 있어요. 부대 <b>체력의 합</b>이 곧 <b>방벽 HP</b>예요!', target: () => $('lane-slots') },
 
     // ── 챕터 3 · 홈 · 출격 · 미션 ──
     { id: 'c3-home', ch: 3, ctx: 'lobby', kind: 'next', tab: 'home',
-      msg: '<b>홈</b>에서는 편성한 동료가 알아서 싸워요. <b>방치 보상</b>도 쌓여요!', target: () => [$('idle-canvas'), $('idle-reward')] },
+      msg: '<b>홈</b>에서는 편성한 동료가 알아서 싸워요. <b>방치 보상</b>도 차곡차곡 쌓여요!', target: () => [$('idle-canvas'), $('idle-reward')] },
     { id: 'c3-sortie', ch: 3, ctx: 'lobby', kind: 'next', tab: 'sortie',
-      msg: '<b>출격</b>에서 스테이지와 모드를 골라 지도로 떠나요.', target: () => [$('mode-select'), $('stage-select')] },
+      msg: '<b>출격</b> 탭에서 스테이지와 모드를 골라 전장으로 나가요.', target: () => [$('mode-select'), $('stage-select')] },
     { id: 'c3-mission', ch: 3, ctx: 'lobby', kind: 'next', tab: 'mission',
-      msg: '<b>미션</b>을 달성하면 보상! 가득 차면 <b>[수령]</b>.', target: () => $('mission-list') },
+      msg: '<b>미션</b>을 달성하면 보상을 받아요. 목표를 채우면 <b>[수령]</b>을 눌러요!', target: () => $('mission-list') },
     { id: 'c3-reward', ch: 3, ctx: 'lobby', kind: 'next', noSkip: true, label: '받기', skip: () => reviewing(),
-      msg: () => '튜토리얼 끝! <b>선물</b>이 도착했어요.<br>' + ui('cls_support', '🛠') + '<b>' + charName(TUTORIAL.rewardId) + '</b> 합류 · {gems}<b>' + TUTORIAL.reward.gems + '</b> · {gold}<b>' + TUTORIAL.reward.gold + '</b>',
+      msg: () => '수고했어요, 지휘관님! <b>튜토리얼 완료</b> 선물이 도착했어요.<br>' + ui('cls_support', '🛠') + '<b>' + charName(TUTORIAL.rewardId) + '</b> 합류 · {gems}<b>' + TUTORIAL.reward.gems + '</b> · {gold}<b>' + TUTORIAL.reward.gold + '</b>',
       onLeave: () => { const m = meta(); try { m && m.tutGrantRewards(); m && m.renderLobby(); } catch (e) {} } },
     { id: 'c3-go', ch: 3, ctx: 'lobby', kind: 'next', noSkip: true, label: '확인',
-      msg: () => reviewing() ? '여기까지예요! 모르는 건 위쪽 <b>?</b> <b>도움말</b>에서 언제든 볼 수 있어요.'
-        : '<b>' + charName(TUTORIAL.rewardId) + '</b>는 <b>[편성]</b> 탭에서 직접 배치해 주세요!<br>모르는 건 위쪽 <b>?</b> <b>도움말</b>에서 언제든 볼 수 있어요.',
+      msg: () => reviewing() ? '수고했어요! 모르는 게 생기면 위쪽 <b>?</b> <b>도움말</b>에서 언제든 찾아볼 수 있어요.'
+        : '<b>' + charName(TUTORIAL.rewardId) + '</b>는 <b>[편성]</b> 탭에서 직접 배치해 주세요!<br>모르는 게 생기면 위쪽 <b>?</b> <b>도움말</b>에서 언제든 찾아볼 수 있어요.',
       buttons: () => reviewing() ? null : [{ a: 'form', label: '편성하러 가기', primary: true }, { a: 'sortie', label: '출격하러 가기' }],
       onButton: (a) => { finishTour(); goTab(a === 'form' ? 'formation' : 'sortie'); } }
   ];
@@ -147,53 +147,53 @@ const Tutorial = (function () {
   const TIPS = [
     // ── 로비 ──
     { id: 'mode.daily', ctx: 'lobby', help: 'modes', when: () => tabOn('sortie') && !!q('#mode-select .sns-tab.on[data-mode="daily"]'), target: () => $('mode-select'),
-      msg: '<b>일일 도전</b>은 오늘 하루 고정된 판! 첫 클리어엔 {gems}<b>' + (typeof MODES !== 'undefined' ? MODES.daily.reward.gems : 40) + '</b>을 줘요.' },
+      msg: '<b>일일 도전</b>은 오늘 하루 같은 판에 도전하는 모드예요. 첫 클리어엔 {gems}<b>' + (typeof MODES !== 'undefined' ? MODES.daily.reward.gems : 40) + '</b>을 줘요.' },
     { id: 'mode.endless', ctx: 'lobby', help: 'modes', when: () => tabOn('sortie') && !!q('#mode-select .sns-tab.on[data-mode="endless"]'), target: () => $('mode-select'),
-      msg: '<b>무한 모드</b>는 보스를 잡을수록 <b>더 강한 막</b>이 이어져요. 최고 기록에 도전!' },
+      msg: '<b>무한 모드</b>는 보스를 쓰러뜨릴 때마다 <b>더 강한 막</b>이 이어져요. 최고 기록에 도전해 봐요!' },
     { id: 'char.detail', ctx: 'lobby', help: 'chars', modal: 'char-modal', when: () => vis('char-modal') && !!q('#char-modal .cd-tab.on[data-cdtab="lvup"]'), target: () => q('#char-modal .cd-statcol'),
-      msg: '<b>레벨업</b>은 {gold}크레딧, <b>승급</b>은 {shards}조각 + {mats}재료예요. 스킬은 아래에서 봐요.' },
+      msg: '<b>레벨업</b>에는 {gold}크레딧, <b>승급</b>에는 {shards}조각과 {mats}재료가 필요해요. 스킬은 아래에서 볼 수 있어요.' },
     { id: 'char.promote', ctx: 'lobby', help: 'chars', modal: 'char-modal', when: () => vis('char-modal') && !!q('#char-modal .cd-tab.on[data-cdtab="promote"]'), target: () => q('#char-modal .cd-cmp'),
-      msg: '<b>승급</b>은 ★을 올려 스탯과 <b>레벨 상한</b>을 키워요. 조각은 가챠 중복·{docs}문서로 모아요.' },
+      msg: '<b>승급</b>하면 ★이 올라 스탯과 <b>레벨 상한</b>이 커져요. 조각은 가챠에서 같은 동료가 나올 때나 {docs}문서로 얻어요.' },
     { id: 'shop.doc', ctx: 'lobby', help: 'econ', when: () => tabOn('shop') && !!q('.shoptabs .sns-tab.on[data-stab="doc"]'), target: () => q('.shoptabs'),
-      msg: '{docs}문서로 보유 요원의 <b>조각</b>을 살 수 있어요(등급이 높을수록 비싸요).' },
+      msg: '{docs}문서로 보유한 동료의 <b>조각</b>을 살 수 있어요. 등급이 높을수록 비싸요.' },
     { id: 'shop.pkg', ctx: 'lobby', when: () => tabOn('shop') && !!q('.shoptabs .sns-tab.on[data-stab="pkg"]'), target: () => q('.shoptabs'),
-      msg: '<b>패키지</b>는 준비 중이에요. 곧 보석 패키지와 주간 패스가 열려요!' },
+      msg: '<b>패키지</b>는 아직 준비 중이에요. 곧 보석 패키지와 주간 패스가 열릴 예정이에요!' },
     { id: 'mission.claim', ctx: 'lobby', when: () => tabOn('mission') && !!q('#mission-list [data-mission]:not([disabled])'), target: () => q('#mission-list [data-mission]:not([disabled])'),
       msg: '달성한 미션이 있어요! <b>[수령]</b>을 눌러 보상을 받아요.' },
     // ── 런 ──
     { id: 'run.map', ctx: 'run', help: 'map', modal: 'map', when: () => { const s = run(); return !!s && !s.tutorial && vis('map') && !vis('reward') && !vis('run-modal'); }, target: () => $('map-body'),
-      msg: '<b>분기 지도</b>예요. 길을 골라 위로! {ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스' },
+      msg: '<b>분기 지도</b>예요. 길을 골라 위로 올라가요!<br>{ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스' },
     { id: 'skill', ctx: 'run', pause: true, help: 'battle',
       when: () => { const s = run(); return !!s && !s.tutorial && s.phase === 'load' && loadReady() && s.chars.some(c => c.gauge >= c.ref.active.gauge) && vis('battle-side'); },
       target: () => $('battle-side'),
-      msg: '<b>스킬 게이지</b>가 찼어요! 오른쪽 <b>스킬 버튼</b>을 켜 두면 이번 전투에 발동해요. <b>[스킬 자동]</b>도 있어요.' },
+      msg: '<b>스킬 게이지</b>가 찼어요! 오른쪽 <b>스킬 버튼</b>을 켜 두면 이번 전투에 발동해요. <b>[스킬 자동]</b>을 켜면 매번 알아서 써요.' },
     { id: 'lvl.relic', ctx: 'run', modal: 'reward', help: 'relic', when: () => vis('reward') && !!q('#reward-choices .relic-card'), target: () => q('#reward .modal-box'),
       msg: () => /레벨/.test(($('reward-title') && $('reward-title').textContent) || '')
-        ? '<b>레벨 업!</b> 보상 <b>3개 중 1개</b>! 짝수 레벨은 이번 판 특수 장비 <b>모듈</b>을 줘요.'
+        ? '<b>레벨 업!</b> 보상 <b>3개 중 1개</b>를 골라요. 짝수 레벨엔 이번 판 동안 쓰는 특수 장비 <b>모듈</b>이 나와요.'
         : '<b>전투 승리!</b> <b>모듈</b> 3개 중 1개를 골라요. 같은 모듈을 또 고르면 <b>개량</b>돼요!' },
     { id: 'lvl.stat', ctx: 'run', modal: 'reward', help: 'map', when: () => vis('reward') && !q('#reward-choices .relic-card') && !!q('#reward-choices .reward-card'), target: () => q('#reward .modal-box'),
-      msg: '홀수 레벨은 <b>스탯 강화</b>예요. 화력·방벽 HP·볼 +1·수리 중 <b>하나</b>를 골라요.' },
+      msg: '홀수 레벨엔 <b>스탯 강화</b>가 나와요. 화력·방벽 HP·볼 +1·수리 중 <b>하나</b>를 골라요.' },
     { id: 'relic.bar', ctx: 'run', help: 'relic',
       when: () => { const s = run(); return !!s && combatOn() && Object.keys(s.relics || {}).length > 0 && !vis('reward') && !vis('run-modal') && !vis('result') && (vis('map') || loadReady()); },
       target: () => vis('map') ? $('map-relics') : $('relic-bar'),
-      msg: '위쪽 <b>모듈 막대</b>를 탭하면 설명과 <b>세트 진행도</b>를 봐요. 같은 <b>태그 3개</b>면 세트 보너스!' },
+      msg: '위쪽 <b>모듈 막대</b>를 탭하면 설명과 <b>세트 진행도</b>를 볼 수 있어요. 같은 <b>태그</b> 모듈이 3개면 세트 보너스!' },
     { id: 'node.shop', ctx: 'run', modal: 'run-modal', help: 'map', when: () => vis('run-modal') && !!q('#run-modal-box [data-buy]'), target: () => $('run-modal-box'),
-      msg: '{ic:node_shop|🛒}<b>상점</b>이에요. 모은 {gold}<b>크레딧</b>으로 모듈이나 방벽 수리를 사요. 안 사도 <b>[떠나기]</b>!' },
+      msg: '{ic:node_shop|🛒}<b>상점</b>이에요. 모은 {gold}<b>크레딧</b>으로 모듈이나 방벽 수리를 살 수 있어요. 사지 않고 <b>[떠나기]</b>를 눌러도 돼요.' },
     { id: 'node.rest', ctx: 'run', modal: 'run-modal', help: 'map', when: () => vis('run-modal') && !!q('#run-modal-box [data-rest]'), target: () => $('run-modal-box'),
-      msg: '{ic:node_rest|🔧}<b>정비</b>예요. <b>수리</b>(방벽 HP 40%)와 <b>개량</b> 중 <b>하나</b>만 골라요.' },
+      msg: '{ic:node_rest|🔧}<b>정비</b>예요. <b>수리</b>(방벽 HP 40% 회복)와 <b>개량</b> 중 <b>하나</b>만 고를 수 있어요.' },
     { id: 'node.elite', ctx: 'run', pause: true, help: 'enemy',
       when: () => { const s = run(); return !!s && !!s.combat && !!s.combat.elite && loadReady(); }, target: () => canvasRect('field'),
-      msg: '{ic:node_elite|💀}<b>정예</b> 전투! 황금빛 <b>정예 적</b>은 세지만 경험치와 보상이 커요.' },
+      msg: '{ic:node_elite|💀}<b>정예</b> 전투예요! 황금빛 <b>정예 적</b>은 강하지만 경험치와 보상이 커요.' },
     { id: 'node.boss', ctx: 'run', pause: true, help: 'enemy',
       when: () => { const s = run(); return !!s && !!s.combat && !!s.combat.boss && loadReady(); }, target: () => canvasRect('field'),
-      msg: '{ic:node_boss|👾}<b>보스</b>예요! 곁의 알약에 <b>예고 패턴</b>까지 남은 턴이 떠요. 그 전에 <b>기절</b> 스킬로 묶으면 취소돼요!' },
+      msg: '{ic:node_boss|👾}<b>보스</b>예요! 보스 곁의 알약에 <b>예고 패턴</b>까지 남은 턴이 떠요. 그 전에 <b>기절</b> 스킬로 묶으면 패턴이 취소돼요!' },
     { id: 'board.interfere', ctx: 'run', pause: true, help: 'enemy',
       when: () => { const s = run(), g = game(); return !!s && !!g && loadReady() && g.anim.floats.some(f => f.note && /교란|오염|파편/.test(f.text)); }, target: () => canvasRect('pins'),
-      msg: '적이 <b>판에 간섭</b>해요! 해킹드론·슬러지·헤비아머를 먼저 잡으면 판이 깨끗해져요.' },
+      msg: '적이 <b>핀볼 판을 방해</b>해요! 해킹드론·슬러지·헤비아머를 먼저 잡으면 판이 깨끗해져요.' },
     { id: 'result', ctx: 'run', modal: 'result', when: () => vis('result'), target: () => $('result-box'),
       msg: () => ($('result-box') && $('result-box').classList.contains('win'))
         ? '<b>승리!</b> 스테이지를 <b>처음 클리어</b>하면 다음 스테이지와 새 모듈이 열려요.'
-        : '쓰러져도 모은 보상은 받아요. 캐릭터를 키워 다시 도전해요!' }
+        : '방벽이 무너져도 모은 보상은 받아요. 동료를 키워 다시 도전해요!' }
   ];
 
   // ═════════ 카드 화면(스포트라이트 + 말풍선) ═════════
@@ -258,7 +258,7 @@ const Tutorial = (function () {
     if (d.ch && !isTip(d) && k !== 'offer') { pg.textContent = d.ch + '/' + CHAPTERS.length + ' · ' + CHAPTERS[d.ch - 1].name + (reviewing() ? ' · 다시 보기' : ''); pg.style.display = 'block'; } else pg.style.display = 'none';
     let btns = '';
     if (k === 'offer') {
-      btns = '<button class="tut-skip" data-a="no">괜찮아요</button><button class="tut-next" data-a="yes">볼래요</button>';
+      btns = '<button class="tut-skip" data-a="no">안 볼래요</button><button class="tut-next" data-a="yes">볼래요</button>';
     } else {
       const last = pi >= pages.length - 1, canNext = (k === 'next' || k === 'tip' || shown.fallback);
       if (!isTip(d) && !d.noSkip) btns += '<button class="tut-skip" data-a="ask" id="tut-skipbtn">건너뛰기</button>';
@@ -366,10 +366,10 @@ const Tutorial = (function () {
     const items = plan.chars.map(id => '<b>' + charName(id) + '</b> 합류').concat(Object.keys(plan.cur).map(k => uiCur(k) + ' <b>' + plan.cur[k] + '</b>'));
     $('tut-sk-h').textContent = rev ? '다시 보기를 그만둘까요?' : '튜토리얼을 건너뛸까요?';
     $('tut-sk-w').innerHTML = rev ? '나중에 계정 메뉴나 도움말에서 다시 볼 수 있어요.'
-      : '<span class="tut-sk-warn">⚠</span> 건너뛰면 <b>남은 안내를 볼 수 없어요.</b> 계정 메뉴·도움말에서 다시 볼 수 있어요.';
+      : '<span class="tut-sk-warn">⚠</span> 건너뛰면 <b>남은 안내를 보지 못해요.</b> 나중에 계정 메뉴나 도움말에서 다시 볼 수 있어요.';
     $('tut-sk-g').innerHTML = items.length
-      ? '<div class="tut-sk-gt">건너뛰면 지금 바로 받는 보상</div><div class="tut-sk-gl">' + items.map(x => '<span>' + x + '</span>').join('') + '</div>'
-        + '<div class="tut-sk-n">동료는 자동으로 배치되지 않아요. <b>[편성]</b> 탭에서 직접 배치해 주세요.</div>' : '';
+      ? '<div class="tut-sk-gt">건너뛰면 아래 보상을 바로 받아요</div><div class="tut-sk-gl">' + items.map(x => '<span>' + x + '</span>').join('') + '</div>'
+        + '<div class="tut-sk-n">동료는 자동으로 배치되지 않아요.<br><b>[편성]</b> 탭에서 직접 배치해 주세요.</div>' : '';
     const ok = $('tut-sk-ok'); ok.disabled = true; ok.style.opacity = '.4'; setTimeout(() => { ok.disabled = false; ok.style.opacity = ''; }, 900);
     $('tut-skipm').classList.add('show'); T.skipOpen = true; window.__tutPause = combatOn();
   }
@@ -408,7 +408,7 @@ const Tutorial = (function () {
     build();
     const t = tut(); if (!t || (!t.done && !t.review)) return;                      // 새 튜토리얼이 진행 중이면 다시 보기는 열지 않는다
     $('tut-menu-box').innerHTML = '<h2>' + ui('ic_info', '❔') + ' 튜토리얼 다시 보기</h2><div class="cd-btns">'
-      + '<button class="btn" data-ch="0">처음부터 전부</button>'
+      + '<button class="btn" data-ch="0">처음부터 모두 보기</button>'
       + CHAPTERS.map(c => '<button class="btn" data-ch="' + c.n + '">' + c.n + ' · ' + c.name + (c.n === 1 ? ' (연습 전투)' : '') + '</button>').join('')
       + '</div><button class="btn primary" data-close="1">닫기</button>';
     $('tut-menu').hidden = false;
@@ -466,7 +466,7 @@ const Tutorial = (function () {
     return null;
   }
   const ctxOk = (d) => d.ctx === 'run' ? combatOn() : lobbyOn();
-  const OFFER = { id: 'offer', ctx: 'lobby', kind: 'offer', msg: '새로 <b>튜토리얼</b>이 생겼어요! 짧게 <b>3챕터</b>로 짚어 드릴까요?' };
+  const OFFER = { id: 'offer', ctx: 'lobby', kind: 'offer', msg: '새 <b>튜토리얼</b>이 생겼어요! <b>3챕터</b>로 짧게 안내해 드릴까요?' };
   TIPS.forEach(d => { d.tip = true; });
 
   function tick() {
