@@ -26,6 +26,7 @@
   const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
   let lastTs = 0, loopStarted = false;   // 루프는 1회만 시작(런마다 rAF 중복 등록 → 속도 배가 버그 방지)
+  let dprCap = 3, frameEma = 16.7, slowMs = 0;   // 해상도 안전장치: 캔버스 배율이 2 를 넘는데 전투가 계속 느리면 2 로 한 번 낮춘다(저사양 DPR 3 폰 보호)
 
   // ============ 화면 전환 ============
   function show(name) {
@@ -61,9 +62,9 @@
   function resize() {
     // ⚠ #app이 transform:scale 되므로 온스크린 px(getBoundingClientRect) 대신 디자인 px(clientWidth)로 측정 — 이중 스케일 방지
     const el = $('stage-wrap');
-    dpr = Math.min(window.devicePixelRatio || 1, 2);
     W = Math.max(240, el.clientWidth || 360);
     H = Math.max(360, el.clientHeight || 640);
+    dpr = Math.min(canvasDpr(W, H), dprCap);        // 기기 화소 비율을 그대로(최대 3) — 2 로 막으면 DPR 3 폰에서 캔버스가 CSS 로 늘어나 전부 흐려짐
     canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -90,7 +91,7 @@
       shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false, autoLoad: false,
       combat: null, over: false
     };
-    CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cg']);   // 편성 3인 시트·컷인 CG는 지도 화면을 보는 동안 받아 둔다
+    CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
     S.map = genMap(); showMap();
     if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }
@@ -1750,7 +1751,7 @@
       ctx.fillStyle = '#0b0812f0'; ctx.fillRect(0, bandY, W, bandH);
       ctx.fillStyle = c.color; ctx.globalAlpha = a * 0.22; ctx.fillRect(0, bandY, W, bandH); ctx.globalAlpha = a;
       ctx.fillStyle = c.color; ctx.fillRect(0, bandY, W, 4); ctx.fillRect(0, bandY + bandH - 4, W, 4);
-      const cg = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.id, 'cg') : null;   // CG 좌측 슬라이드 인
+      const cg = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.id, 'cgm') : null;   // CG 좌측 슬라이드 인(작게 그리므로 중간 크기 — 큰 원본을 10배 가까이 줄이면 뭉개짐)
       const slide = Math.min(1, tt / 0.32);
       if (cg) { const ih = bandH * 1.35, iw = ih * (832 / 1216), ix = -iw * 0.35 + slide * (iw * 0.35 + W * 0.04); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(cg, ix, bandY + bandH - ih, iw, ih); }
       ctx.textAlign = 'right';
@@ -1785,7 +1786,7 @@
       let h = '';
       for (const k of order) {
         const isB = k.indexOf('boss_') === 0;
-        h += '<span class="eb-it' + (isB ? ' boss' : '') + '"><i class="eb-ic" style="background-image:url(assets/enemy/' + k + '.webp);background-size:' + (isB ? '400% 200%' : '400% 100%') + '"></i>' + (isB ? '' : '×' + cnt[k]) + '</span>';
+        h += '<span class="eb-it' + (isB ? ' boss' : '') + '"><i class="eb-ic" style="background-image:url(' + enemyUrl(k) + ');background-size:' + (isB ? '400% 200%' : '400% 100%') + '"></i>' + (isB ? '' : '×' + cnt[k]) + '</span>';
       }
       if (wait) h += '<span class="eb-it wait">+' + wait + '</span>';
       el.querySelector('.eb-chips').innerHTML = h;
@@ -1807,7 +1808,11 @@
     for (let i = anim.ghosts.length - 1; i >= 0; i--) { const g = anim.ghosts[i]; g.gt += d; stepEnemyVis(g, d, nowS); if (g.gt > 0.5) anim.ghosts.splice(i, 1); }   // 방벽에 닿은 적: 걸어 들어가며 사라짐
   }
   function loop(ts) {
-    const d = Math.min(0.032, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
+    const raw = Math.min(100, ts - lastTs || 16.7), d = Math.min(0.032, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
+    if (dpr > 2 && S && !S.over && S.phase !== 'map' && !document.hidden) {   // 배율 3 급 캔버스가 3초 넘게 ≈28fps 미만이면 한 번만 2 로 낮춘다
+      frameEma += (raw - frameEma) * 0.03; slowMs = frameEma > 36 ? slowMs + raw : 0;
+      if (slowMs > 3000) { dprCap = 2; slowMs = 0; resize(); }
+    }
     if (S && !S.over) {
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;

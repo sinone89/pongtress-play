@@ -278,7 +278,7 @@ const Meta = (function () {
       si.hidden = mode === 'daily';
       if (mode !== 'daily') {
         const s = M.stage, sc = stageScale(s), bk = stageBoss(s), boss = BOSSES[bk];
-        const ic = (key, boss) => '<i class="stg-ic" style="background-image:url(assets/enemy/' + key + '.webp);background-size:' + (boss ? '400% 200%' : '400% 100%') + '"></i>';
+        const ic = (key, boss) => '<i class="stg-ic" style="background-image:url(' + enemyUrl(key) + ');background-size:' + (boss ? '400% 200%' : '400% 100%') + '"></i>';
         si.innerHTML = '<div class="stg-tiles">' + (STAGE_POOL[s] || []).map(p => '<div class="stg-tile">' + ic(p[0]) + '<span>' + ENEMIES[p[0]].name + '</span></div>').join('')
           + '<div class="stg-tile boss">' + ic('boss_' + bk, true) + '<span>' + boss.name + '</span></div></div>'
           + '<div class="stg-mul"><span>적 HP ×' + sc.hp.toFixed(1) + '</span><span>적 공격 ×' + sc.dmg.toFixed(1) + '</span><span>' + uiCur('gold') + ' 보상 ×' + sc.reward.toFixed(1) + '</span></div>';
@@ -341,8 +341,8 @@ const Meta = (function () {
       return { id, i, cls: (base(id) || {}).cls, st: 'ready', t, rl: t, burst: 0, cd: 0, hold: 0, a: CharAnim.create(id) };
     });
     function fit() {
-      const dpr = Math.min(2, window.devicePixelRatio || 1);
       D.w = Math.max(1, cv.clientWidth || 300); D.h = Math.max(1, cv.clientHeight || 260); D.U = D.w / 405;
+      const dpr = canvasDpr(D.w, D.h);                                        // 기기 화소 비율 그대로(최대 3) — 전투 캔버스와 같은 규칙
       cv.width = D.w * dpr; cv.height = D.h * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
       const card = $('idle-reward'); D.cardH = (card && card.offsetHeight) ? card.offsetHeight : D.h * 0.18;
       const n = Math.max(1, D.cs.length);
@@ -729,7 +729,7 @@ const Meta = (function () {
     }
     box.innerHTML =
       '<div class="cd-head">'
-      + '<div class="cd-img"' + (o ? '' : ' style="filter:grayscale(1);opacity:.45"') + ' style="border-color:' + R.color + '"><span class="cd-ph">' + (cl.icon || '🔫') + '</span><img class="cd-pimg" src="' + CharArt.path(id, 'cg') + '" alt="" onerror="this.style.display=\'none\'"></div>'
+      + '<div class="cd-img"' + (o ? '' : ' style="filter:grayscale(1);opacity:.45"') + ' style="border-color:' + R.color + '"><span class="cd-ph">' + (cl.icon || '🔫') + '</span><img class="cd-pimg" src="' + CharArt.small(id) + '" alt="" onerror="this.style.display=\'none\'"></div>'   /* 작게 보이는 칸 = 중간 크기 CG(미리 줄이고 샤프닝), 화면이 아주 크면 원본 */
       + '<div class="cd-info">'
       + '<div class="cd-irow"><div class="cd-grade ' + gcls + '">' + R.name + '</div></div>'
       + '<div class="cd-irow"><div class="cd-ival cd-starsv">' + stars + '</div></div>'

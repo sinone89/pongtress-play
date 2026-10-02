@@ -50,8 +50,7 @@ body {
 #title-hero .th-shadow { position: absolute; left: 50%; bottom: -1.2%; width: 62%; height: 5.5%; transform: translateX(-50%);
   background: radial-gradient(closest-side, #000c, #0000 100%); }
 #title-hero .th img { position: relative; height: 100%; width: auto; max-width: 128%; object-fit: contain; object-position: 50% 100%;
-  filter: drop-shadow(0 1.4cqw 2.6cqw #000d); animation: heroFloat 5.6s ease-in-out infinite; }
-@keyframes heroFloat { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-1%); } }
+  filter: drop-shadow(0 1.4cqw 2.6cqw #000d); }   /* 둥실 모션(translateY 애니메이션) 제거 — 합성 레이어가 소수 픽셀로 움직이면 그림이 계속 번져 보인다. 생기는 발광(th-glow)·크로스페이드가 담당 */
 @keyframes heroGlow { 0%, 100% { opacity: .72; transform: translateX(-50%) scale(1); } 50% { opacity: 1; transform: translateX(-50%) scale(1.06); } }
 @keyframes titlePulse { 0%,100% { transform: scale(1); box-shadow: 0 8px 22px rgba(255,93,177,.28); } 50% { transform: scale(1.04); box-shadow: 0 10px 30px rgba(255,93,177,.5); } }
 .logo { margin: 0; font-size: clamp(38px, 13vw, 68px); letter-spacing: 3px; font-weight: 800;

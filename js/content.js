@@ -464,27 +464,33 @@ function loadImg(src) {
   return img;
 }
 
+// 그림 주소 캐시 버스트 — index.html 이 이 스크립트를 부를 때 붙인 ?v=NNN 을 캐릭터·적 그림 주소에도 붙인다(그림만 바꿔 배포해도 브라우저가 옛 파일을 쓰지 않게)
+const ASSET_Q = (function () { try { const m = /[?&]v=([\w.-]+)/.exec(document.currentScript.src); return m ? '?v=' + m[1] : ''; } catch (e) { return ''; } })();
+
 // ── 캐릭터 아트 로더 ──
-// assets/char/<id>_cg.webp(CG) · <id>_sheet.webp(애니메이션 시트 4×4) · <id>_thumb.webp(편성칩·상점·가챠용 정면 대기 컷)
+// assets/char/<id>_cg.webp(CG) · <id>_sheet.webp(애니메이션 시트 4×4) · <id>_thumb.webp(편성칩·상점·가챠용 정면 대기 컷 320×320)
+// 시트·CG·썸네일은 변환 때 샤프닝(tools/sharpen.ps1)이 걸려 있다 — 도트풍 그림이 줄어들 때 뭉개져 보이는 것을 막기 위함.
 const CharArt = (function () {
   const cache = {};   // key '<id>_<state>' → Image
-  const SUF = { cg: '_cg', sheet: '_sheet', thumb: '_thumb' };
+  const SUF = { cg: '_cg', cgm: '_cgm', sheet: '_sheet', thumb: '_thumb' };   // cgm = 가로 640 중간 크기 CG(작게 보이는 상세 팝업용 — 큰 CG 를 3배 넘게 줄이면 뭉개짐)
   const norm = (state) => SUF[state] ? state : 'thumb';          // 구 'load'/'fire'(2장 스프라이트) 요청은 썸네일로
-  function path(id, state) { return 'assets/char/' + id + SUF[norm(state)] + '.webp'; }
+  function path(id, state) { return 'assets/char/' + id + SUF[norm(state)] + '.webp' + ASSET_Q; }
+  // 작게 보이는 칸(캐릭터 상세 팝업)용 CG 주소 — 앱 가로 기기 픽셀(CSS px × DPR)이 1700 이하면 중간 크기(cgm), 그보다 크면 원본(cg)
+  function small(id) { const app = document.getElementById('app'), w = (app ? app.clientWidth : window.innerWidth) * (window.devicePixelRatio || 1); return path(id, w > 1700 ? 'cg' : 'cgm'); }
   function load(id, state) { const k = id + '_' + norm(state); return cache[k] || (cache[k] = loadImg(path(id, state))); }
   // 캔버스용: 로드 완료+성공이면 Image, 아니면 null
   function sprite(id, state) { const img = load(id, state); return (img.__ok && img.complete) ? img : null; }
   // 미리 받아 두기(편성 3인의 시트는 출격 직전에)
   function preload(ids, states) { (ids || []).forEach(function (id) { if (id) (states || ['sheet']).forEach(function (s) { load(id, s); }); }); }
-  return { path: path, load: load, sprite: sprite, preload: preload };
+  return { path: path, small: small, load: load, sprite: sprite, preload: preload };
 })();
 
 // ── 캔버스 이미지 로더(공통) ── 있으면 Image, 없으면 null(게임이 도형으로 폴백)
-function makeCanvasLoader(dir, ext, exts) {
+function makeCanvasLoader(dir, ext, exts, bust) {     // bust=true 면 주소에 ?v=빌드 를 붙인다(자주 바뀌는 그림만)
   const cache = {};
   function ready(name) {
     let img = cache[name];
-    if (!img) { img = loadImg(dir + name + '.' + ((exts && exts[name]) || ext || 'png')); cache[name] = img; }
+    if (!img) { img = loadImg(dir + name + '.' + ((exts && exts[name]) || ext || 'png') + (bust ? ASSET_Q : '')); cache[name] = img; }
     return (img.__ok && img.complete) ? img : null;
   }
   function preload(names) { (names || []).forEach(ready); }
@@ -493,13 +499,22 @@ function makeCanvasLoader(dir, ext, exts) {
 // FX 시트: assets/fx/<name>.png — muzzle 512×128(4) · shell 256×128(2) · boom 1024×512(4×2) · hit_spark 512×128(4)
 const FxArt = makeCanvasLoader('assets/fx/', 'png');
 // 적/보스 시트: assets/enemy/<id>.webp — 일반 1024×256(4프레임) · 보스 2048×1024(행0 이동 4 + 행1 상태 프레임)
-const EnemyArt = makeCanvasLoader('assets/enemy/', 'webp');
+const EnemyArt = makeCanvasLoader('assets/enemy/', 'webp', null, true);
+const enemyUrl = (key) => 'assets/enemy/' + key + '.webp' + ASSET_Q;   // CSS 배경으로 쓰는 곳(적 요약 줄·스테이지 정보)도 같은 주소(캐시 공유·버스트)
 // 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
 const PegArt = makeCanvasLoader('assets/peg/', 'png');
 // 배경/영역 레이어: assets/bg/<name>.webp (bg_field/bg_wall/bg_board) · frame_pocket 만 png
 const BgArt = makeCanvasLoader('assets/bg/', 'webp', { frame_pocket: 'png' });
 // UI 아이콘(캔버스에 그릴 때): assets/ui/<name>.png (DOM 에서는 uiIcon/ui 사용)
 const UiArt = makeCanvasLoader('assets/ui/', 'png');
+
+// 캔버스 해상도 배율(전투·홈 캔버스 공용): 기기 화소 비율을 그대로 따른다 — 이전엔 2 로 막아서 DPR 3 폰에서 캔버스가 CSS 로 1.5배 늘어나 전부 흐렸다.
+// 2 이하는 그대로, 2 초과는 최대 3 까지 올리되 백킹 스토어가 너무 커지면(≈3.2M 화소) 줄이되 2 아래로는 내리지 않는다.
+function canvasDpr(w, h) {
+  const d = window.devicePixelRatio || 1;
+  if (d <= 2) return d;
+  return Math.max(2, Math.min(3, d, Math.sqrt(3.2e6 / Math.max(1, w * h))));
+}
 
 // ── 시트 그리기 도구 ──
 // 큰 시트를 2배 이상 줄여 그리면 계단·반짝임이 생기므로, 절반(1/2, 1/4) 크기 사본을 한 번 만들어 거기서 샘플링한다.
@@ -620,7 +635,7 @@ const CharAnim = (function () {
     ctx.save(); ctx.translate(x, feetY); if (fc !== 1) ctx.scale(fc, 1);
     let ok = false;
     if (sheet) { const rc = cell(a), r = rc[0], c = rc[1]; drawCell(ctx, sheet, c * CELL, r * CELL, CELL, CELL, -pivotX(a.id, r) * k, -FOOT_Y * k, size, size); ok = true; }
-    else { const th = CharArt.sprite(a.id, 'thumb'); if (th) { drawCell(ctx, th, 0, 0, 256, 256, -size * 0.5, -size * (FOOT_Y / CELL), size, size); ok = true; } }
+    else { const th = CharArt.sprite(a.id, 'thumb'); if (th) { drawCell(ctx, th, 0, 0, 320, 320, -size * 0.5, -size * (FOOT_Y / CELL), size, size); ok = true; } }   // 썸네일 = 시트 i0 를 줄이지 않고 잘라 낸 320×320
     ctx.restore(); return ok;
   }
   // 총구 좌표(캔버스 좌표) — col: 사격 프레임 0~3. 반환 ang = 포신 방향(라디안, 캔버스 좌표계: 0=오른쪽, 위쪽은 음수)
