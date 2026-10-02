@@ -243,6 +243,27 @@ const Meta = (function () {
       + '</button>';
   }
 
+  // ── 보유 캐릭터 정렬(스틸앤샷 직원 목록 방식) ──
+  // 행 = 등급(위에서 아래로 커먼 → 레전더리 — 스틸앤샷 COLRAR 순서), 열 = 클래스(사수 · 포수 · 지원, 열 머리글 표시).
+  // 같은 칸에 둘 이상이면 행을 늘리고 빈 칸은 null. 위치는 보유 여부와 무관하게 고정(미보유는 어둡게) — 목록·상세 팝업의 ‹ › 순서가 같다.
+  // ⚠ 등급 순서를 뒤집으려면(레전더리 먼저) ROSTER_RARS 만 거꾸로.
+  const ROSTER_RARS = ['common', 'rare', 'epic', 'legendary'], ROSTER_CLS = ['gunner', 'cannon', 'support'];
+  function rosterGrid() {
+    const rars = ROSTER_RARS.concat([...new Set(ROSTER.map(c => c.rarity))].filter(r => ROSTER_RARS.indexOf(r) < 0));   // 목록에 없는 새 등급·클래스도 뒤에 붙인다
+    const clss = ROSTER_CLS.concat([...new Set(ROSTER.map(c => c.cls))].filter(k => ROSTER_CLS.indexOf(k) < 0));
+    const rows = [];
+    for (const rar of rars) {
+      const cols = clss.map(k => ROSTER.filter(c => c.rarity === rar && c.cls === k));
+      const n = Math.max(0, ...cols.map(a => a.length));
+      for (let i = 0; i < n; i++) rows.push(cols.map(a => a[i] || null));
+    }
+    return { clss, rows };
+  }
+  const rosterOrder = () => rosterGrid().rows.reduce((a, r) => a.concat(r.filter(Boolean)), []);   // 화면 순서(행 우선)의 캐릭터 목록
+  function rosterHead(clss) {     // 열 머리글 = 클래스 아이콘 + 이름(클래스 색), 스크롤해도 목록 맨 위에 붙어 있다
+    return '<div class="oh-row">' + clss.map(k => { const c = CLASS[k] || { name: k, color: '#9a92c6' }; return '<div class="stcol-h" style="--c:' + c.color + '">' + clsIcon(k) + ' ' + c.name + '</div>'; }).join('') + '</div>';
+  }
+
   // 홈 = 자동전투 연출(풀블리드) + 방치 보상
   function renderHome() { renderIdleCard(); idleStart(); }
 
@@ -552,8 +573,10 @@ const Meta = (function () {
       } else d.innerHTML = '<span class="lane-empty">' + uiIcon('ic_add', '＋', 'width:1.2em;height:1.2em') + '</span><span class="lane-lbl">' + (lane + 1) + '레인</span>';
       slots.append(d);
     });
-    const list = $('owned-list'), keepTop = list.scrollTop;                       // 다시 그려도 보던 스크롤 위치를 유지
-    list.innerHTML = ROSTER.map(c => charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) })).join('');
+    const list = $('owned-list'), keepTop = list.scrollTop, grid = rosterGrid();   // 다시 그려도 보던 스크롤 위치를 유지
+    list.style.setProperty('--oc', grid.clss.length);                              // 열 수(클래스 수)
+    list.innerHTML = rosterHead(grid.clss)
+      + grid.rows.map(row => row.map(c => c ? charChip(c.id, { inParty: inParty(c.id), placed: inParty(c.id) }) : '<div class="st-empty"></div>').join('')).join('');
     list.scrollTop = keepTop;
     const oc = $('owned-count'); if (oc) oc.textContent = ROSTER.filter(c => M.owned[c.id]).length + '/' + ROSTER.length;
   }
@@ -697,7 +720,7 @@ const Meta = (function () {
     }
   }
   function cycleChar(dir) {
-    const owned = ROSTER.filter(c => M.owned[c.id]).map(c => c.id);
+    const owned = rosterOrder().filter(c => M.owned[c.id]).map(c => c.id);         // 편성 탭 목록과 같은 순서(등급 행 → 클래스 열)
     if (owned.length < 2) return;
     const i = owned.indexOf(cdId);
     openChar(owned[(i + dir + owned.length) % owned.length]);

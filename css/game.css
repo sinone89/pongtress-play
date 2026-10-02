@@ -544,7 +544,14 @@ body {
 #char-modal .cd-nav:active { transform: translateY(-50%) scale(.92); }
 
 /* ═══ 보유 캐릭터 카드 = 스틸앤샷式 stchar (등급배지+성급 / 초상화+Lv / 이름바) ═══ */
-#owned-list { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2.2cqw; }
+#owned-list { display: grid; grid-template-columns: repeat(var(--oc, 3), 1fr); gap: 2.2cqw; }
+/* 열 머리글(스틸앤샷 .stcol-h): 클래스 아이콘+이름. 목록이 스크롤돼도 맨 위에 붙어 있고, 아래로 갈수록 투명해지는 어두운 바탕이 지나가는 카드를 가린다 */
+#owned-list .oh-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(var(--oc, 3), 1fr); gap: 2.2cqw; position: sticky; top: 0; z-index: 4; padding-bottom: 1.4cqw;
+  background: linear-gradient(180deg, #0d0b1ef2 74%, #0d0b1e00); }
+.stcol-h { display: flex; align-items: center; justify-content: center; gap: 1.2cqw; padding: 1.4cqw 1cqw; border: 1px solid #ffffff22; border-radius: 2.6cqw;
+  font-size: 3.4cqw; font-weight: 800; color: var(--c, var(--amber)); background: linear-gradient(180deg, #2a2142, #1b1430); }
+.stcol-h .uic { width: 1.25em; height: 1.25em; vertical-align: middle; }
+.st-empty { min-height: 1px; }                       /* 같은 칸에 캐릭터가 없을 때의 빈 자리(격자 정렬 유지) */
 .stchar { appearance: none; display: flex; flex-direction: column; min-height: 40cqw; background: #1a1226;
   border: 2px solid #ffffff20; border-radius: 3cqw; overflow: hidden; text-align: center; cursor: grab;
   padding: 0; color: var(--ink); font: inherit; position: relative; touch-action: none; }
