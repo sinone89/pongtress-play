@@ -89,7 +89,7 @@ const Tutorial = (function () {
       msg: '<b>핀볼 판</b>을 <b>끌어서 조준</b>하고, 손을 떼면 <b>발사</b>돼요!',
       target: () => canvasRect('pins'), hand: aimHand(0.7), done: () => launched() >= 1 },
     { id: 'c1-pocket', ch: 1, ctx: 'run', kind: 'next', dim: false, label: '알겠어요',
-      msg: '볼이 위쪽 <b>색 칸</b>에 들어가면 루비의 <b>탄환이 충전</b>돼요.',
+      msg: '볼이 위쪽 <b>충전 칸</b>에 들어가면 루비의 <b>탄환이 충전</b>돼요.',
       done: () => { const s = run(); return !s || (s.balls.length === 0 && launched() >= 1) || s.phase !== 'load'; } },
     { id: 'c1-aim2', ch: 1, ctx: 'run', kind: 'do', ready: loadReady, tap: '아까처럼 끌었다 놓아요',
       msg: '<b>한 발 더</b> 쏴 봐요!', target: () => canvasRect('pins'), hand: aimHand(0.3),
@@ -129,7 +129,7 @@ const Tutorial = (function () {
     { id: 'c3-sortie', ch: 3, ctx: 'lobby', kind: 'next', tab: 'sortie',
       msg: '<b>출격</b> 탭에서 스테이지와 모드를 골라 전장으로 나가요.', target: () => [$('mode-select'), $('stage-select')] },
     { id: 'c3-mission', ch: 3, ctx: 'lobby', kind: 'next', tab: 'mission',
-      msg: '<b>미션</b>을 달성하면 보상을 받아요. 목표를 채우면 <b>[수령]</b>을 눌러요!', target: () => $('mission-list') },
+      msg: '<b>미션</b>을 달성하면 보상을 받아요. 목표를 채우면 <b>[받기]</b>를 눌러요!', target: () => $('mission-list') },
     { id: 'c3-reward', ch: 3, ctx: 'lobby', kind: 'next', noSkip: true, label: '받기', skip: () => reviewing(),
       msg: () => '수고했어요, 지휘관님! <b>튜토리얼 완료</b> 선물이 도착했어요.<br>' + ui('cls_support', '🛠') + '<b>' + charName(TUTORIAL.rewardId) + '</b> 합류 · {gems}<b>' + TUTORIAL.reward.gems + '</b> · {gold}<b>' + TUTORIAL.reward.gold + '</b>',
       onLeave: () => { const m = meta(); try { m && m.tutGrantRewards(); m && m.renderLobby(); } catch (e) {} } },
@@ -147,19 +147,19 @@ const Tutorial = (function () {
   const TIPS = [
     // ── 로비 ──
     { id: 'mode.daily', ctx: 'lobby', help: 'modes', when: () => tabOn('sortie') && !!q('#mode-select .sns-tab.on[data-mode="daily"]'), target: () => $('mode-select'),
-      msg: '<b>일일 도전</b>은 오늘 하루 같은 판에 도전하는 모드예요. 첫 클리어엔 {gems}<b>' + (typeof MODES !== 'undefined' ? MODES.daily.reward.gems : 40) + '</b>을 줘요.' },
+      msg: () => { const g = typeof MODES !== 'undefined' ? MODES.daily.reward.gems : 40; return '<b>일일 도전</b>은 오늘 하루 같은 판에 도전하는 모드예요. 첫 클리어엔 {gems}<b>' + g + '</b>' + eulReul(g) + ' 줘요.'; } },
     { id: 'mode.endless', ctx: 'lobby', help: 'modes', when: () => tabOn('sortie') && !!q('#mode-select .sns-tab.on[data-mode="endless"]'), target: () => $('mode-select'),
       msg: '<b>무한 모드</b>는 보스를 쓰러뜨릴 때마다 <b>더 강한 막</b>이 이어져요. 최고 기록에 도전해 봐요!' },
     { id: 'char.detail', ctx: 'lobby', help: 'chars', modal: 'char-modal', when: () => vis('char-modal') && !!q('#char-modal .cd-tab.on[data-cdtab="lvup"]'), target: () => q('#char-modal .cd-statcol'),
       msg: '<b>레벨업</b>에는 {gold}크레딧, <b>승급</b>에는 {shards}조각과 {mats}재료가 필요해요. 스킬은 아래에서 볼 수 있어요.' },
     { id: 'char.promote', ctx: 'lobby', help: 'chars', modal: 'char-modal', when: () => vis('char-modal') && !!q('#char-modal .cd-tab.on[data-cdtab="promote"]'), target: () => q('#char-modal .cd-cmp'),
-      msg: '<b>승급</b>하면 ★이 올라 스탯과 <b>레벨 상한</b>이 커져요. 조각은 가챠에서 같은 동료가 나올 때나 {docs}문서로 얻어요.' },
+      msg: '<b>승급</b>하면 ★이 올라 능력치와 <b>레벨 상한</b>이 커져요. 조각은 가챠에서 같은 동료가 나올 때나 {docs}문서로 얻어요.' },
     { id: 'shop.doc', ctx: 'lobby', help: 'econ', when: () => tabOn('shop') && !!q('.shoptabs .sns-tab.on[data-stab="doc"]'), target: () => q('.shoptabs'),
       msg: '{docs}문서로 보유한 동료의 <b>조각</b>을 살 수 있어요. 등급이 높을수록 비싸요.' },
     { id: 'shop.pkg', ctx: 'lobby', when: () => tabOn('shop') && !!q('.shoptabs .sns-tab.on[data-stab="pkg"]'), target: () => q('.shoptabs'),
       msg: '<b>패키지</b>는 아직 준비 중이에요. 곧 보석 패키지와 주간 패스가 열릴 예정이에요!' },
     { id: 'mission.claim', ctx: 'lobby', when: () => tabOn('mission') && !!q('#mission-list [data-mission]:not([disabled])'), target: () => q('#mission-list [data-mission]:not([disabled])'),
-      msg: '달성한 미션이 있어요! <b>[수령]</b>을 눌러 보상을 받아요.' },
+      msg: '달성한 미션이 있어요! <b>[받기]</b>를 눌러 보상을 챙겨요.' },
     // ── 런 ──
     { id: 'run.map', ctx: 'run', help: 'map', modal: 'map', when: () => { const s = run(); return !!s && !s.tutorial && vis('map') && !vis('reward') && !vis('run-modal'); }, target: () => $('map-body'),
       msg: '<b>분기 지도</b>예요. 길을 골라 위로 올라가요!<br>{ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스' },
@@ -169,10 +169,10 @@ const Tutorial = (function () {
       msg: '<b>스킬 게이지</b>가 찼어요! 오른쪽 <b>스킬 버튼</b>을 켜 두면 이번 전투에 발동해요. <b>[스킬 자동]</b>을 켜면 매번 알아서 써요.' },
     { id: 'lvl.relic', ctx: 'run', modal: 'reward', help: 'relic', when: () => vis('reward') && !!q('#reward-choices .relic-card'), target: () => q('#reward .modal-box'),
       msg: () => /레벨/.test(($('reward-title') && $('reward-title').textContent) || '')
-        ? '<b>레벨 업!</b> 보상 <b>3개 중 1개</b>를 골라요. 짝수 레벨엔 이번 판 동안 쓰는 특수 장비 <b>모듈</b>이 나와요.'
+        ? '<b>레벨업!</b> 보상 <b>3개 중 1개</b>를 골라요. 짝수 레벨엔 이번 런 동안 쓰는 특수 장비 <b>모듈</b>이 나와요.'
         : '<b>전투 승리!</b> <b>모듈</b> 3개 중 1개를 골라요. 같은 모듈을 또 고르면 <b>개량</b>돼요!' },
     { id: 'lvl.stat', ctx: 'run', modal: 'reward', help: 'map', when: () => vis('reward') && !q('#reward-choices .relic-card') && !!q('#reward-choices .reward-card'), target: () => q('#reward .modal-box'),
-      msg: '홀수 레벨엔 <b>스탯 강화</b>가 나와요. 화력·방벽 HP·볼 +1·수리 중 <b>하나</b>를 골라요.' },
+      msg: '홀수 레벨엔 <b>능력치 강화</b>가 나와요. 화력·방벽 HP·볼 +1·수리 중 <b>하나</b>를 골라요.' },
     { id: 'relic.bar', ctx: 'run', help: 'relic',
       when: () => { const s = run(); return !!s && combatOn() && Object.keys(s.relics || {}).length > 0 && !vis('reward') && !vis('run-modal') && !vis('result') && (vis('map') || loadReady()); },
       target: () => vis('map') ? $('map-relics') : $('relic-bar'),

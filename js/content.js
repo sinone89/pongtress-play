@@ -291,10 +291,10 @@ const COMBATS = [
 //   → 골칸 개방/버프 칸(포켓 꽉 차면 무효)·증식판/범퍼 설치(페그 겹침)는 제거하고 순수 스탯 보상으로 교체.
 const REWARDS = [
   { id: 'heal',  name: '🔧 수리',      desc: '방벽 HP +30',                  apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 30); } },
-  { id: 'atk',   name: '🔩 화력 조정', desc: '모든 캐릭터 공격력 +1',         apply: (S) => { S.atkBonus += 1; } },
+  { id: 'atk',   name: '🔩 화력 조정', desc: '모든 동료 공격력 +1',          apply: (S) => { S.atkBonus += 1; } },
   { id: 'maxhp', name: '🧱 방벽 보강', desc: '방벽 최대 HP +40 (+즉시 회복)', apply: (S) => { S.wallHpMax += 40; S.wallHp += 40; } },
   { id: 'ball',  name: '➕ 탄창 증설', desc: '이번 런 장전 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
-  { id: 'power', name: '💥 화력 증폭', desc: '모든 캐릭터 공격력 +2',         apply: (S) => { S.atkBonus += 2; } },
+  { id: 'power', name: '💥 화력 증폭', desc: '모든 동료 공격력 +2',          apply: (S) => { S.atkBonus += 2; } },
   { id: 'fort',  name: '🛡 요새화',    desc: '방벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
 ];
 
@@ -336,8 +336,8 @@ const RELICS = {
                 lv2: { name: '유탄 파편', desc: '적 처치 시 주변 2칸 적에게 처치 피해의 50%', mult: 0.5, rad: 2 } },
   blast:      { tag: 'explosive', icon: '🎆', name: '연쇄 폭발', lv1: { desc: '광역 스킬 타격 수 +2', count: 2, mult: 1 },
                 lv2: { name: '대폭발', desc: '광역 스킬 타격 수 +4 · 피해 +20%', count: 4, mult: 1.2 } },
-  powder:     { tag: 'explosive', icon: '🛢', name: '선제 포격', lv1: { desc: '전투 시작 시 모든 적에게 (총 탄약 × 1) 피해', mult: 1 },
-                lv2: { name: '집중 포화', desc: '전투 시작 시 모든 적에게 (총 탄약 × 2) 피해', mult: 2 } },
+  powder:     { tag: 'explosive', icon: '🛢', name: '선제 포격', lv1: { desc: '전투 시작 시 모든 적에게 (총 탄환 × 1) 피해', mult: 1 },
+                lv2: { name: '집중 포화', desc: '전투 시작 시 모든 적에게 (총 탄환 × 2) 피해', mult: 2 } },
   // 🛡 방호
   steel:      { tag: 'guard',     icon: '🧱', name: '재생 방벽', lv1: { desc: '방벽 최대 HP +20% · 매 턴 5 회복', pct: 0.2, heal: 5 },
                 lv2: { name: '초재생 방벽', desc: '방벽 최대 HP +35% · 매 턴 10 회복', pct: 0.35, heal: 10 } },
@@ -380,9 +380,9 @@ const SKILL_BOARD = {
 };
 // 적이 판에 간섭(장전 시작 시 적용, 해당 적이 필드에 있는 동안). 전투에서 먼저 잡을 대상이 생김.
 const ENEMY_BOARD = {
-  drone:  { steal: 1, text: '해킹드론이 특수 페그를 교란했다!' },        // 특수 페그 → 일반 페그(해킹)
-  sludge: { peg: 'sludge', n: 1, text: '슬러지가 오염 페그를 뿌렸다!' },   // 오염 페그(볼 흡수)
-  heavy:  { peg: 'scrap',  n: 1, text: '헤비아머가 파편을 흩뿌렸다!' }    // 파편(반사만)
+  drone:  { steal: 1, text: '해킹드론이 특수 페그를 교란했어요!' },        // 특수 페그 → 일반 페그(해킹)
+  sludge: { peg: 'sludge', n: 1, text: '슬러지가 오염 페그를 뿌렸어요!' },   // 오염 페그(볼 흡수)
+  heavy:  { peg: 'scrap',  n: 1, text: '헤비아머가 파편을 흩뿌렸어요!' }    // 파편(반사만)
 };
 const ENEMY_BOARD_CAP = 4;   // 적 간섭으로 추가되는 페그 최대(판이 막히지 않게)
 // 보스 예고 패턴: N턴마다 강력한 행동 예고 → 그 턴에 기절시키면 저지.
@@ -413,6 +413,8 @@ function ui(name, emoji) { return uiIcon(name, emoji, 'width:1.15em;height:1.15e
 const UI_CUR = { gold: ['cur_gold', '🪙'], mats: ['cur_mats', '🔩'], gems: ['cur_gems', '💎'], docs: ['cur_docs', '📄'], shards: ['cur_shard', '🔷'] };
 const uiCur = (k) => ui(UI_CUR[k][0], UI_CUR[k][1]);   // 재화 키(gold/mats/gems/docs/shards) → 아이콘
 const tagIc = (t) => ui('tag_' + t, RELIC_TAGS[t].icon);   // 모듈 태그(precision/explosive/guard/pinball/harvest) 아이콘
+// 숫자 뒤 조사 '을/를' — 읽을 때 받침이 있으면(끝자리 0·1·3·6·7·8) '을', 없으면 '를' (10을 · 15를 · 40을). 수치가 바뀌어도 문장이 맞도록 문구에서 쓴다
+const eulReul = (n) => ('013678'.indexOf(String(n).replace(/\D/g, '').slice(-1)) >= 0 ? '을' : '를');
 // 도움말 버튼(? 아이콘): [data-help] 는 js/help.js 가 문서 위임으로 연다 → 지도 머리말처럼 다시 그려지는 곳에도 그대로 쓸 수 있다(로비·전투 머리말은 index.html 에 같은 모양으로 직접 써 둠)
 const helpBtn = (cls) => '<button class="help-btn ' + cls + '" data-help="open" aria-label="도움말">' + uiIcon('ic_info', '❔') + '</button>';
 

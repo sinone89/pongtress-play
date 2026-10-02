@@ -1132,7 +1132,7 @@
     if (S.over) return; S.over = true;
     const e = Meta.onRunEnd(runInfo(false));
     const where = S.mode === 'endless' ? '무한 ' + (S.loop + 1) + '막 ' + (S.combatIndex + 1) + '층' : runLabel();
-    showResult({ win: false, endless: S.mode === 'endless', title: S.mode === 'endless' ? '작전 종료' : '패배', sub: where + '에서 방벽이 붕괴했습니다', e });
+    showResult({ win: false, endless: S.mode === 'endless', title: S.mode === 'endless' ? '작전 종료' : '패배', sub: where + '에서 방벽이 무너졌어요', e });
   }
   // 결과 화면: 승리/패배 배너 + 통계 행(아이콘) + 획득 재화 칩 + 해금·신기록 알림. 항목은 차례로 떠오른다(rsIn, 지연 i*0.07s)
   function showResult(o) {
@@ -1923,7 +1923,7 @@
     for (let lane = 0; lane < CFG.lanes; lane++) {
       const c = S.chars.find(ch => ch.lane === lane);
       const b = document.createElement('button');
-      if (!c) { b.className = 'skillbtn empty'; b.disabled = true; b.textContent = '빈 슬롯'; col.append(b); continue; }
+      if (!c) { b.className = 'skillbtn empty'; b.disabled = true; b.textContent = '빈 레인'; col.append(b); continue; }
       const sk = c.ref.active, ready = c.gauge >= sk.gauge;
       b.className = 'skillbtn' + (ready ? ' ready' : '') + (c.armed ? ' armed' : '');
       b.style.setProperty('--lc', laneHex(lane));                                           // 게이지 막대 = 레인 색

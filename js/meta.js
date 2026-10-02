@@ -19,7 +19,7 @@ const Meta = (function () {
   function showLogin() { const l = $('login'); if (l) l.classList.add('show'); const id = $('lg-id'); if (id) setTimeout(() => id.focus(), 80); }
   function submitLogin() {
     const id = ($('lg-id').value || '').trim(), pw = $('lg-pw').value || '';
-    if (!id || !pw) { lgMsg('아이디와 비밀번호를 입력하세요'); return; }
+    if (!id || !pw) { lgMsg('아이디와 비밀번호를 입력해 주세요'); return; }
     if (id.length < 2) { lgMsg('아이디는 2자 이상이어야 해요'); return; }
     const a = getAccts();
     if (a[id]) { if (a[id].pw !== pw) { lgMsg('비밀번호가 틀렸어요'); return; } }   // 기존 계정: 비번 확인
@@ -384,7 +384,7 @@ const Meta = (function () {
     }
     const n = partySlots().filter(Boolean).length, warn = $('sortie-warn');
     const benched = ownedIds().filter(id => !inParty(id)).length;                     // 보유했지만 배치하지 않은 동료(자동 배치는 하지 않으므로 알려 준다)
-    if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
+    if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 동료를 1명 이상 배치해 주세요.'; $('btn-sortie').disabled = true; }
     else if (n < 3 && benched > 0) { warn.hidden = false; warn.textContent = '빈 레인이 있어요. 편성 탭에서 동료를 배치해 보세요!'; $('btn-sortie').disabled = false; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
   }
@@ -669,7 +669,7 @@ const Meta = (function () {
         const owned = !!M.owned[c.id], can = owned && M.currencies.docs >= price;
         return '<div class="sns-card' + (owned ? '' : ' locked') + '"><div class="sns-row">'
           + '<div class="shop-ico">' + (owned ? '<img src="' + CharArt.path(c.id, 'thumb') + '" alt="" onerror="this.remove()">' : '<span class="lock-ic">' + uiIcon('ic_lock', '🔒', 'width:1.3em;height:1.3em') + '</span>') + '</div>'
-          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? uiCur('shards') + ' 보유 조각 ' + (M.shards[c.id] || 0) : '요원 미보유') + '</div></div>'
+          + '<div class="sns-grow"><div class="sns-nm">' + c.name + '</div><div class="sns-ds">' + (owned ? uiCur('shards') + ' 보유 조각 ' + (M.shards[c.id] || 0) : '동료 미보유') + '</div></div>'
           + '<button class="sns-btn sm" data-doc="' + c.id + '"' + (can ? '' : ' disabled') + '>' + (owned ? uiCur('docs') + price : '미보유') + '</button>'
           + '</div></div>';
       }).join('');
@@ -701,7 +701,7 @@ const Meta = (function () {
     const box = $('gacha-modal-box');
     box.innerHTML = '<h2>' + ui('ic_gacha', '🎰') + ' 가챠 확률</h2>'
       + '<div class="gi-rates">' + GACHA.rates.slice().reverse().map(r => { const R = RARITY[r.rarity] || {}, g = RAR_G[r.rarity] || 'g-n'; return '<div class="gi-row"><span class="g-tag ' + g + '">' + R.name + '</span><b>' + r.w + '%</b></div>'; }).join('') + '</div>'
-      + '<div class="gi-guide"><div class="gi-g"><b>' + uiCur('shards') + ' 조각</b> — 이미 보유한 요원을 중복 획득하면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
+      + '<div class="gi-guide"><div class="gi-g"><b>' + uiCur('shards') + ' 조각</b> — 이미 가진 동료가 또 나오면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
       + '<button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -711,7 +711,7 @@ const Meta = (function () {
     list.innerHTML = MISSIONS.map(m => {
       const p = missionProgress(m), done = p >= m.goal, claimed = !!M.claimed[m.id];
       const pct = Math.min(100, 100 * p / m.goal);
-      const label = claimed ? '수령 완료' : done ? ui('ic_reward', '🎁') + ' 수령' : '진행 중';
+      const label = claimed ? '수령 완료' : done ? ui('ic_reward', '🎁') + ' 받기' : '진행 중';
       return '<div class="sns-card"><div class="sns-row" style="align-items:flex-start">'
         + '<div class="sns-ico">' + uiIcon('ic_mission', '🎯', 'width:100%;height:100%') + '</div>'
         + '<div class="sns-grow">'
@@ -731,9 +731,9 @@ const Meta = (function () {
       + '<p class="muted">' + uiCur('gold') + M.currencies.gold + ' ' + uiCur('mats') + M.currencies.mats + ' ' + uiCur('gems') + M.currencies.gems + ' ' + uiCur('docs') + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
       + '<div class="cd-btns">'
       + '<button class="btn" data-cheat="cur">화폐 전체 +9999</button>'
-      + '<button class="btn" data-cheat="unlock">전 캐릭터 획득</button>'
+      + '<button class="btn" data-cheat="unlock">전 동료 획득</button>'
       + '<button class="btn" data-cheat="shards">모든 조각 +999</button>'
-      + '<button class="btn" data-cheat="max">전 캐릭터 Lv·★ 최대</button>'
+      + '<button class="btn" data-cheat="max">전 동료 Lv·★ 최대</button>'
       + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
       + '<button class="btn" data-cheat="relics">전 모듈 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
@@ -779,9 +779,9 @@ const Meta = (function () {
       case 'aoe': return '앞 ' + sk.count + '기에게 광역 포격 (공격 ×' + (sk.mult || 1) + ')';
       case 'heal': return '방벽 HP +' + sk.amount + ' 회복';
       case 'stun': return '앞 ' + sk.count + '기 ' + (sk.turns || 1) + '턴 기절';
-      case 'addPeg': return '핀볼판에 ' + (PEG_NM[sk.peg] || sk.peg) + ' 페그 +' + sk.n;
+      case 'addPeg': return '핀볼 판에 ' + (PEG_NM[sk.peg] || sk.peg) + ' 페그 +' + sk.n;
       case 'addBall': return '전투 시작 장전 볼 +' + sk.n;
-      case 'closeBlank': return '전투 시작 시 꽝 포켓 ' + sk.n + '칸 개방';
+      case 'closeBlank': return '전투 시작 시 꽝 칸 ' + sk.n + '개를 충전 칸으로';
       default: return '';
     }
   }
@@ -795,7 +795,7 @@ const Meta = (function () {
     cdId = id;
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common;
     const box = $('char-modal-box'); box.classList.add('cd-modal');
-    if (!o) { box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2><p class="muted">미보유 — 상점 가챠로 획득하세요.</p><button class="sns-btn sub" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
+    if (!o) { box.innerHTML = '<h2>' + b.name + ' ' + rarTag(b.rarity) + '</h2><p class="muted">아직 만나지 못한 동료예요. 상점 가챠에서 얻을 수 있어요.</p><button class="sns-btn sub" data-close="1">닫기</button>'; $('char-modal').hidden = false; return; }
     const cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const cl = CLASS[b.cls] || { icon: '', name: '', color: 'var(--cyan)' };
     const gcls = RAR_G[b.rarity] || 'g-n';
@@ -934,7 +934,7 @@ const Meta = (function () {
         const ok = toggleParty(pt.dataset.party); openChar(pt.dataset.party); renderLobby();
         if (!ok) {                                                  // 배치칸 3개가 다 찬 상태에서 편성 → 말없이 무시하지 말고 버튼에 잠깐 알린다
           const b = document.querySelector('#char-modal .cd-place');
-          if (b) { b.textContent = '배치칸이 가득 찼어요'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected && !$('char-modal').hidden) openChar(cdId); }, 1300); }
+          if (b) { b.textContent = '레인이 가득 찼어요'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected && !$('char-modal').hidden) openChar(cdId); }, 1300); }
         } else if (typeof Sound !== 'undefined') Sound.play('click');
       }
     };

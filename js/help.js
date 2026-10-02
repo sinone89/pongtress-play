@@ -30,8 +30,8 @@ const Help = (function () {
 
   // ═════════ 주제 ═════════
   function tBasic() {
-    return P('<b>폭주한 병기군단</b>이 <b>방벽</b>으로 몰려와요. 핀볼로 캐릭터의 <b>탄환을 충전</b>하고, 그 탄환으로 적을 쓰러뜨려 <b>보스</b>를 돌파하면 승리! 방벽 HP가 <b>0이 되면 패배</b>예요.')
-      + H('한 판의 흐름')
+    return P('<b>폭주한 병기군단</b>이 <b>방벽</b>으로 몰려와요. 핀볼로 동료의 <b>탄환을 충전</b>하고, 그 탄환으로 적을 쓰러뜨려 <b>보스</b>를 돌파하면 승리! 방벽 HP가 <b>0이 되면 패배</b>예요.')
+      + H('한 런의 흐름')
       + STEPS([
         '<b>출격</b> 탭에서 스테이지와 편성 부대를 확인하고 출격해요.',
         '<b>분기 지도</b>(' + MAP_CFG.floors + '층)에서 갈 노드를 골라요. 맨 위는 보스예요.',
@@ -40,10 +40,10 @@ const Help = (function () {
         '보스를 쓰러뜨리면 클리어! 처음 클리어한 스테이지는 다음 스테이지와 새 모듈이 열려요.'
       ])
       + H('장전과 전투')
-      + ROW(pegImg('peg_normal'), '장전 단계', '핀볼 판에 볼을 쏴서(기본 ' + CFG.launchesPerTurn + '발) 위쪽 <b>포켓</b>을 채워요. 포켓에 닿은 볼은 같은 색 레인 캐릭터의 <b>탄환</b>이 돼요.')
-      + ROW(big('ic_battle', '💥'), '전투 단계', '충전된 탄환만큼 캐릭터가 <b>자동으로 사격</b>해요. 표적은 맨 앞 적! 끝나면 적이 한 칸 전진하고 다시 장전으로 돌아가요.')
-      + ROW(big('stat_hp', '🛡'), '방벽 HP', '편성한 캐릭터 <b>체력의 합</b>이에요. 적이 방벽에 닿으면 깎이고, 0이 되면 패배해요.')
-      + TIP('주제 탭을 눌러 핀볼 판·전투·모듈·적·캐릭터·재화·모드를 자세히 볼 수 있어요.');
+      + ROW(pegImg('peg_normal'), '장전 단계', '핀볼 판에 볼을 쏴서(기본 ' + CFG.launchesPerTurn + '발) 위쪽 <b>포켓</b>을 채워요. 포켓에 닿은 볼은 같은 색 레인 동료의 <b>탄환</b>이 돼요.')
+      + ROW(big('ic_battle', '💥'), '전투 단계', '충전된 탄환만큼 동료가 <b>자동으로 사격</b>해요. 표적은 맨 앞 적! 끝나면 적이 한 칸 전진하고 다시 장전으로 돌아가요.')
+      + ROW(big('stat_hp', '🛡'), '방벽 HP', '편성한 동료 <b>체력의 합</b>이에요. 적이 방벽에 닿으면 깎이고, 0이 되면 패배해요.')
+      + TIP('주제 탭을 눌러 핀볼 판·전투·모듈·적·동료·재화·모드를 자세히 볼 수 있어요.');
   }
 
   const PEG_ORDER = ['normal', 'mult2', 'mult5', 'charge', 'gold', 'bomb', 'bumper', 'scrap', 'sludge'];
@@ -52,7 +52,7 @@ const Help = (function () {
     mult2: () => '충전볼이 <b>' + (1 + PEG_TYPES.mult2.split) + '개</b>로 늘어나요.',
     mult5: () => '충전볼이 <b>' + (1 + PEG_TYPES.mult5.split) + '개</b>로 늘어나요!',
     charge: () => '<b>충전 ×' + PEG_TYPES.charge.charge + '</b> 볼 1개 — 한 번에 탄환을 많이 채워요.',
-    gold: () => '충전볼과 함께 <b>크레딧 ' + PEG_TYPES.gold.gold + '</b>을 줘요(상점에서 써요).',
+    gold: () => '충전볼과 함께 <b>크레딧 ' + PEG_TYPES.gold.gold + '</b>' + eulReul(PEG_TYPES.gold.gold) + ' 줘요(상점에서 써요).',
     bomb: () => '맞으면 <b>주변 페그를 연쇄로 터뜨려요</b>. 스킬을 쓴 다음 판에 생겨요.',
     bumper: () => '볼을 <b>세게 튕겨 내요</b>. 사라지지 않고 콤보도 올리지 않아요. 기절 스킬 등으로 생겨요.',
     scrap: () => '볼을 튕기기만 해요(효과 없음). 헤비아머가 뿌려요.',
@@ -70,13 +70,13 @@ const Help = (function () {
       + ROW(pegImg('obst_bumper'), '고정 범퍼', '판에 박힌 큰 장애물. 볼을 <b>세게 튕겨요</b>(속도 ×1.25). 사라지지 않아요.')
       + ROW(pegImg('obst_pillar'), '기둥', '볼을 단단하게 튕겨 내요. 사라지지 않아요. 둘 다 콤보에는 안 들어가요.')
       + H('포켓')
-      + P('판 위쪽 9칸이 포켓이에요. 캐릭터(레인)마다 3칸이고, 캐릭터의 <b>골칸</b> 수만큼이 충전 칸이에요.')
-      + ROW(gl('◆', '#46e6d0'), '충전 칸', '들어간 볼이 그 레인 캐릭터의 <b>탄환</b>과 <b>스킬 게이지</b>를 채워요.')
+      + P('판 위쪽 9칸이 포켓이에요. 레인마다 3칸이고, 그 레인 동료의 <b>골칸</b> 수만큼이 충전 칸이에요.')
+      + ROW(gl('◆', '#46e6d0'), '충전 칸', '들어간 볼이 그 레인 동료의 <b>탄환</b>과 <b>스킬 게이지</b>를 채워요.')
       + ROW(gl('✕', '#8a85a8'), '꽝 칸', '들어가도 충전되지 않아요(회복 칸·패시브로 바뀌기도 해요).')
       + ROW(gl('×' + JACKPOT_MUL, '#ffd93b'), '잭팟 칸', '좌우로 움직이는 칸이에요. 여기에 들어가면 충전이 <b>×' + JACKPOT_MUL + '</b>! 꽝 칸이어도 크레딧 +10을 줘요.')
       + H('콤보')
       + P('한 볼이 <b>페그를 연속으로 터뜨린 수</b>가 콤보예요. <b>' + COMBO_STEP + '콤보마다</b> 보너스 충전볼이 생겨요(' + COMBO_STEP + '→+1, ' + COMBO_STEP * 2 + '→+2, ' + COMBO_STEP * 3 + '→+3, ' + COMBO_STEP * 4 + ' 이상은 +' + COMBO_MAX + ').')
-      + TIP('충전볼은 터진 자리에서 거의 곧장 위로 올라가요. 충전하고 싶은 캐릭터의 <b>충전 칸 아래쪽 페그</b>를 노려 보세요!');
+      + TIP('충전볼은 터진 자리에서 거의 곧장 위로 올라가요. 충전하고 싶은 동료의 <b>충전 칸 아래쪽 페그</b>를 노려 보세요!');
   }
 
   // 스킬 종류(content.js ROSTER 의 active.kind) — 누가 가졌는지는 ROSTER 에서 읽어 온다
@@ -96,15 +96,15 @@ const Help = (function () {
       kinds += ROW(big('cls_' + cls, CLASS[cls].icon), k[1], k[2] + (own.length ? '<br><span class="hp-st">' + own.map((c) => c.name).join(' · ') + '</span>' : ''));
     });
     return H('전투 단계')
-      + P('장전이 끝나면 충전된 <b>탄환 수만큼</b> 캐릭터들이 차례로 사격해요. 한 발의 피해는 캐릭터의 <b>공격력</b>이고, 표적은 레인과 상관없이 <b>맨 앞 적</b>이에요.')
+      + P('장전이 끝나면 충전된 <b>탄환 수만큼</b> 동료들이 차례로 사격해요. 한 발의 피해는 동료의 <b>공격력</b>이고, 표적은 레인과 상관없이 <b>맨 앞 적</b>이에요.')
       + P('사격이 끝나면 적이 <b>한 칸</b>(빠른 적은 두 칸) 전진해요. 방벽에 닿은 적은 사라지면서 방벽 HP를 깎아요. 적을 다 쓰러뜨리면 전투 승리!')
       + H('화면 읽는 법')
-      + ROW(big('ic_levelup', '⬆'), '경험치 막대', '머리글 아래 가는 막대예요. 적을 쓰러뜨리면 차고, 가득 차면 <b>레벨 업 보상</b>!')
+      + ROW(big('ic_levelup', '⬆'), '경험치 막대', '머리글 아래 가는 막대예요. 적을 쓰러뜨리면 차고, 가득 차면 <b>레벨업 보상</b>!')
       + ROW(big('relic_crit', '🎯'), '모듈 막대', '지금까지 모은 모듈이에요. 눌러서 설명과 <b>세트 진행도</b>를 볼 수 있어요.')
       + ROW(spr('sentry'), '적 요약 줄', '필드에 있는 적의 종류별 마릿수와 <b>남은 총 HP</b>예요. +N은 아직 등장하지 않은 적이에요.')
-      + ROW(big('stat_hp', '🛡'), '방벽 HP 막대', '캐릭터 아래 초록 막대가 방벽의 남은 HP예요.')
+      + ROW(big('stat_hp', '🛡'), '방벽 HP 막대', '동료 아래 초록 막대가 방벽의 남은 HP예요.')
       + H('액티브 스킬')
-      + P('캐릭터마다 <b>스킬 게이지</b>가 있어요. 충전 칸에 볼이 들어갈 때마다 탄환과 함께 차고, 가득 차면 오른쪽 <b>스킬 버튼</b>이 켜져요. 스킬을 쓰면 게이지는 0이 돼요.')
+      + P('동료마다 <b>스킬 게이지</b>가 있어요. 충전 칸에 볼이 들어갈 때마다 탄환과 함께 차고, 가득 차면 오른쪽 <b>스킬 버튼</b>이 켜져요. 스킬을 쓰면 게이지는 0이 돼요.')
       + ROW(big('ic_reward', '🎁'), '직접 켜기', '버튼을 눌러 두면 이번 전투에 발동해요. 직접 켜면 <b>피해 +' + pct(MANUAL_SKILL_BONUS) + '%</b>!')
       + ROW(big('ic_promote', '⏫'), '스킬 자동', '켜 두면 게이지가 찰 때마다 알아서 써요(피해 보너스는 없어요).')
       + ROW(big('ic_battle', '💥'), '전투 자동', '장전 단계의 볼 발사까지 알아서 해줘요.')
@@ -112,7 +112,7 @@ const Help = (function () {
       + kinds
       + H('스킬의 흔적')
       + P('스킬을 쓰면 <b>다음 판</b>에 흔적이 남아요. ' + Object.keys(SKILL_BOARD).map((k) => '<b>' + skillName(k) + '</b> → ' + SKILL_BOARD[k].text).join(' · ') + '.')
-      + TIP('스킬 게이지는 충전 칸에 볼이 들어갈 때 같이 차요. 스킬을 쓰고 싶은 캐릭터의 레인을 집중해서 채워 보세요.');
+      + TIP('스킬 게이지는 충전 칸에 볼이 들어갈 때 같이 차요. 스킬을 쓰고 싶은 동료의 레인을 집중해서 채워 보세요.');
   }
 
   const TAG_ORDER = ['precision', 'explosive', 'guard', 'pinball', 'harvest'];
@@ -132,8 +132,8 @@ const Help = (function () {
       + ROW(big('node_shop', T.shop.icon), T.shop.name, '런 크레딧으로 모듈(' + SHOP_PRICE.relic + ', 가진 모듈 개량 ' + SHOP_PRICE.relicEvo + ')이나 방벽 수리(' + SHOP_PRICE.heal + ')를 사요. 쓴 크레딧은 정산에서 빠져요.')
       + ROW(big('node_rest', T.rest.icon), T.rest.name, '방벽 HP <b>' + pct(REST_HEAL) + '% 회복</b> 또는 모듈 1개 <b>개량</b> 중 하나만 골라요.')
       + ROW(big('node_boss', T.boss.icon), T.boss.name, '맨 위에서 기다려요. 쓰러뜨리면 스테이지 클리어!')
-      + H('레벨 업 보상')
-      + P('적을 쓰러뜨리면 경험치가 쌓여 레벨이 올라요. 올릴 때마다 보상을 <b>3개 중 1개</b> 골라요 — <b>짝수 레벨은 모듈</b>, <b>홀수 레벨은 스탯 강화</b>예요.')
+      + H('레벨업 보상')
+      + P('적을 쓰러뜨리면 경험치가 쌓여 레벨이 올라요. 올릴 때마다 보상을 <b>3개 중 1개</b> 골라요 — <b>짝수 레벨은 모듈</b>, <b>홀수 레벨은 능력치 강화</b>예요.')
       + rw
       + LINK('relic', '모듈 목록 보기');
   }
@@ -145,7 +145,7 @@ const Help = (function () {
       mods += '<div class="hp-tag" style="--c:' + tg.color + '">' + tagIc(t) + '<b>' + tg.name + '</b><span class="hp-set">세트(' + RELIC_SET_N + '개): ' + tg.set + '</span></div>';
       Object.keys(RELICS).filter((id) => RELICS[id].tag === t).forEach((id) => { if (unlocked.indexOf(id) < 0) anyLock = true; mods += relicRow(id, unlocked); });
     });
-    return P('<b>모듈</b>은 이번 판 동안만 쓰는 특수 장비예요. 전투에서 이기거나 짝수 레벨이 되면 <b>3개 중 1개</b>를 골라요. 같은 모듈을 또 고르면 <b>개량(Lv2)</b>돼서 더 강해져요.')
+    return P('<b>모듈</b>은 이번 런 동안만 쓰는 특수 장비예요. 전투에서 이기거나 짝수 레벨이 되면 <b>3개 중 1개</b>를 골라요. 같은 모듈을 또 고르면 <b>개량(Lv2)</b>돼서 더 강해져요.')
       + P('모듈은 <b>태그</b> 5종으로 나뉘어요. 같은 태그를 <b>' + RELIC_SET_N + '개</b> 모으면 <b>세트 보너스</b>가 켜져요.')
       + mods
       + (anyLock ? P('🔒 표시는 아직 해금 전이에요. 스테이지를 <b>처음 클리어할 때마다 2종씩</b> 열려요.') : '')
@@ -186,9 +186,9 @@ const Help = (function () {
       + P('아래 수치는 <b>스테이지 1</b> 기준이에요. 스테이지가 높을수록 적이 튼튼하고 세져요.')
       + en
       + H('판 간섭')
-      + P('일부 적은 필드에 있는 동안 장전 판을 <b>방해</b>해요(간섭 페그는 한 번에 최대 ' + ENEMY_BOARD_CAP + '개). 장전 화면에 “…했다!” 안내가 뜨면, 그 적을 먼저 쓰러뜨려 판을 깨끗하게 만들 수 있어요.')
+      + P('일부 적은 필드에 있는 동안 장전 판을 <b>방해</b>해요(간섭 페그는 한 번에 최대 ' + ENEMY_BOARD_CAP + '개). 장전 화면에 “…했어요!” 안내가 뜨면, 그 적을 먼저 쓰러뜨려 판을 깨끗하게 만들 수 있어요.')
       + H('정예')
-      + P('정예 노드의 첫 웨이브에는 <b>정예 적</b>(황금빛 오라) 한 기가 섞여 있어요. 체력 ×' + ELITE.hpMul + ', 공격 ×' + ELITE.dmgMul + '로 세지만 경험치 ×' + ELITE.expMul + ', 쓰러뜨리면 크레딧 +' + ELITE.gold + '을 줘요.')
+      + P('정예 노드의 첫 웨이브에는 <b>정예 적</b>(황금빛 오라) 한 기가 섞여 있어요. 체력 ×' + ELITE.hpMul + ', 공격 ×' + ELITE.dmgMul + '로 세지만 경험치 ×' + ELITE.expMul + ', 쓰러뜨리면 크레딧 +' + ELITE.gold + eulReul(ELITE.gold) + ' 줘요.')
       + H('보스')
       + bs
       + P('보스 곁의 알약에 패턴까지 <b>남은 턴</b>이 떠요. 그 턴이 0이 되기 전에 <b>기절</b> 스킬로 묶으면 패턴이 <b>취소(저지)</b>돼요.')
@@ -211,16 +211,16 @@ const Help = (function () {
       + P(rar + '<br>클래스마다 등급별로 1명씩, 모두 <b>' + ROSTER.length + '명</b>이에요. 가챠로 모아요.')
       + H('능력치')
       + ROW(big('stat_atk', '🔩'), '공격', '한 발의 피해예요.')
-      + ROW(big('stat_hp', '🛡'), '체력', '편성한 캐릭터 체력의 합이 <b>방벽 HP</b>예요.')
+      + ROW(big('stat_hp', '🛡'), '체력', '편성한 동료 체력의 합이 <b>방벽 HP</b>예요.')
       + ROW(big('stat_gol', '🎯'), '골칸', '레인 포켓 3칸 중 <b>충전 칸</b>의 수(1~3)예요. 많을수록 장전이 쉬워요.')
       + H('스킬·패시브')
       + ROW(big('ic_battle', '💥'), '액티브 스킬', '게이지가 가득 차면 쓰는 필살기예요. 전투 중 오른쪽 스킬 버튼으로 켜요.')
       + ROW(big('ic_info', '❔'), '패시브', PASSIVE_NOTE)
       + H('성장')
       + ROW(big('ic_levelup', '⬆'), '레벨업', uiCur('gold') + '크레딧으로 올려요. 레벨 상한은 ★마다 늘어요(' + GROWTH.levelCapByStar.slice(1).join(' → ') + ').')
-      + ROW(big('ic_promote', '⏫'), '승급', uiCur('shards') + '조각과 ' + uiCur('mats') + '재료로 ★을 올려요(최대 ★' + GROWTH.starMax + '). 스탯이 크게 오르고 레벨 상한도 늘어요. ★1→2: ' + uiCur('shards') + pc.shards + ' · ' + uiCur('mats') + pc.mats + '.')
+      + ROW(big('ic_promote', '⏫'), '승급', uiCur('shards') + '조각과 ' + uiCur('mats') + '재료로 ★을 올려요(최대 ★' + GROWTH.starMax + '). 능력치가 크게 오르고 레벨 상한도 늘어요. ★1→2: ' + uiCur('shards') + pc.shards + ' · ' + uiCur('mats') + pc.mats + '.')
       + H('편성')
-      + P('<b>편성</b> 탭에서 캐릭터를 <b>3개 레인</b>에 배치해요. 목록의 카드를 빈 레인으로 <b>끌어다 놓거나</b>, 카드를 눌러 상세 화면에서 <b>[편성]</b>을 눌러요. 레인 색은 전투 때 포켓 색과 이어져요.');
+      + P('<b>편성</b> 탭에서 동료를 <b>3개 레인</b>에 배치해요. 목록의 카드를 빈 레인으로 <b>끌어다 놓거나</b>, 카드를 눌러 상세 화면에서 <b>[편성]</b>을 눌러요. 레인 색은 전투 때 포켓 색과 이어져요.');
   }
 
   function tEcon() {
@@ -228,20 +228,20 @@ const Help = (function () {
     MISSIONS.forEach((m) => { ms += ROW(big('ic_mission', '📋'), m.name, m.desc + ' → ' + cost(m.reward)); });
     const rates = GACHA.rates.map((r) => RARITY[r.rarity].name + ' ' + r.w + '%').join(' · ');
     return H('재화')
-      + ROW(big('cur_gold', '🪙'), '크레딧', '캐릭터 <b>레벨업</b>에 써요. 런 중에는 상점에서 모듈을 사는 데 쓰고, 런이 끝나면 남은 크레딧이 정산돼요.')
-      + ROW(big('cur_mats', '🔩'), '재료', '캐릭터 <b>승급</b>에 써요.')
+      + ROW(big('cur_gold', '🪙'), '크레딧', '동료 <b>레벨업</b>에 써요. 런 중에는 상점에서 모듈을 사는 데 쓰고, 런이 끝나면 남은 크레딧이 정산돼요.')
+      + ROW(big('cur_mats', '🔩'), '재료', '동료 <b>승급</b>에 써요.')
       + ROW(big('cur_gems', '💎'), '보석', '<b>가챠</b>에 써요. 스테이지 클리어·일일 도전·미션 보상으로 받아요.')
-      + ROW(big('cur_docs', '📄'), '문서', '상점 문서 탭에서 캐릭터 <b>조각</b>과 바꿔요.')
-      + ROW(big('cur_shard', '🔷'), '조각', '캐릭터 승급 재료예요. 가챠에서 이미 가진 캐릭터가 나오면 +' + GACHA.dupShards + '.')
+      + ROW(big('cur_docs', '📄'), '문서', '상점 문서 탭에서 동료 <b>조각</b>과 바꿔요.')
+      + ROW(big('cur_shard', '🔷'), '조각', '동료 승급 재료예요. 가챠에서 이미 가진 동료가 나오면 +' + GACHA.dupShards + '.')
       + H('가챠')
-      + P('단일 ' + uiCur('gems') + GACHA.cost1 + ' · 10연 ' + uiCur('gems') + GACHA.cost10 + ' · <b>하루 무료 1회</b>.<br>확률: ' + rates + '. 이미 가진 캐릭터가 나오면 조각으로 바뀌어요.')
+      + P('단일 ' + uiCur('gems') + GACHA.cost1 + ' · 10연 ' + uiCur('gems') + GACHA.cost10 + ' · <b>하루 무료 1회</b>.<br>확률: ' + rates + '. 이미 가진 동료가 나오면 조각으로 바뀌어요.')
       + H('문서 교환')
-      + P('문서로 <b>보유한 캐릭터</b>의 조각을 살 수 있어요(커먼 제외). 조각 1개당 레어 ' + uiCur('docs') + DOC_SHOP.price.rare + ', 에픽 ' + uiCur('docs') + DOC_SHOP.price.epic + ', 레전더리 ' + uiCur('docs') + DOC_SHOP.price.legendary + '.')
+      + P('문서로 <b>보유한 동료</b>의 조각을 살 수 있어요(커먼 제외). 조각 1개당 레어 ' + uiCur('docs') + DOC_SHOP.price.rare + ', 에픽 ' + uiCur('docs') + DOC_SHOP.price.epic + ', 레전더리 ' + uiCur('docs') + DOC_SHOP.price.legendary + '.')
       + H('패키지')
       + ROW(big('ic_package', '📦'), '보석 패키지·주간 패스', '아직 준비 중이에요. 곧 열려요!')
       + H('미션')
       + ms
-      + P('진행도가 가득 차면 <b>[수령]</b>으로 보상을 받아요.')
+      + P('진행도가 가득 차면 <b>[받기]</b> 버튼이 켜져요.')
       + H('방치 보상')
       + ROW(big('ic_idle', '💤'), '홈에서 쌓여요', '출격하지 않아도 시간이 지나면 ' + uiCur('gold') + '크레딧(분당 ' + IDLE.goldPerMin + ')과 ' + uiCur('mats') + '재료(분당 ' + IDLE.matsPerMin + ')가 쌓여요. 최대 ' + IDLE.capHours + '시간, 해금한 스테이지가 높을수록 많아요(최대 ×' + IDLE.mul(STAGE_MAX) + ').')
       + H('런 정산')
@@ -264,7 +264,7 @@ const Help = (function () {
       + tbl
       + H('모듈 해금')
       + P('스테이지를 <b>처음 클리어할 때마다</b> 모듈이 2종씩 해금돼요(세 번째 클리어에 전부 열려요).')
-      + TIP('막히면 편성 캐릭터를 키우거나 승급해서 다시 도전해 보세요. 낮은 스테이지를 반복해도 재화를 모을 수 있어요.');
+      + TIP('막히면 편성한 동료를 키우거나 승급해서 다시 도전해 보세요. 낮은 스테이지를 반복해도 재화를 모을 수 있어요.');
   }
 
   const TOPICS = [
@@ -274,7 +274,7 @@ const Help = (function () {
     { id: 'map', name: '지도·보상', ic: () => big('ic_reward', '🎁'), build: tMap },
     { id: 'relic', name: '모듈', ic: () => big('relic_crit', '🎯'), build: tRelic },
     { id: 'enemy', name: '적·보스', ic: () => big('node_elite', '💀'), build: tEnemy },
-    { id: 'chars', name: '캐릭터', ic: () => big('nav_formation', '👥'), build: tChars },
+    { id: 'chars', name: '동료', ic: () => big('nav_formation', '👥'), build: tChars },
     { id: 'econ', name: '재화·상점', ic: () => big('nav_shop', '🛒'), build: tEcon },
     { id: 'modes', name: '모드', ic: () => big('nav_sortie', '🚀'), build: tModes }
   ];
