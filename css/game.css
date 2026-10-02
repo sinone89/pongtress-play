@@ -35,6 +35,10 @@ body {
 #title-art { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; z-index: 0; }
 #title::after { content: ""; position: absolute; inset: 0; z-index: 1;
   background: linear-gradient(180deg, #0d0b1e88 0%, #0d0b1e22 30%, #0d0b1e22 62%, #0d0b1ed8 100%); }
+/* 타이틀 키아트(ART.title): 캐릭터가 그림에 이미 들어 있다 → 편성 캐릭터 겹침을 숨기고, 어둡힘은 로고·버튼 자리에만 살짝 */
+#title.has-key #title-art { object-position: 50% 50%; }
+#title.has-key #title-hero { display: none; }
+#title.has-key::after { background: linear-gradient(180deg, #0d0b1e55 0%, #0d0b1e00 20%, #0d0b1e00 82%, #0d0b1e99 100%); }
 /* 타이틀 크기는 프레임 폭 비례(cqw) — 화면이 넓은 기기에서도 로고·버튼이 작아 보이지 않게 */
 .title-top { position: relative; z-index: 3; text-align: center; padding: 3cqw 4cqw 0; width: 100%; }
 .title-btm { position: relative; z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 2.6cqw;
@@ -516,6 +520,11 @@ body {
 .cd-modal .cd-grade.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
 .cd-modal .cd-starsv { gap: 0.5cqw; color: #3a3358; font-size: 4.4cqw; }
 .cd-modal .cd-starsv .st.on { color: var(--amber); }
+/* 성급 ★ = 아이콘 그림(ic_star — 시안 수정 별): 켜짐은 금빛으로 색을 돌리고, 꺼짐은 회색으로 가라앉힌다(그림이 없으면 위의 글자 ★ 색 규칙이 그대로 쓰인다) */
+.cd-modal .cd-starsv .st .uic, .stchar .sc-star .sc-st .uic { vertical-align: middle; }
+.cd-modal .cd-starsv .st .uic-im, .stchar .sc-star .sc-st .uic-im { filter: grayscale(1) brightness(.45); opacity: .85; }
+.cd-modal .cd-starsv .st.on .uic-im, .stchar .sc-star .sc-st.on .uic-im { filter: hue-rotate(-148deg) saturate(1.3) brightness(1.1); opacity: 1; }
+.cd-modal .cd-x .uic { width: 1.1em !important; height: 1.1em !important; vertical-align: middle !important; }
 .cd-modal .cd-lvval b { font-size: 6cqw; color: var(--amber); } .cd-modal .cd-lvval span { font-size: 3cqw; color: var(--muted); font-weight: 700; }
 .cd-modal .cd-nameval { color: var(--ink); }
 .cd-modal .cd-clsval { font-size: 3.3cqw; }
@@ -538,7 +547,7 @@ body {
 .cd-modal .cd-bot .btn.sub { background: #ffffff14; color: var(--muted); box-shadow: none; }
 .cd-modal .cd-bot .btn.warn { background: #ff5d7a2e; color: #ff9eb0; box-shadow: inset 0 0 0 1px #ff5d7a88; }   /* 배치칸이 가득 차서 편성이 안 될 때 잠깐 보이는 피드백 */
 .cd-modal .cd-action[disabled] { opacity: .45; filter: grayscale(.3); }
-.cd-modal .cd-x { display: block; width: 100%; margin-top: 2cqw; appearance: none; border: 0; background: #ffffff10; color: var(--muted); font: inherit; font-weight: 800; font-size: 3.4cqw; padding: 2.4cqw 0; border-radius: 2.6cqw; cursor: pointer; }
+.cd-modal .cd-x { display: flex; align-items: center; justify-content: center; gap: 1.2cqw; width: 100%; margin-top: 2cqw; appearance: none; border: 0; background: #ffffff10; color: var(--muted); font: inherit; font-weight: 800; font-size: 3.4cqw; padding: 2.4cqw 0; border-radius: 2.6cqw; cursor: pointer; }
 /* 좌우 캐릭터 순환 화살표 = 화면 가장자리 원형 */
 #char-modal .cd-nav { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 9.5cqw; height: 9.5cqw; border-radius: 50%; border: 2px solid var(--amber); background: #1a1330ee; color: var(--amber); font-size: 6cqw; font-weight: 900; line-height: 1; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; box-shadow: 0 6px 20px #000b; }
 #char-modal .cd-prev { left: 1cqw; } #char-modal .cd-next { right: 1cqw; }

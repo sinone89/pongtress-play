@@ -22,7 +22,7 @@
 
   // ── 전역 상태 ──
   let S = null;          // 런/전투 상태
-  let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null, fx: [], shake: 0, ghosts: [] };
+  let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null, fx: [], shake: 0, ghosts: [], lau: { ang: -Math.PI / 2, tgt: -Math.PI / 2, recoil: 0, flash: 0 } };   // lau = 발사대 포신(조준 각도·반동·총구 섬광) — 그림이 있을 때만 쓰인다
   const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
   let lastTs = 0, loopStarted = false;   // 루프는 1회만 시작(런마다 rAF 중복 등록 → 속도 배가 버그 방지)
@@ -121,7 +121,7 @@
     S.chars = [];
     S.party.forEach((id, lane) => { if (id) S.chars.push({ ref: Meta.leveledDef(id), lane, ammo: 0, gauge: 0, armed: false, anim: CharAnim.create(id) }); });
     S.passiveBalls = 0;
-    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null; anim.fx = []; anim.shake = 0; anim.ghosts = [];
+    S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null; anim.fx = []; anim.shake = 0; anim.ghosts = []; anim.lau = { ang: -Math.PI / 2, tgt: -Math.PI / 2, recoil: 0, flash: 0 };
     buildBoard();
     // 패시브(보드 효과) 적용 — 페그 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
     { const _r = Math.random; Math.random = makeRng(boardSeed() + 31);
@@ -353,6 +353,7 @@
     }
     S.launchedThisTurn = (S.launchedThisTurn || 0) + 1;
     S.launchesLeft--;
+    anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;   // 발사대 포신: 쏜 방향으로 맞추고 반동·섬광(자동 발사도 같은 방향)
     Sound.play('launch');
   }
 
@@ -1378,6 +1379,41 @@
     ctx.restore();
   }
 
+  // 떠오르는 글자 속 이모지(🪙 🛡 …)를 아이콘 그림으로 바꿔 그린다 — 쓰인 이모지의 그림이 모두 준비됐을 때만(아니면 글자 그대로). 조각 목록은 글자마다 한 번만 만들어 둔다.
+  const FLOAT_IC = { '🪙': 'cur_gold', '🧱': 'relic_steel', '💥': 'tag_explosive', '⛓': 'relic_chain', '🍀': 'relic_lucky', '🛢': 'relic_powder', '⏱': 'ic_timer', '🛡': 'tag_guard' };
+  const FLOAT_SPLIT = /((?:🪙|🧱|💥|⛓|🍀|🛢|⏱|🛡)️?)/u;
+  function floatSegs(f) {
+    if (f._segs === undefined) {
+      const parts = f.text.split(FLOAT_SPLIT).filter(Boolean);
+      f._segs = parts.length > 1 || (parts[0] && FLOAT_IC[parts[0].replace('️', '')]) ? parts.map(function (s) { const nm = FLOAT_IC[s.replace('️', '')]; return nm ? { ic: nm } : { s: s }; }) : null;
+    }
+    const segs = f._segs;
+    return segs && segs.every(function (sg) { return !sg.ic || UiArt.ready(sg.ic); }) ? segs : null;
+  }
+
+  // 발사대 그림(ART.launcher): 받침(정지) + 포신(조준 방향으로 회전·발사 때 뒤로 튕김) + 총구 섬광. 둘 다 없으면 null → 호출한 쪽이 노란 원으로 폴백(한 부품만 있으면 있는 것만 그린다).
+  // 치수는 규격 좌표(받침 256×256, 포신 128×224·회전 중심 (64,160))를 기준으로 하므로 그림이 2배·4배 해상도로 와도 같은 모양이다.
+  function launcherArtReady() {
+    const A = ART.launcher; if (!A.on) return null;
+    const base = PegArt.ready(A.base), barrel = PegArt.ready(A.barrel);
+    return (base || barrel) ? { base: base, barrel: barrel } : null;
+  }
+  function drawLauncherArt(L, pinsW, art) {
+    const A = ART.launcher, k = pinsW * A.size / A.baseSrc, lau = anim.lau, dim = S.launchesLeft > 0 ? 1 : 0.5;   // 볼이 떨어지면 어둡게
+    ctx.save(); ctx.globalAlpha = dim;
+    if (art.base) drawCell(ctx, art.base, 0, 0, art.base.naturalWidth, art.base.naturalHeight, L.x - A.baseSrc * k / 2, L.y - A.baseSrc * k / 2, A.baseSrc * k, A.baseSrc * k);
+    if (art.barrel) {
+      ctx.translate(L.x, L.y); ctx.rotate(lau.ang + Math.PI / 2);                       // 그림은 위(↑)가 앞 → 조준각(오른쪽=0)에 90° 더해 돌린다
+      const back = lau.recoil * A.recoil * pinsW;                                       // 반동: 뒤(+y)로 밀렸다가 돌아온다
+      drawCell(ctx, art.barrel, 0, 0, art.barrel.naturalWidth, art.barrel.naturalHeight, -A.pivotX * k, -A.pivotY * k + back, A.barrelW * k, A.barrelH * k);
+    }
+    ctx.restore();
+    if (lau.flash > 0) {                                                                // 총구 섬광(총구 끝에서 포신 방향으로)
+      const reach = A.pivotY * k - lau.recoil * A.recoil * pinsW;
+      FxSheet.muzzle(ctx, L.x + Math.cos(lau.ang) * reach, L.y + Math.sin(lau.ang) * reach, lau.ang, pinsW * A.flashSize, 1 - lau.flash, A.flashColor);
+    }
+  }
+
   function draw() {
     ctx.clearRect(0, 0, W, H);
     const shk = anim.shake > 0.3;
@@ -1539,9 +1575,11 @@
     }
     // 발사대(하단 중앙) + 조준 가이드
     if (S.phase === 'load') {
-      const L = launcher();
-      ctx.fillStyle = S.launchesLeft > 0 ? '#ffcf5c' : '#555';
-      ctx.beginPath(); ctx.arc(L.x, L.y, 11, 0, 7); ctx.fill();
+      const L = launcher(), lart = launcherArtReady();                  // 발사대 그림(받침·포신)이 준비됐으면 예측선 위에 그리고, 아니면 노란 원
+      if (!lart) {
+        ctx.fillStyle = S.launchesLeft > 0 ? '#ffcf5c' : '#555';
+        ctx.beginPath(); ctx.arc(L.x, L.y, 11, 0, 7); ctx.fill();
+      }
       if (aimActive && S.launchesLeft > 0) {
         const pts = simulateAim(aimDir(aimX, aimY));
         ctx.save(); ctx.lineWidth = 2.5; ctx.setLineDash([5, 7]); ctx.lineCap = 'round';
@@ -1554,6 +1592,7 @@
         ctx.setLineDash([]); ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4, 0, 7); ctx.fill();
         ctx.restore();
       }
+      if (lart) drawLauncherArt(L, r.pins.w, lart);                      // 받침 + 포신(예측선 위 — 포신이 선의 시작을 덮는다)
     }
 
     // 골 포켓 — 상단은 레인별 캐릭터 이름 라벨, 하단은 포켓 셀
@@ -1569,6 +1608,8 @@
     for (let i = 0; i < 9; i++) {
       const pk = S.pockets[i]; const x = g.x + i * pw;
       const isC = pk.type === 'charge', isB = pk.type === 'buff';
+      const pimg = ART.pocket.on ? PegArt.ready(isC ? ART.pocket.charge[pk.lane % 3] : isB ? ART.pocket.buff : ART.pocket.blank) : null;   // 칸 그림(충전은 레인 색별) — 이 칸의 그림이 없으면 아래 도형
+      if (pimg) { drawCell(ctx, pimg, 0, 0, pimg.naturalWidth, pimg.naturalHeight, x + 1, cellY + 1, pw - 2, cellH - 3); continue; }
       ctx.fillStyle = isC ? laneHex(pk.lane) + '55' : isB ? '#66ccff33' : '#ffffff08';
       ctx.fillRect(x + 1, cellY + 1, pw - 2, cellH - 3);
       ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, cellY + 1, pw - 2, cellH - 3);
@@ -1580,11 +1621,15 @@
     if (fpk) drawPocketFrame(fpk, g.x, cellY, g.w, cellH);
     if (S.jack && S.phase === 'load') {                  // 움직이는 잭팟 포켓(×3)
       const jx = g.x + S.jack.x * g.w, jw = pw * 0.96, pul = 0.6 + 0.4 * Math.sin(performance.now() / 140);
-      ctx.save(); ctx.globalCompositeOperation = 'lighter';
-      ctx.fillStyle = 'rgba(255,217,59,' + (0.16 + 0.14 * pul).toFixed(3) + ')'; ctx.fillRect(jx - jw / 2, cellY + 1, jw, cellH - 3);
-      ctx.restore();
-      ctx.save(); ctx.strokeStyle = '#ffd93b'; ctx.lineWidth = 2.5; ctx.strokeRect(jx - jw / 2, cellY + 1, jw, cellH - 3);
-      ctx.fillStyle = '#ffd93b'; ctx.font = 'bold ' + Math.max(10, Math.round(cellH * 0.34)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      const jimg = ART.pocket.on ? PegArt.ready(ART.pocket.jackpot) : null;   // 잭팟 덮개 그림(금색 괄호 프레임, 속은 투명)
+      if (jimg) { ctx.save(); ctx.globalAlpha = 0.72 + 0.28 * pul; drawCell(ctx, jimg, 0, 0, jimg.naturalWidth, jimg.naturalHeight, jx - jw / 2, cellY + 1, jw, cellH - 3); ctx.restore(); }
+      else {
+        ctx.save(); ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = 'rgba(255,217,59,' + (0.16 + 0.14 * pul).toFixed(3) + ')'; ctx.fillRect(jx - jw / 2, cellY + 1, jw, cellH - 3);
+        ctx.restore();
+        ctx.save(); ctx.strokeStyle = '#ffd93b'; ctx.lineWidth = 2.5; ctx.strokeRect(jx - jw / 2, cellY + 1, jw, cellH - 3); ctx.restore();
+      }
+      ctx.save(); ctx.fillStyle = '#ffd93b'; ctx.font = 'bold ' + Math.max(10, Math.round(cellH * 0.34)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText('×' + JACKPOT_MUL, jx, cellY + cellH * 0.18 + 2); ctx.fillText('×' + JACKPOT_MUL, jx, cellY + cellH * 0.18 + 2);
       ctx.restore();
     }
@@ -1599,14 +1644,27 @@
       ctx.globalAlpha = Math.max(0, Math.min(1, f.t / 0.7)); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       const base = f.note ? 16 : f.ld ? LOAD_POPUP_PX : f.big ? 44 : 30;               // 장전 화면 팝업(ld)은 종류 불문 같은 크기
       const cs = f.ld ? COMBO_TEXT_SCALE : 1;                                          // 외곽선·글로우도 같은 비율
-      const fsz = Math.round(base * pop * U);
-      ctx.font = '900 ' + fsz + 'px system-ui';
+      let fsz = Math.round(base * pop * U);
+      const segs = floatSegs(f);                                                                // 이모지를 아이콘 그림으로 바꿀 수 있으면 조각 목록, 아니면 null(글자 그대로)
+      const measure = () => { ctx.font = '900 ' + fsz + 'px system-ui'; return segs ? segs.reduce(function (a, sg) { return a + (sg.ic ? fsz * 1.2 : ctx.measureText(sg.s).width); }, 0) : ctx.measureText(f.text).width; };
+      let tw = measure();
+      if (tw > W - 12 * U) { fsz = Math.max(8, Math.floor(fsz * (W - 12 * U) / tw)); tw = measure(); }   // 화면 폭보다 긴 알림(방호 발동 등)은 폭에 맞춰 줄인다 — 이전엔 양 끝이 잘렸다
+      const isz = fsz * 1.08, icw = fsz * 1.2;                                                  // 아이콘 한 변 · 아이콘이 차지하는 폭
       const yy = Math.max(fsz * 0.75, f.note ? f.y : f.y - (1 - Math.min(1, f.t)) * 46 * U);   // 알림(note)은 제자리 · 화면 위로 잘리지 않게 클램프
-      const half = ctx.measureText(f.text).width / 2 + 6 * U, xx = Math.max(half, Math.min(W - half, f.x));   // 벽 쪽에서 터져도 글자가 화면 밖으로 잘리지 않게
+      const half = tw / 2 + 6 * U, xx = Math.max(half, Math.min(W - half, f.x));   // 벽 쪽에서 터져도 글자가 화면 밖으로 잘리지 않게
       ctx.lineJoin = 'round'; ctx.lineWidth = (f.big || f.ld ? 8 : 6) * U * cs; ctx.strokeStyle = 'rgba(8,4,16,0.95)';
-      ctx.strokeText(f.text, xx, yy);
+      if (!segs) ctx.strokeText(f.text, xx, yy);
+      else { ctx.textAlign = 'left'; let sx = xx - tw / 2; for (const sg of segs) { if (sg.ic) sx += icw; else { ctx.strokeText(sg.s, sx, yy); sx += ctx.measureText(sg.s).width; } } }
       if (f.big && !f.note) { ctx.shadowColor = f.color; ctx.shadowBlur = 14 * U * cs; }   // 큰 숫자는 색 글로우
-      ctx.fillStyle = f.color; ctx.fillText(f.text, xx, yy);
+      ctx.fillStyle = f.color;
+      if (!segs) ctx.fillText(f.text, xx, yy);
+      else {
+        let sx = xx - tw / 2;
+        for (const sg of segs) {
+          if (sg.ic) { const im = UiArt.ready(sg.ic); drawCell(ctx, im, 0, 0, im.naturalWidth, im.naturalHeight, sx + fsz * 0.06, yy - isz / 2, isz, isz); sx += icw; }
+          else { ctx.fillText(sg.s, sx, yy); sx += ctx.measureText(sg.s).width; }
+        }
+      }
       ctx.restore();
     }
     for (const fl of anim.flashes) {                      // 타격/페그 접촉 섬광: 링 → 발광 코어
@@ -1803,6 +1861,11 @@
     for (let i = anim.floats.length - 1; i >= 0; i--) { anim.floats[i].t -= d * 1.05; if (anim.floats[i].t <= 0) anim.floats.splice(i, 1); }
     for (let i = anim.flashes.length - 1; i >= 0; i--) { anim.flashes[i].t -= d * 3; if (anim.flashes[i].t <= 0) anim.flashes.splice(i, 1); }
     for (let i = anim.shots.length - 1; i >= 0; i--) { anim.shots[i].t += d * 4.6; if (anim.shots[i].t >= 1.15) anim.shots.splice(i, 1); }
+    const lau = anim.lau;                                              // 발사대 포신: 조준 중이면 그쪽으로, 장전 화면이 아니면 정면(위)으로 되돌린다
+    if (aimActive && S.phase === 'load' && S.launchesLeft > 0) { const ad = aimDir(aimX, aimY); lau.tgt = Math.atan2(ad.dy, ad.dx); }
+    else if (S.phase !== 'load') lau.tgt = -Math.PI / 2;
+    { const da = Math.atan2(Math.sin(lau.tgt - lau.ang), Math.cos(lau.tgt - lau.ang)); lau.ang += da * Math.min(1, d * 22); }   // 가까운 쪽으로 보간
+    lau.recoil = Math.max(0, lau.recoil - d * 6); lau.flash = Math.max(0, lau.flash - d * 7);
     for (const c of S.chars) CharAnim.update(c.anim, d);
     const nowS = performance.now() / 1000;
     for (const e of S.enemies) { if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 3.2); stepEnemyVis(e, d, nowS); }
@@ -1881,10 +1944,19 @@
     }, 4600);
   }
 
+  // 타이틀 키아트(ART.title): 처음부터 캐릭터가 들어간 한 장짜리 일러스트. 그림이 실제로 로드되면 #title-art 를 교체하고(.has-key) 편성 캐릭터 겹침을 숨긴다 — 로드 실패면 옛 연출 그대로.
+  function initTitleArt() {
+    const t = $('title'), im = $('title-art'); if (!ART.title.on || !t || !im) return;
+    const k = new Image();
+    k.onload = function () { if (k.naturalWidth > 0) { im.src = k.src; im.style.display = ''; t.classList.add('has-key'); } };
+    k.src = ART.title.src + ASSET_Q;
+  }
+
   // ============ 와이어링 ============
   Meta.load();
   Meta.init({ onSortie: startRun });
   initTitleHero();
+  initTitleArt();
   Sound.syncIcons();
   document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
   const enterLobby = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
@@ -1924,8 +1996,10 @@
     FxArt.preload(['muzzle', 'shell', 'boom', 'hit_spark']);
     EnemyArt.preload(Object.keys(ENEMIES).concat(['boss_titan', 'boss_swarm', 'boss_carrier']));
     BgArt.preload(['bg_field', 'bg_wall', 'bg_board', 'frame_pocket']);
-    UiArt.preload(['stat_hp', 'ic_timer']);
+    UiArt.preload(['stat_hp', 'ic_timer'].concat(Object.keys(FLOAT_IC).map(function (k) { return FLOAT_IC[k]; })));
     PegArt.preload(Object.keys(PEG_TYPES).map(function (k) { return 'peg_' + k; }).concat(['obst_bumper', 'obst_pillar']));
+    if (ART.pocket.on) PegArt.preload(ART.pocket.charge.concat([ART.pocket.blank, ART.pocket.buff, ART.pocket.jackpot]));   // 새 그림 슬롯(켜져 있을 때만 요청 — 꺼져 있으면 404 도 없다)
+    if (ART.launcher.on) PegArt.preload([ART.launcher.base, ART.launcher.barrel]);
   }, 600);
 
   // 디버그/스모크 훅

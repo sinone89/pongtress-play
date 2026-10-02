@@ -256,7 +256,7 @@ const Meta = (function () {
   function charChip(id, opts) {
     opts = opts || {};
     const b = base(id), o = M.owned[id], R = RARITY[b.rarity] || RARITY.common, g = RAR_G[b.rarity] || 'g-n', owned = !!o;
-    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="sc-st' + (owned && s <= o.star ? ' on' : '') + '">★</span>';
+    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="sc-st' + (owned && s <= o.star ? ' on' : '') + '">' + ui('ic_star', '★') + '</span>';
     return '<button class="stchar' + (owned ? '' : ' locked') + (opts.placed ? ' placed' : '') + '" data-char="' + id + '">'
       + '<div class="sc-top"><div class="sc-grade ' + g + '">' + R.name + '</div><div class="sc-star">' + stars + '</div></div>'
       + '<div class="sc-img"><img class="sc-cg" src="' + CharArt.path(id, 'thumb') + '" alt="" draggable="false" onerror="this.remove()">'
@@ -370,8 +370,8 @@ const Meta = (function () {
   // ── 방치 홈 자동전투 연출(코스메틱) ──
   // 캐릭터가 '재장전(정면 대기·재장전 동작) → 돌아서서 점사(뒷모습 조준·발사 프레임) → 다시 정면'을 반복한다 — 전투와 같은 CharAnim.
   // 포탄은 실측한 총구(SHEET_META)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
-  // 홈 배경 assets/bg/bg_lobby.webp(1080×1920)에서 뒷벽이 바닥과 만나는 선의 y(이미지 좌표). 배경을 바꾸면 이 값도 다시 잴 것.
-  const BG_LOBBY = { w: 1080, h: 1920, farY: 930 };
+  // 홈 배경 assets/bg/bg_lobby.webp(1080×1920)에서 뒷벽이 바닥과 만나는 선(문턱)의 y(이미지 좌표). 배경을 바꾸면 js/artmeta.js 의 ART.lobby.farY 도 다시 잴 것.
+  const BG_LOBBY = { w: 1080, h: 1920, farY: ART.lobby.farY };
   let _idleRAF = 0, _idleDbg = null;
   function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }
   function idleDebug() { return _idleDbg; }
@@ -405,11 +405,12 @@ const Meta = (function () {
 
     // ── 적: 하늘에서 떨어지지 않는다 — 바닥 안쪽 끝(뒷벽이 바닥과 만나는 선)에서 나타나 바닥을 따라 걸어오고, 캐릭터 쪽으로 올수록 커진다(원근) ──
     // e.d = 깊이(0 = 먼 끝 → 1 = 캐릭터 발치 줄), e.u = 바닥 폭에 대한 좌우 위치(-1..1; 가까울수록 바닥이 넓어져 부채꼴로 벌어진다)
-    const FAR_HALF = 0.25, NEAR_HALF = 0.62;                                   // 바닥 절반 폭(캔버스 폭 비율): 먼 끝 / 캐릭터 줄
-    const depthK = (d) => 0.42 + 0.58 * d;                                      // 원근 배율(멀수록 작게)
+    const FAR_HALF = ART.lobby.farHalf, NEAR_HALF = ART.lobby.nearHalf;        // 바닥 절반 폭(캔버스 폭 비율): 먼 끝(문턱) / 캐릭터 줄
+    const SPAWN_D = ART.lobby.spawnD, FADE_D = ART.lobby.fade;                   // 적이 나타나는 깊이(0=문턱, 음수=열린 문 너머) · 서서히 보이는 구간
+    const depthK = (d) => 0.42 + 0.58 * d;                                      // 원근 배율(멀수록 작게) — 음수 깊이(문 너머)는 더 작게
     const ESZ = { sentry: 0.15, drone: 0.15, walker: 0.19, hound: 0.165, heavy: 0.2, sludge: 0.14 };   // 가까이 왔을 때 스프라이트 한 변(캔버스 폭 비율)
     const ESPD = { sentry: 1, drone: 1.1, walker: 0.85, hound: 1.5, heavy: 0.72, sludge: 0.8 };        // 걸음 속도 배율
-    const speedOf = (e) => 0.19 * (ESPD[e.type] || 1) * (0.55 + 0.85 * e.d);                            // 깊이/초(멀수록 느리게 보임)
+    const speedOf = (e) => 0.19 * (ESPD[e.type] || 1) * (0.55 + 0.85 * Math.max(0, e.d));              // 깊이/초(멀수록 느리게 보임 — 문 너머(음수)는 문턱과 같은 속도)
     // 적의 화면 위치·크기: (x, y)=발 닿는 곳, s=스프라이트 한 변, cy=몸통 중심(조준점), top=머리 쪽. dd 로 미래 깊이를 넣어 조준 보정에도 쓴다
     function ePos(e, dd) {
       const d = dd == null ? e.d : dd, k = depthK(d), s = D.w * e.sz * k * (1 + 0.14 * e.kick);
@@ -423,7 +424,7 @@ const Meta = (function () {
       let u = 0; for (let t = 0; t < 6; t++) { u = (Math.random() * 2 - 1) * 0.7; if (!D.en.some(o => Math.abs(o.d - d) < 0.16 && Math.abs(o.u - u) < 0.3)) break; }   // 같은 자리에 겹쳐 나오지 않게
       return { type, u, d, sz: (ESZ[type] || 0.16) * (0.93 + Math.random() * 0.14), col: (ENEMIES[type] || {}).color || '#fff', hp, mhp: hp, pend: 0, hit: 0, kick: 0, ph: Math.random() * 6.28 };
     }
-    function spawn() { if (D.en.length < 8) D.en.push(mkEnemy(0)); }
+    function spawn() { if (D.en.length < 8) D.en.push(mkEnemy(SPAWN_D)); }
     for (let i = 0; i < 4; i++) D.en.push(mkEnemy(0.12 + Math.random() * 0.6));
 
     // 캐릭터 그림 위치·크기 — 그리기와 총구 계산이 같은 값을 쓴다(어긋남 방지). 시트 한 칸(320)을 charS×charS 로, 발(cx, groundY)에 맞춰 그린다
@@ -476,7 +477,7 @@ const Meta = (function () {
     }
     function step(dt) {
       D.now += dt;
-      if (Math.random() < dt * 1.0) spawn();
+      if (Math.random() < dt * ART.lobby.rate) spawn();
       for (const e of D.en) { e.d += dt * speedOf(e); e.hit = Math.max(0, e.hit - dt); e.kick = Math.max(0, e.kick - dt * 8); }
       D.cs.forEach(c => stepChar(c, dt));
       for (const p of D.pj) { p.t += dt / p.dur; if (p.t >= 1 && !p.done) { p.done = true; hitAt(p); } }
@@ -491,7 +492,7 @@ const Meta = (function () {
     }
 
     function drawEnemy(e) {
-      const p = ePos(e), a = Math.max(0, Math.min(1, e.d / 0.09)); if (a <= 0) return;   // 바닥 끝에서 서서히 나타남
+      const p = ePos(e), a = Math.max(0, Math.min(1, (e.d - SPAWN_D) / FADE_D)); if (a <= 0) return;   // 나타나는 곳(문턱 또는 문 너머)에서 서서히 나타남
       const x = p.x, y = p.y, s = p.s, ty = p.top;
       ctx.save();
       ctx.globalAlpha = a * (p.lift ? 0.2 : 0.34); ctx.fillStyle = '#000';                       // 바닥 그림자(바닥 위를 걷는 느낌)
@@ -759,7 +760,7 @@ const Meta = (function () {
     const cap = levelCap(id), maxLv = o.level >= cap, maxStar = o.star >= GROWTH.starMax;
     const cl = CLASS[b.cls] || { icon: '', name: '', color: 'var(--cyan)' };
     const gcls = RAR_G[b.rarity] || 'g-n';
-    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">★</span>';
+    let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">' + ui('ic_star', '★') + '</span>';
     // 현재 → 다음 스탯 비교 박스 + 성장 액션(스틸앤샷式)
     const STAT = [[ui('stat_atk', '💥'), '공격', 'atk'], [ui('stat_hp', '🛡'), '체력', 'hp'], [ui('stat_gol', '🎯'), '골칸', 'gol']];
     const cur = statAt(id, o.level, o.star);
@@ -803,7 +804,7 @@ const Meta = (function () {
       + '<button class="btn cd-place ' + (inParty(id) ? 'sub' : '') + '" data-party="' + id + '">' + (inParty(id) ? '편성 해제' : ui('ic_place', '🪧') + ' 편성') + '</button>'
       + '<button class="btn cd-action" ' + actAttr + (actEnabled ? '' : ' disabled') + '>' + actLabel + '</button>'
       + '</div>'
-      + '<button class="cd-x" data-close="1">닫기</button>';
+      + '<button class="cd-x" data-close="1">' + ui('ic_close', '✕') + ' 닫기</button>';
     $('char-modal').hidden = false;
   }
 
