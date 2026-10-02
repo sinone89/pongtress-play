@@ -1,0 +1,51 @@
+/* PONGTRESS UI 스킨(9분할) — html.skin 일 때만 켜진다. 꺼져 있으면(기본) 이 파일은 아무 효과가 없다.
+   켜는 법: 주소 뒤 ?art=skin (또는 ?art=all) — js/artmeta.js 의 ART.on.skin 이 <html class="skin"> 을 붙인다. 마음에 들면 artmeta.js 의 on.skin 을 true 로.
+   원리: 소스 그림(assets/ui/skin/*.png)을 border-image 로 늘려 버튼·카드·모달 등에 입힌다.
+     --sk 소스 · --t --r --b --l 슬라이스(위 오른쪽 아래 왼쪽, 소스 px) · --k 배율(소스 1px = 828 프레임에서 k px; 단위는 cqw 라 프레임 폭에 비례)
+   슬라이스·배율은 tools/skin-test.html 로 늘려 보며 정했다(같은 값을 유지). 새 조각을 입힐 때는 아래 "공통 틀"에 선택자를 더하고 변수만 정한다.
+   그림에 없는 상태(눌림·비활성)는 기존 CSS 의 :active/:disabled 가 그대로 만든다. */
+html.skin { --u: calc(1cqw / 8.28); }   /* 828 프레임의 CSS 1px 에 해당하는 길이 */
+
+/* ── 공통 틀 ──  (⚠ :is() 안에 #id 를 넣으면 목록 전체의 우선순위가 올라가 아래 클래스 규칙이 지므로, id 는 목록 밖에 따로 쓴다) */
+html.skin :is(.btn, .sns-btn, .sns-card, .idle-card, .gbanner, .modal-box, .toast), html.skin #stage-info, html.skin #lobby-nav {
+  --bw: calc(var(--t) * var(--k) * var(--u)) calc(var(--r) * var(--k) * var(--u)) calc(var(--b) * var(--k) * var(--u)) calc(var(--l) * var(--k) * var(--u));
+  border: solid transparent; border-width: var(--bw);
+  border-image: var(--sk) var(--t) var(--r) var(--b) var(--l) fill / var(--bw) stretch;
+  border-radius: 0; background: none; box-shadow: none; -webkit-backdrop-filter: none; backdrop-filter: none;
+}
+
+/* ── 버튼 3종: btn_*.png 296×206 · 슬라이스 64 123 60 118 ── */
+html.skin :is(.btn, .sns-btn) { --t: 64; --r: 123; --b: 60; --l: 118; --k: .34; }
+html.skin .btn { --sk: url('../assets/ui/skin/btn_primary.png'); --k: .36; padding: .5cqw 0; }
+html.skin .sns-btn { --sk: url('../assets/ui/skin/btn_chunky.png'); padding: .2cqw 0; text-shadow: none; }
+html.skin .sns-btn.sm { --k: .27; padding: 0; }
+html.skin :is(.btn.sub, .sns-btn.sub) { --sk: url('../assets/ui/skin/btn_sub.png'); }
+html.skin .title-btm .btn { padding: 1cqw 6cqw; }          /* 타이틀 [터치하여 시작]: 넉넉한 폭 */
+html.skin #lobby-main .btn, html.skin .home-cta-btn { padding: .8cqw 0; }   /* 로비의 큰 CTA(출격 등) — game.css 의 #lobby-main .btn 패딩(3.4cqw)보다 우선하도록 선택자를 맞춘다 */
+
+/* ── 카드·패널: panel_frame.png 348×331 · 슬라이스 84 112 80 112 ── */
+html.skin :is(.sns-card, .idle-card, .gbanner), html.skin #stage-info { --sk: url('../assets/ui/skin/panel_frame.png'); --t: 84; --r: 112; --b: 80; --l: 112; --k: .30; padding: 1cqw 1.4cqw; }
+/* 목록 행(아이콘+이름+설명+버튼이 한 줄): row_frame.png 405×185 · 슬라이스 58 90 54 90 */
+html.skin .sns-card:has(> .sns-row) { --sk: url('../assets/ui/skin/row_frame.png'); --t: 58; --r: 90; --b: 54; --l: 90; padding: .4cqw 1cqw; }
+html.skin .gbanner { padding: 2.4cqw 1.6cqw 1.4cqw; }                   /* 가챠 배너: 위 테두리(3cqw) + 제목 자리 — ⓘ 버튼이 아래 버튼과 겹치지 않게 */
+html.skin .gbanner .gb-info { top: 3.4cqw; right: 3.8cqw; }
+
+/* ── 모달: modal_frame.png 415×382 · 슬라이스 108 125 100 125 ── */
+html.skin .modal-box { --sk: url('../assets/ui/skin/modal_frame.png'); --t: 108; --r: 125; --b: 100; --l: 125; --k: .30; padding: 2.2cqw 2.6cqw; }
+html.skin .modal-box.cd-modal { padding: .8cqw 1cqw; }
+
+/* ── 토스트: toast_frame.png 408×183 · 슬라이스 56 99 52 67 (테두리 색 대신 바깥 발광으로 종류를 알린다) ── */
+html.skin .toast { --sk: url('../assets/ui/skin/toast_frame.png'); --t: 56; --r: 99; --b: 52; --l: 67; --k: .34; padding: .6cqw 1.4cqw;
+  filter: drop-shadow(0 0 2.2cqw color-mix(in srgb, var(--c, #ffcf5c) 55%, transparent)); }
+
+/* ── 하단 내비: nav_bar.png 518×201 · 슬라이스 66 112 24 112 ── */
+html.skin #lobby-nav { --sk: url('../assets/ui/skin/nav_bar.png'); --t: 66; --r: 112; --b: 24; --l: 112; --k: .45; background: none; }
+html.skin .tabbtn.active { box-shadow: none; }
+
+/* ── 띠 모양(가로로만 늘림): 위·아래 슬라이스 0 → 왼쪽·오른쪽 끝(캡)만 고정, 높이는 내용이 정한다(캡은 높이에 맞춰 늘어 비율이 거의 유지) ── */
+/* 섹션 헤더: header_banner.png 518×84 · 캡 왼 92 오른 88 */
+html.skin .sns-h { border: solid transparent; border-width: 0 10cqw 0 10.4cqw; border-image: url('../assets/ui/skin/header_banner.png') 0 88 0 92 fill / 0 10cqw 0 10.4cqw stretch;
+  border-radius: 0; background: none; padding: 2.2cqw 0; }
+/* 상단 재화 칩: chip_frame.png 316×84 · 캡 좌우 56 */
+html.skin #lobby-top .cur { border: solid transparent; border-width: 0 2.2cqw; border-image: url('../assets/ui/skin/chip_frame.png') 0 56 0 56 fill / 0 2.2cqw stretch;
+  border-radius: 0; background: none; padding: 1.6cqw 0; }
