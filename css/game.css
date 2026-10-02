@@ -786,6 +786,31 @@ body {
 #tut .tut-skip { appearance: none; background: transparent; border: 1px solid #ffffff2e; color: var(--muted); font: inherit; font-size: 3.1cqw; font-weight: 700; padding: 1.8cqw 3.2cqw; border-radius: 2.6cqw; cursor: pointer; }
 #tut .tut-next { appearance: none; border: 0; background: linear-gradient(180deg, #ffe08a, var(--amber)); color: #3a2a05; font: inherit; font-size: 3.8cqw; font-weight: 800; padding: 2.2cqw 6cqw; border-radius: 2.8cqw; box-shadow: 0 .8cqw 0 #9c7c2c; cursor: pointer; }
 #tut .tut-next:active { transform: translateY(.5cqw); box-shadow: 0 .3cqw 0 #9c7c2c; }
+#tut .tut-body { position: relative; }
+#tut .tut-prog { position: absolute; top: -2.6cqw; right: 3.4cqw; display: none; padding: .6cqw 2.6cqw; border-radius: 999px; background: #191330; border: .5cqw solid var(--amber); color: var(--amber); font-size: 2.8cqw; font-weight: 800; letter-spacing: .05cqw; }   /* 챕터 진행 표시: 1/3 · 첫 전투 */
+#tut .tut-more { margin-right: auto; }                                                                                  /* 팁의 [자세히 ›] 는 왼쪽 */
+/* 건너뛰기 확인 팝업 — 경고 + 지금 받는 보상. #tut 밖(형제)이라 카드가 숨겨져도 남는다 */
+#tut-skipm { position: absolute; inset: 0; z-index: 115; display: none; align-items: center; justify-content: center; padding: 6cqw; background: rgba(6, 4, 14, .82); }
+#tut-skipm.show { display: flex; }
+#tut-skipm .tut-sk-box { width: 100%; background: linear-gradient(180deg, #251d3c, #191330); border: .6cqw solid var(--amber); border-radius: 4.2cqw; padding: 5cqw 5cqw 4.4cqw; box-shadow: 0 2cqw 6cqw #000c; }
+#tut-skipm .tut-sk-h { color: var(--amber); font-weight: 800; font-size: 5cqw; margin-bottom: 2.4cqw; }
+#tut-skipm .tut-sk-w { color: var(--ink); font-size: 3.6cqw; line-height: 1.55; word-break: keep-all; }
+#tut-skipm .tut-sk-w b { color: #ff9eb0; }
+#tut-skipm .tut-sk-warn { color: #ffcf5c; font-weight: 900; }
+#tut-skipm .tut-sk-gt { margin-top: 3.4cqw; color: var(--muted); font-size: 3.1cqw; font-weight: 700; }
+#tut-skipm .tut-sk-gl { display: flex; flex-wrap: wrap; gap: 1.6cqw; margin-top: 1.6cqw; }
+#tut-skipm .tut-sk-gl > span { padding: 1.4cqw 3cqw; border-radius: 999px; background: #ffffff12; border: 1px solid #ffcf5c66; color: var(--ink); font-size: 3.5cqw; white-space: nowrap; }
+#tut-skipm .tut-sk-gl b { color: var(--amber); }
+#tut-skipm .tut-sk-gl .uic { width: 1.2em; height: 1.2em; vertical-align: -0.25em; }
+#tut-skipm .tut-sk-n { margin-top: 2.2cqw; color: var(--muted); font-size: 3cqw; line-height: 1.5; }
+#tut-skipm .tut-sk-n b { color: var(--amber); }
+#tut-skipm .tut-sk-row { display: flex; justify-content: flex-end; gap: 2.4cqw; margin-top: 4cqw; }
+#tut-skipm .tut-skip { appearance: none; background: transparent; border: 1px solid #ffffff2e; color: var(--muted); font: inherit; font-size: 3.6cqw; font-weight: 700; padding: 2.2cqw 5.4cqw; border-radius: 2.8cqw; cursor: pointer; }
+#tut-skipm .tut-next { appearance: none; border: 0; background: linear-gradient(180deg, #ffe08a, var(--amber)); color: #3a2a05; font: inherit; font-size: 3.8cqw; font-weight: 800; padding: 2.4cqw 7cqw; border-radius: 2.8cqw; box-shadow: 0 .8cqw 0 #9c7c2c; cursor: pointer; }
+#tut-skipm .tut-next:active { transform: translateY(.5cqw); box-shadow: 0 .3cqw 0 #9c7c2c; }
+/* 튜토리얼 전투: 루비 1명이라 레벨·경험치·스킬 열·자동 버튼은 필요 없다 */
+#combat.tut-battle #c-level, #combat.tut-battle #exp-bar, #combat.tut-battle #battle-side { display: none !important; }
+.gbanner .sns-btn[disabled] { opacity: .45; }
 
 /* ═══ 도움말(js/help.js) — ? 버튼 + 주제 탭 팝업 ═══ */
 .help-btn { appearance: none; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 0;

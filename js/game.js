@@ -71,15 +71,16 @@
   }
 
   // ============ 런 시작 ============
+  // mode 'tutorial' = 튜토리얼 전투(js/tutorial.js): 분기 지도 없이 전투 1회, 루비 1명(계정 편성과 무관), 약한 적, 패배 불가, 레벨업·결과·정산 없음(승리 횟수·미션에 안 셈)
   function startRun(opts) {
     opts = opts || (Meta.runOptions ? Meta.runOptions() : {});
-    const mode = opts.mode || 'normal';
-    const party = Meta.partySlots();                // [id|null ×3] — 편성
-    const stage = opts.stage || Meta.stage(), scale = stageScale(stage);   // 스테이지 난이도 배수
-    const wallMax = party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
+    const mode = opts.mode || 'normal', tut = mode === 'tutorial';
+    const party = tut ? ['knight', null, null] : Meta.partySlots();                // [id|null ×3] — 편성
+    const stage = tut ? 1 : (opts.stage || Meta.stage()), scale = tut ? Object.assign({}, TUTORIAL.scale) : stageScale(stage);   // 스테이지 난이도 배수
+    const wallMax = tut ? TUTORIAL.wallHp : party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
     S = {
-      mode, stage, scale, seedBase: opts.seed || 0, loop: 0,
-      combatIndex: 0, nodeIdx: 0, level: 1, exp: 0, expNext: expToNext(1),
+      mode, tutorial: tut, stage, scale, seedBase: opts.seed || 0, loop: 0,
+      combatIndex: 0, nodeIdx: 0, level: 1, exp: 0, expNext: tut ? Infinity : expToNext(1),
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0], buffBonus: 0,
       runKills: 0, floorsCleared: 0, runMaxCombo: 0,
       wallBase: wallMax, wallHpMax: wallMax, wallHp: wallMax,
@@ -93,8 +94,23 @@
     };
     CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
-    S.map = genMap(); showMap();
+    $('combat').classList.toggle('tut-battle', tut);                      // 튜토리얼 전투: 레벨·경험치·스킬 열·자동 버튼을 숨긴다(css)
+    if (tut) { window.__tutPause = false; startCombat({ name: TUTORIAL.combat.name, tutorial: true, waves: TUTORIAL.combat.waves.map(w => w.slice()) }, 0, 0); }
+    else { S.map = genMap(); showMap(); }
     if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }
+  }
+  // 튜토리얼 전투를 이기면: 멈춰 두고(S.over) 튜토리얼 카드가 이어받는다. 정산(onRunEnd)·결과 화면은 쓰지 않는다
+  function winTutorial() {
+    S.over = true; S.phase = 'done'; aimActive = false;
+    Sound.play('win');
+    if (typeof Tutorial !== 'undefined') Tutorial.event('tutwin');
+  }
+  // 튜토리얼 전투를 떠나 로비로(카드의 [동료 만나러 가기] · 건너뛰기 · 연습 전투 끝)
+  function exitTutorialBattle() {
+    if (S && S.tutorial) S.over = true;
+    window.__tutPause = false; aimActive = false;
+    $('combat').classList.remove('tut-battle');
+    show('lobby'); Meta.renderLobby();
   }
 
   const roster = (id) => ROSTER.find(c => c.id === id);
@@ -138,7 +154,7 @@
       }
     }
     S.waveIdx = 0;
-    $('c-name').textContent = runLabel() + ' · ' + combat.name;
+    $('c-name').textContent = S.tutorial ? '튜토리얼 전투' : runLabel() + ' · ' + combat.name;
     enterLoad();
     syncHud();
   }
@@ -304,6 +320,8 @@
     // 버프 칸(보상): 꽝칸 일부를 버프(방벽 회복) 칸으로
     let bb = S.buffBonus || 0;
     for (const p of S.pockets) { if (bb <= 0) break; if (p.type === 'blank') { p.type = 'buff'; bb--; } }
+    // 튜토리얼 전투: 루비 혼자라 충전 칸 6칸(모두 루비 색) + 꽝 3칸 — 루비 골칸 1칸으론 너무 느리고, 꽝 칸이 있어야 "색 칸만 충전"이 보인다
+    if (S.tutorial) S.pockets = S.pockets.map((p, i) => ({ lane: 0, type: i < 6 ? 'charge' : 'blank' }));
   }
 
   function applyPassive(p) {
@@ -616,6 +634,8 @@
     const side = $('battle-side'); if (side) side.style.display = 'none';   // 전투 중 사이드바 숨김
     anim.floats = anim.floats.filter(f => !f.note);                         // 장전 화면용 안내 문구는 전투에 들고 가지 않는다
     anim.skillCuts = []; anim.cut = null;
+    // 튜토리얼 전투: 장전이 운 나쁘게 빗나가도 전투가 허공에 쏘지 않도록 최소 탄환을 채워 준다
+    if (S.tutorial) { const c0 = S.chars[0]; if (c0 && c0.ammo < 6) { const add = 6 - c0.ammo; c0.ammo += add; c0.gauge += add; } }
     // 액티브 스킬 발동(자동 또는 armed) 결정 → 샷 큐 구성
     S.shotQueue = [];
     for (const c of S.chars) {
@@ -881,6 +901,7 @@
       S.guardUsed = true; S.wallHp = Math.round(S.wallHpMax * 0.5);
       anim.floats.push({ x: W / 2, y: layout().wall.y, text: '🛡 방호 발동! 방벽 50%', color: '#5ce0a0', t: 1.6, big: true }); anim.shake = Math.max(anim.shake, 8);
     }
+    if (S.tutorial && S.wallHp < 1) S.wallHp = 1;      // 튜토리얼 전투는 패배 불가
     if (S.wallHp <= 0) { S.wallHp = 0; loseRun(); return; }
     // 드론 모함(정지형): 매 턴 경비봇 사출
     if (S.combat.boss && S.bossDef && S.bossDef.kind === 'carrier' && S.enemies.some(x => x.isBoss)) summonAdd();
@@ -937,7 +958,7 @@
     let placed = 0;
     for (let k = 0; k < w.length; k++) {
       const cell = spawnCell(k % CFG.fieldLanes); if (!cell) break;   // 빈 칸에만 등장(앞 웨이브와 겹치지 않음)
-      const type = pickEnemyType(S.stage), def = ENEMIES[type];   // 종류는 스테이지 풀에서 (웨이브 길이=마릿수)
+      const type = ENEMIES[w[k]] ? w[k] : pickEnemyType(S.stage), def = ENEMIES[type];   // 종류는 스테이지 풀에서 (웨이브 길이=마릿수) — 원소가 적 종류 id 면 그 종류(튜토리얼 전투)
       const hp = Math.round(def.hp * S.scale.hp);
       S.enemies.push({ type, name: def.name, lane: cell.lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
       placed++;
@@ -1094,6 +1115,7 @@
   // 전투 노드 클리어: 모듈 3택(개량 1칸 보장) → 맵. 무한 모드 보스 → 다음 막.
   function winCombat() {
     S.floorsCleared = (S.floorsCleared || 0) + 1;
+    if (S.tutorial) { winTutorial(); return; }          // 튜토리얼 전투: 모듈 보상·지도 없이 카드가 이어받는다
     S.phase = 'map';
     if (S.combat && S.combat.boss) { nextLoop(); return; }
     const t = S.combat && S.combat.elite ? '정예 격파 보상' : '전투 승리 보상';
@@ -1600,8 +1622,9 @@
     const lblH = Math.min(g.h * 0.4, 20), cellY = g.y + lblH, cellH = g.h - lblH;
     for (let l = 0; l < CFG.lanes; l++) {                 // 레인 그룹 라벨(골칸↔캐릭터 매칭)
       const c = S.chars.find(ch => ch.lane === l); if (!c) continue;
-      const gx = g.x + (l * 3 + 1.5) * pw;
-      ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, 3 * pw - 2, lblH - 1);
+      const span = (S.tutorial && l === 0) ? 6 : 3;       // 튜토리얼 전투: 루비의 충전 칸 6칸 위에 라벨
+      const gx = g.x + (l * 3 + span / 2) * pw;
+      ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, span * pw - 2, lblH - 1);
       ctx.fillStyle = laneHex(l); ctx.font = 'bold ' + Math.max(11, Math.round(lblH * 0.72)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(c.ref.name, gx, g.y + lblH / 2 + 1); ctx.textBaseline = 'alphabetic';
     }
@@ -1877,7 +1900,7 @@
       frameEma += (raw - frameEma) * 0.03; slowMs = frameEma > 36 ? slowMs + raw : 0;
       if (slowMs > 3000) { dprCap = 2; slowMs = 0; resize(); }
     }
-    if (S && !S.over) {
+    if (S && (!S.over || (S.tutorial && S.phase === 'done'))) {     // 튜토리얼 전투 승리 뒤(카드가 떠 있는 동안)에도 화면은 계속 그린다(루비가 서 있는 모습)
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;
       if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
@@ -1959,7 +1982,11 @@
   initTitleArt();
   Sound.syncIcons();
   document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
-  const enterLobby = () => { Sound.resume(); Sound.play('click'); show('lobby'); Meta.renderLobby(); };
+  const enterLobby = () => {
+    Sound.resume(); Sound.play('click');
+    if (typeof Tutorial !== 'undefined' && Tutorial.battleDue()) { startRun({ mode: 'tutorial' }); return; }   // 새 계정의 첫 진입 = 튜토리얼 전투부터(로비는 그 뒤)
+    show('lobby'); Meta.renderLobby();
+  };
   $('title').onclick = enterLobby;        // 타이틀 아무 곳이나 탭 → 시작
   $('btn-start').onclick = (e) => { e.stopPropagation(); enterLobby(); };
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
@@ -2011,7 +2038,8 @@
     // 화면 연출까지 한 걸음(rAF가 멈춘 숨은 탭에서 수동 진행용): layoutT 보간 포함
     step(dt) { if (!S || S.over) return; const tgt = S.layoutTarget || 0; if (S.layoutT !== tgt) { const st = dt / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + st) : Math.max(tgt, S.layoutT - st); } if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } stepVisuals(dt); },
     render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos, renderSkills, showResult, renderEnemyBar,
-    layout, launcher            // 튜토리얼이 캔버스 영역(적 필드·방벽·포켓·핀볼 판)을 짚어 주는 데 쓴다
+    layout, launcher,           // 튜토리얼이 캔버스 영역(적 필드·방벽·포켓·핀볼 판)을 짚어 주는 데 쓴다
+    exitTutorialBattle
   };
 
   // 헤드리스 자가 테스트: ?sim=1 로 런을 자동 진행하며 런타임 오류·상태를 #boot-error 에 남긴다.

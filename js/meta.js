@@ -77,10 +77,45 @@ const Meta = (function () {
     if (!MODES[M.runMode]) M.runMode = 'normal';
     M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
     M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
-    // 튜토리얼 진행(js/tutorial.js): 새 계정 = 처음부터 자동 시작 / 튜토리얼 도입 전부터 있던 계정 = 완료로 보고 한 번 '볼까요?' 제안
-    if (!M.tut || typeof M.tut !== 'object') M.tut = fresh ? { v: 1, at: 'welcome', done: false, offered: true, seen: {} } : { v: 1, at: 'welcome', done: true, offered: false, seen: {} };
+    // 튜토리얼 진행(js/tutorial.js, v2): 새 계정 = 첫 전투부터 자동 시작 / 튜토리얼 도입 전부터 있던 계정 = 완료로 보고 한 번 '볼까요?' 제안
+    //   v2 필드 — battle: 튜토리얼 전투를 끝냈나 · pulled: 튜토리얼 가챠를 했나 · rewarded: 완료 선물을 받았나 · review: 다시 보기 중인 챕터(0=아님, -1=전체)
+    if (!M.tut || typeof M.tut !== 'object') M.tut = fresh ? { v: 2, at: 'c1-hello', done: false, offered: true, seen: {}, battle: false, pulled: false, rewarded: false, review: 0 }
+      : { v: 2, at: 'c1-hello', done: true, offered: false, seen: {}, battle: true, pulled: true, rewarded: true, review: 0 };
     if (!M.tut.seen || typeof M.tut.seen !== 'object') M.tut.seen = {};
+    if ((M.tut.v || 1) < 2) {                                // v1(구 38단계 투어) → v2: 진행 중이던 계정도 완료로 본다(이미 3명을 가졌다). 새 튜토리얼은 아직 못 봤으면 한 번 제안
+      Object.assign(M.tut, { v: 2, at: 'c1-hello', offered: !!(M.tut.done && M.tut.offered), done: true, battle: true, pulled: true, rewarded: true, review: 0 });
+    }
+    // 개발용 ?sim(시뮬)·?notut(튜토리얼 끔): 신규 계정은 보라·코코를 더해 3명으로 시작한다(편성까지) — 시뮬·수동 테스트가 예전과 똑같이 돌아간다
+    if (fresh && /[?&](sim|notut)\b/.test(location.search)) {
+      TUTORIAL.starter.forEach(id => { if (!M.owned[id]) M.owned[id] = { level: 1, star: 1 }; });
+      M.party = ['knight'].concat(TUTORIAL.starter);
+      Object.assign(M.tut, { done: true, offered: true, battle: true, pulled: true, rewarded: true });
+    }
     save();
+  }
+  // ── 튜토리얼 보상(js/tutorial.js 가 부른다) ──
+  // 동료는 어떤 경우에도 자동 편성하지 않는다 — 플레이어가 편성 탭에서 직접 배치한다.
+  function tutOn() { return !!M && !!M.tut && (M.tut.v || 1) >= 2 && !M.tut.done && !M.tut.review && !(typeof Tutorial !== 'undefined' && Tutorial.disabled); }   // 신규 튜토리얼 진행 중인가(다시 보기 중은 제외 — 보상·잠금 없음)
+  function tutPullDue() { return tutOn() && !M.tut.pulled && !M.owned[TUTORIAL.pullId]; }   // 튜토리얼 가챠 1회가 남았나
+  function grantChar(id) {                                                                  // 동료 지급: 처음이면 보유에 추가, 이미 있으면 조각으로
+    const b = base(id); if (!b) return null;
+    if (M.owned[id]) { M.shards[id] = (M.shards[id] || 0) + GACHA.dupShards; return { id, name: b.name, rarity: b.rarity, isNew: false }; }
+    M.owned[id] = { level: 1, star: 1 }; return { id, name: b.name, rarity: b.rarity, isNew: true };
+  }
+  function tutorialPull() {                                                                 // 튜토리얼 가챠 1회: 보라 확정 · 일일 무료·보석·확률에 영향 없음
+    if (!tutPullDue()) return null;
+    const r = grantChar(TUTORIAL.pullId); M.tut.pulled = true; save(); return [r];
+  }
+  function tutRewardPlan() {                                                                // 지금 건너뛰거나 완료하면 받게 될 것(건너뛰기 팝업·완료 카드에 표시)
+    const t = M.tut || {}, chars = [], cur = {};
+    if (!t.pulled && !M.owned[TUTORIAL.pullId]) chars.push(TUTORIAL.pullId);
+    if (!t.rewarded) { if (!M.owned[TUTORIAL.rewardId]) chars.push(TUTORIAL.rewardId); Object.assign(cur, TUTORIAL.reward); }
+    return { chars, cur };
+  }
+  function tutGrantRewards() {                                                              // 못 받은 동료·완료 재화를 한꺼번에 지급(완료·건너뛰기 공통). 중복 지급 없음(플래그)
+    const plan = tutRewardPlan();
+    plan.chars.forEach(grantChar); gain(plan.cur);
+    Object.assign(M.tut, { pulled: true, rewarded: true, battle: true }); save(); return plan;
   }
   // ── 모듈 해금 / 출격 옵션(모드·일일 시드) ──
   function unlockedRelics() { return (M && M.relicsUnlocked) ? M.relicsUnlocked.slice() : RELIC_START_UNLOCKED.slice(); }
@@ -160,6 +195,7 @@ const Meta = (function () {
     return { id: c.id, name: c.name, rarity: c.rarity, isNew };
   }
   function gacha(n, free) {
+    if (tutOn()) return null;                    // 튜토리얼 진행 중엔 일반 뽑기 잠금(튜토리얼 가챠 1회만 — 동료가 먼저 뽑혀 선물과 겹치는 것을 막는다)
     if (free) { const today = new Date().toISOString().slice(0, 10); if (M.daily.freeGachaDate === today) return null; M.daily.freeGachaDate = today; }
     else { const cost = n === 10 ? GACHA.cost10 : GACHA.cost1; if (M.currencies.gems < cost) return null; M.currencies.gems -= cost; }
     const res = []; for (let i = 0; i < n; i++) res.push(pullOne());
@@ -347,7 +383,9 @@ const Meta = (function () {
       });
     }
     const n = partySlots().filter(Boolean).length, warn = $('sortie-warn');
+    const benched = ownedIds().filter(id => !inParty(id)).length;                     // 보유했지만 배치하지 않은 동료(자동 배치는 하지 않으므로 알려 준다)
     if (n === 0) { warn.hidden = false; warn.textContent = '편성 탭에서 캐릭터를 1명 이상 배치하세요.'; $('btn-sortie').disabled = true; }
+    else if (n < 3 && benched > 0) { warn.hidden = false; warn.textContent = '빈 레인이 있어요 — 편성 탭에서 동료를 배치해 보세요!'; $('btn-sortie').disabled = false; }
     else { warn.hidden = true; $('btn-sortie').disabled = false; }
   }
 
@@ -608,14 +646,15 @@ const Meta = (function () {
 
   // ── 상점(스틸앤샷式): 서브탭(가챠/문서/패키지) → 배너·카드 ──
   function shopGachaBody() {
-    const free = freeAvailable();
+    const free = freeAvailable(), tutPull = tutPullDue(), lock = tutOn();                  // 튜토리얼 중: 튜토리얼 뽑기 1회만 열려 있고 일반 뽑기는 잠긴다
     return '<div class="gbanner">'
       + '<button class="gb-info" data-gachainfo="1">' + ui('ic_info', '❔') + '</button>'          // 확률은 ⓘ 팝업에서만 표시(배너에 중복 표기 안 함)
       + '<div class="gb-t">' + ui('ic_ticket', '🎫') + ' 상시 배너</div>'
-      + (free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
+      + (tutPull ? '<div class="gb-d"><b>첫 영입! 튜토리얼 뽑기 1회 무료</b></div>' : lock ? '<div class="gb-d">튜토리얼이 끝나면 열려요</div>' : free ? '<div class="gb-d"><b>오늘 무료 1회!</b></div>' : '')
       + '<div class="gb-btns">'
-      +   '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '">단일 ' + (free ? '무료' : uiCur('gems') + GACHA.cost1) + '</button>'
-      +   '<button class="sns-btn" data-gacha="10">10연 ' + uiCur('gems') + GACHA.cost10 + '</button>'
+      +   (tutPull ? '<button class="sns-btn" data-gacha="tutorial">튜토리얼 뽑기 · 무료</button>'
+            : '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '"' + (lock ? ' disabled' : '') + '>단일 ' + (free ? '무료' : uiCur('gems') + GACHA.cost1) + '</button>')
+      +   (tutPull ? '' : '<button class="sns-btn" data-gacha="10"' + (lock ? ' disabled' : '') + '>10연 ' + uiCur('gems') + GACHA.cost10 + '</button>')
       + '</div></div>';
   }
   function shopDocBody() {
@@ -871,7 +910,7 @@ const Meta = (function () {
       const gc = e.target.closest('[data-gacha]');
       if (gc && !gc.disabled) {
         const which = gc.dataset.gacha;
-        const res = which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
+        const res = which === 'tutorial' ? tutorialPull() : which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
         if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
         return;
       }
@@ -919,5 +958,7 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug, get state() { return M; } };
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug,
+    tutOn, tutPullDue, tutorialPull, tutRewardPlan, tutGrantRewards, grantChar,           // 튜토리얼 보상·가챠(js/tutorial.js 가 사용)
+    get state() { return M; } };
 })();

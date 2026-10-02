@@ -61,7 +61,7 @@ function makePeg(fx, fy, type) {
 // 레벨업에 필요한 누적 경험치: 레벨 L→L+1 (충전·처치가 늘어난 만큼 완만하게)
 function expToNext(level) { return 16 + level * 11; }
 
-// ── 캐릭터 (프로토타입: 처음부터 3명 배치. 편성/가챠는 다음 패스) ──
+// ── 캐릭터 (12종. 새 계정의 시작 보유·편성은 아래 META_START, 보라·코코는 튜토리얼에서 합류) ──
 // atk 공격력(발당 피해) · hp 체력(방벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
 const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' }, legendary: { name: '레전더리', color: '#ffce54' } };
@@ -165,17 +165,31 @@ function stageScale(s) {
   };
 }
 
-// 시작 메타 상태(3인 보유로 바로 플레이 가능, 가챠용 보석 지급)
+// 시작 메타 상태(루비 1명으로 시작 — 보라는 튜토리얼 가챠, 코코는 튜토리얼 완료 선물로 합류한다. 가챠용 보석 지급)
+//   ⚠ 신규 계정에만 적용. 개발용 ?sim·?notut 은 Meta.load 가 보라·코코를 더해 3명으로 시작시킨다(TUTORIAL.starter).
 const META_START = {
   currencies: { gold: 200, mats: 120, gems: 320, docs: 0 },
   shards: {},
-  owned: { knight: { level: 1, star: 1 }, grenadier: { level: 1, star: 1 }, guard: { level: 1, star: 1 } },
-  party: ['knight', 'grenadier', 'guard'],   // 사수·포수·지원 커먼 1명씩
+  owned: { knight: { level: 1, star: 1 } },
+  party: ['knight', null, null],             // 1레인=루비. 나머지 레인은 비어 있다(동료를 영입해 직접 배치)
   stage: 1, maxStage: 1,
   stats: { runsWon: 0, kills: 0, floors: 0 },
   claimed: {},
   daily: { freeGachaDate: '' },
   idle: { last: 0 }               // 방치 보상 마지막 정산 시각(ms). 0이면 최초 진입 시 now로 초기화
+};
+// 튜토리얼(js/tutorial.js · meta.js · game.js 가 함께 쓰는 값)
+//  · 첫 진입 = 튜토리얼 전투 1회(분기 지도 없이, 루비 1명, 패배 불가) → 상점의 튜토리얼 가챠 1회(보라 확정) → 편성 → 홈 → 출격 → 미션 → 완료 선물(코코 + 재화)
+//  · 건너뛰기: 확인 팝업에서 [확인]을 눌러야만 건너뛰고, 그 순간 아직 못 받은 동료(보라·코코)와 완료 재화를 한꺼번에 받는다. 동료는 어떤 경우에도 자동 배치하지 않는다(플레이어가 편성 탭에서 직접).
+const TUTORIAL = {
+  pullId: 'grenadier',                       // 튜토리얼 가챠 1회의 확정 결과(보라)
+  rewardId: 'guard',                         // 튜토리얼 완료 선물 캐릭터(코코)
+  reward: { gems: 200, gold: 300 },          // 완료 선물 재화(기존 선물 그대로)
+  starter: ['grenadier', 'guard'],           // 건너뛰기로 한꺼번에 받는 동료 · 개발용 신규 계정 지급
+  scale: { hp: 0.7, dmg: 0.3, exp: 1, reward: 0 },   // 튜토리얼 전투의 적: 약하게(체력 ×0.7, 공격 ×0.3)
+  wallHp: 120,                               // 튜토리얼 전투의 방벽 HP(루비 혼자라도 지지 않게)
+  // 튜토리얼 전투: 2웨이브(경비봇 2 → 드론 1 + 경비봇 1). 웨이브 원소가 적 종류 id 면 그 종류로 등장한다.
+  combat: { name: '튜토리얼', tutorial: true, waves: [['sentry', 'sentry'], ['drone', 'sentry']] }
 };
 // 방치(idle) 보상: 홈에서 시간 경과에 따라 골드·재료 누적, 상한 있음. 해금 스테이지가 높을수록 배율↑.
 const IDLE = {
