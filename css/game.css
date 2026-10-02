@@ -789,6 +789,19 @@ body {
 #tut .tut-body { position: relative; }
 #tut .tut-prog { position: absolute; top: -2.6cqw; right: 3.4cqw; display: none; padding: .6cqw 2.6cqw; border-radius: 999px; background: #191330; border: .5cqw solid var(--amber); color: var(--amber); font-size: 2.8cqw; font-weight: 800; letter-spacing: .05cqw; }   /* 챕터 진행 표시: 1/3 · 첫 전투 */
 #tut .tut-more { margin-right: auto; }                                                                                  /* 팁의 [자세히 ›] 는 왼쪽 */
+/* 시범 장면(슬로모션·정지 설명) — 지켜보는 동안 터치만 막는 투명 막 · 가리키는 고리 · 말풍선 · 상단 캡션 */
+#tut .tut-block.clear { background: transparent; }
+#tut #tut-marks { position: absolute; inset: 0; pointer-events: none; z-index: 1; }
+#tut .tut-mk { position: absolute; border-radius: 50%; border: .8cqw solid #fff; box-shadow: 0 0 2.4cqw #fffb, inset 0 0 2cqw #fff7; transform: translate(-50%, -50%); animation: tutMark .9s ease-in-out infinite; }
+#tut .tut-mk.sq { border-radius: 2.4cqw; transform: none; border-color: var(--amber); box-shadow: 0 0 3cqw #ffcf5ccc, inset 0 0 2cqw #ffcf5c66; }
+@keyframes tutMark { 0%, 100% { opacity: 1; scale: 1; } 50% { opacity: .55; scale: 1.1; } }
+#tut .tut-call { position: absolute; padding: 1.4cqw 3.2cqw; border-radius: 999px; background: #191330f5; border: .5cqw solid var(--amber); color: #fff; font-weight: 800; font-size: 3.7cqw; line-height: 1.25; white-space: nowrap; transform: translate(-50%, -100%); box-shadow: 0 1cqw 3cqw #000a; }
+#tut .tut-call::after { content: ''; position: absolute; left: 50%; bottom: -1.5cqw; width: 2.4cqw; height: 2.4cqw; background: #191330; border-right: .5cqw solid var(--amber); border-bottom: .5cqw solid var(--amber); transform: translateX(-50%) rotate(45deg); }
+#tut .tut-call b { color: var(--amber); }
+#tut .tut-call.below { transform: translate(-50%, 0); }
+#tut .tut-call.below::after { bottom: auto; top: -1.5cqw; transform: translateX(-50%) rotate(225deg); }
+#tut #tut-cap { position: absolute; left: 50%; top: 3cqw; transform: translateX(-50%); padding: 1.8cqw 5cqw; border-radius: 999px; background: #191330ee; border: .5cqw solid var(--amber); color: #fff; font-weight: 800; font-size: 3.8cqw; display: none; white-space: nowrap; box-shadow: 0 1cqw 3cqw #000a; }
+#tut #tut-cap b { color: var(--amber); }
 /* 건너뛰기 확인 팝업 — 경고 + 지금 받는 보상. #tut 밖(형제)이라 카드가 숨겨져도 남는다 */
 #tut-skipm { position: absolute; inset: 0; z-index: 115; display: none; align-items: center; justify-content: center; padding: 6cqw; background: rgba(6, 4, 14, .82); }
 #tut-skipm.show { display: flex; }
@@ -820,7 +833,12 @@ body {
 .lobby-help { font-size: 4.6cqw; }
 .combat-help { width: 7cqw; height: 7cqw; font-size: 4.2cqw; }
 .map-help { width: 7.4cqw; height: 7.4cqw; font-size: 4.2cqw; }
-#combat-top { grid-template-columns: 1fr auto auto auto auto; }                          /* 이름 · 단계 · 레벨 · 음소거 · 도움말 */
+#combat-top { grid-template-columns: 1fr auto auto auto auto auto; }                     /* 이름 · 단계 · 레벨 · 전투 속도 · 음소거 · 도움말 */
+/* 전투 속도 버튼(×1 / ×2) — 전투 phase 의 사격·연출 속도. 켜면(×2) 호박색 */
+.speed-btn { appearance: none; margin: 0; padding: .7cqw 2.6cqw; border: 1px solid #ffffff2e; border-radius: 999px; background: #ffffff12; color: var(--muted); font: inherit; font-weight: 900; font-size: 3.7cqw; line-height: 1.2; cursor: pointer; letter-spacing: .02em; }
+.speed-btn.on { color: var(--amber); border-color: var(--amber); background: #ffcf5c1e; }
+.speed-btn:active { transform: scale(.94); }
+#combat.tut-battle #speed-btn { display: none !important; }                           /* 튜토리얼 전투는 속도를 고정(안내 속도에 맞춘다) */
 #help-modal.modal { inset: auto; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(100vw, calc(100dvh * 9 / 16)); height: min(100dvh, calc(100vw * 16 / 9)); padding: 2.4cqw; z-index: 55; }   /* 배경 막도 9:16 프레임 크기에 맞춤 — 위아래 레터박스·옆 여백까지 덮지 않는다 */
 .help-box { max-width: 96cqw; height: 100%; max-height: 100%; display: flex; flex-direction: column; padding: 3cqw 3cqw 2.6cqw; text-align: left; overflow: hidden; }
 .hp-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 2.2cqw; }

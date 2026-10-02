@@ -25,6 +25,12 @@
   let anim = { floats: [], flashes: [], shots: [], skillCuts: [], cut: null, fx: [], shake: 0, ghosts: [], lau: { ang: -Math.PI / 2, tgt: -Math.PI / 2, recoil: 0, flash: 0 } };   // lau = 발사대 포신(조준 각도·반동·총구 섬광) — 그림이 있을 때만 쓰인다
   const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
+  let aimShown = null, demoAim = null;   // aimShown = 마지막으로 화면에 그려 준 조준 방향(손을 떼면 이 방향으로 쏜다 — 보이는 대로 나간다) · demoAim = 튜토리얼 시범 조준점(손가락 시범에 맞춰 점선만 보여 줌)
+  let tScale = 1, battleSpeed = 1;       // tScale = 튜토리얼 슬로모션 배율(0.1~1) · battleSpeed = 전투 속도 버튼(1배/2배 — 기기에 저장)
+  try { battleSpeed = localStorage.getItem('pongtress_speed') === '2' ? 2 : 1; } catch (e) {}
+  // 보드 배율: 페그·볼의 크기와 속도는 '기준 판 폭(폰 375 화면)' 기준 px 로 정하고, 실제 핀볼 판 폭에 비례해 키운다 → 화면이 커도 판의 모양·난이도·볼 속도는 그대로
+  const REF_PINS_W = 311;
+  let BU = 1;
   let lastTs = 0, loopStarted = false;   // 루프는 1회만 시작(런마다 rAF 중복 등록 → 속도 배가 버그 방지)
   let dprCap = 3, frameEma = 16.7, slowMs = 0;   // 해상도 안전장치: 캔버스 배율이 2 를 넘는데 전투가 계속 느리면 2 로 한 번 낮춘다(저사양 DPR 3 폰 보호)
 
@@ -57,7 +63,7 @@
     return r;
   }
   // 발사대 위치(핀볼 영역 하단 중앙, 바닥에서 살짝 띄워 바닥 뱅크샷 여지를 둠)
-  function launcher() { const p = layout().pins; return { x: p.x + p.w / 2, y: p.y + p.h - Math.max(CFG.ballRadius + 4, p.h * 0.12) }; }
+  function launcher() { const p = layout().pins; return { x: p.x + p.w / 2, y: p.y + p.h - Math.max((CFG.ballRadius + 4) * BU, p.h * 0.12) }; }
 
   function resize() {
     // ⚠ #app이 transform:scale 되므로 온스크린 px(getBoundingClientRect) 대신 디자인 px(clientWidth)로 측정 — 이중 스케일 방지
@@ -68,6 +74,7 @@
     canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    BU = Math.max(0.55, (W * (1 - SIDE_FR)) / REF_PINS_W);   // 보드 배율(페그·볼 크기·볼 속도에 곱한다)
   }
 
   // ============ 런 시작 ============
@@ -92,6 +99,7 @@
       shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false, autoLoad: false,
       combat: null, over: false
     };
+    tScale = 1; demoAim = null; aimShown = null; aimActive = false;      // 튜토리얼 슬로모션·시범 조준은 새 런에 들고 가지 않는다
     CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
     $('combat').classList.toggle('tut-battle', tut);                      // 튜토리얼 전투: 레벨·경험치·스킬 열·자동 버튼을 숨긴다(css)
@@ -108,7 +116,7 @@
   // 튜토리얼 전투를 떠나 로비로(카드의 [동료 만나러 가기] · 건너뛰기 · 연습 전투 끝)
   function exitTutorialBattle() {
     if (S && S.tutorial) S.over = true;
-    window.__tutPause = false; aimActive = false;
+    window.__tutPause = false; aimActive = false; tScale = 1; demoAim = null;
     $('combat').classList.remove('tut-battle');
     show('lobby'); Meta.renderLobby();
   }
@@ -210,34 +218,36 @@
   // 패턴 라이브러리. asp로 둥근 도형을 화면상 둥글게 보정, cx/cy 중심
   function pegPatterns(asp, step) {
     const cx = 0.5, cy = 0.47;
+    const kk = CFG.pegScale || 1, sc = (n) => Math.max(2, Math.round(n / kk));   // kk = 페그 성김 배율(페그·볼을 키운 만큼 같이 키워 판의 빽빽함을 맞춘다) — 열·행·줄 수를 kk 로 나눈다
     const ax = (rr) => Math.min(0.42, rr * asp);   // x반경(과도 확장 방지)
+    const radii = (lo, hi, n) => Array.from({ length: n }, (_, i) => n < 2 ? lo : lo + (hi - lo) * i / (n - 1));   // 동심 도형의 반경 목록(개수가 줄어도 바깥 크기는 그대로)
     // 좌우 레일: 중앙 집중형 그림 패턴에서도 양옆 레인(좌/우 캐릭터)이 장전할 수 있도록 가장자리 기둥 페그
-    const rails = (rows = 8) => { const p = []; for (const fx of [0.10, 0.90]) for (let i = 0; i < rows; i++) p.push({ fx, fy: 0.11 + i * (0.74 / (rows - 1)) }); return p; };
+    const rails = (rows = sc(8)) => { const p = []; for (const fx of [0.10, 0.90]) for (let i = 0; i < rows; i++) p.push({ fx, fy: 0.11 + i * (0.74 / (rows - 1)) }); return p; };
     return {
       grid() {
-        const pts = [], cols = CFG.pegCols, rows = CFG.pegRows;
+        const pts = [], cols = sc(CFG.pegCols), rows = sc(CFG.pegRows);
         for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const off = (r % 2) ? 0.5 / cols : 0; pts.push({ fx: (c + 0.5) / cols + off, fy: 0.10 + r * (0.76 / (rows - 1)) }); }
         return pts;
       },
       chevrons() {   // ∨ 여러 줄(진폭 크게)
-        const pts = [], rows = 8, per = 13;
+        const pts = [], rows = sc(8), per = sc(13);
         for (let r = 0; r < rows; r++) { const fy0 = 0.11 + r * (0.74 / (rows - 1)); for (let i = 0; i < per; i++) { const t = i / (per - 1), vv = Math.abs(t - 0.5) * 2; pts.push({ fx: 0.08 + t * 0.84, fy: fy0 + (0.5 - vv) * 0.06 }); } }
         return pts;
       },
       zigzag() {     // 톱니(삼각파) 여러 줄 — 행 간격·진폭 크게 해서 모양이 보이게
-        let pts = []; const rows = 6, seg = 5;
+        let pts = []; const rows = sc(6), seg = 5;
         for (let r = 0; r < rows; r++) { const fy = 0.13 + r * (0.68 / (rows - 1)), verts = []; for (let i = 0; i <= seg; i++) { const t = i / seg, up = (i % 2 === 0) ? -1 : 1; verts.push({ fx: 0.09 + t * 0.82, fy: fy + up * 0.05 }); } pts = pts.concat(alongPath(verts, false, step)); }
         return pts;
       },
       diamonds() {   // 동심 다이아(촘촘) + 좌우 레일(중앙 반경 축소로 레일 공간 확보)
         let pts = [];
-        for (const rr of [0.09, 0.17, 0.25, 0.33]) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
+        for (const rr of radii(0.09, 0.33, sc(4))) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
         pts.push({ fx: cx, fy: cy });
         return pts.concat(rails());
       },
       rings() {      // 동심 원(촘촘) + 좌우 레일
         let pts = [];
-        for (const rr of [0.09, 0.16, 0.23, 0.30]) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
+        for (const rr of radii(0.09, 0.30, sc(4))) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
         pts.push({ fx: cx, fy: cy });
         return pts.concat(rails());
       },
@@ -263,7 +273,7 @@
   // 이번 판의 페그 좌표: 패턴 하나를 골라 생성 → 경계 클램프 → 겹침 제거
   // ⚠ 항상 '장전' 영역 비율로 생성(전투 시작 시 layoutT=1이면 핀볼 영역이 납작해 dedupe가 판을 뭉갬 — 전투2+ 페그 급감 버그)
   function pegLayout() {
-    const asp = ((H * LOAD_FRAC.pins) / W) || 1.3, step = CFG.pegStep;
+    const asp = ((H * LOAD_FRAC.pins) / W) || 1.3, kk = CFG.pegScale || 1, step = CFG.pegStep * kk;
     const P = pegPatterns(asp, step), keys = Object.keys(P);
     let key;
     if (forcedPattern && P[forcedPattern]) key = forcedPattern;   // 디버그: 강제 패턴
@@ -277,7 +287,7 @@
     let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
     // 페그를 상단 ~72%로 압축 → 하단에 발사 부채꼴 공간 확보(발사대와 밀착 방지)
     for (const p of pts) p.fy = 0.05 + p.fy * 0.74;
-    return dedupePts(pts, asp, CFG.pegMinGap);
+    return dedupePts(pts, asp, CFG.pegMinGap * kk);
   }
 
   // ============ 보드(페그·포켓) 생성 ============
@@ -292,9 +302,9 @@
     S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
     // 장애물과 겹치는 페그 제거(겹침 방지) — px 공간에서 판정
     if (S.obstacles.length) {
-      const rp = layout().pins, mg = CFG.ballRadius + 3;
+      const rp = layout().pins, mg = (CFG.ballRadius + 3) * BU;
       S.pegs = S.pegs.filter(p => {
-        const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius);
+        const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius) * BU;
         for (const o of S.obstacles) {
           if (o.t === 'bar') {
             const ox = o.fx * rp.w, oy = o.fy * rp.h, ow = o.fw * rp.w, oh = o.fh * rp.h;
@@ -367,62 +377,126 @@
     const n = first ? Math.max(1, rv('multishot', 'n') || 1) : 1, base = Math.atan2(dir.dy, dir.dx);
     for (let k = 0; k < n; k++) {               // 다중 발사: 중앙 + 좌우로 부채꼴
       const a = base + (k === 0 ? 0 : (k % 2 ? 1 : -1) * 0.13 * Math.ceil(k / 2));
-      S.balls.push({ x: L.x, y: L.y, vx: Math.cos(a) * CFG.launchSpeed, vy: Math.sin(a) * CFG.launchSpeed, r: CFG.ballRadius, age: 0, combo: 0, nextBonus: COMBO_STEP, first });
+      S.balls.push({ x: L.x, y: L.y, vx: Math.cos(a) * CFG.launchSpeed * BU, vy: Math.sin(a) * CFG.launchSpeed * BU, r: CFG.ballRadius * BU, age: 0, combo: 0, nextBonus: COMBO_STEP, first });
     }
     S.launchedThisTurn = (S.launchedThisTurn || 0) + 1;
     S.launchesLeft--;
     anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;   // 발사대 포신: 쏜 방향으로 맞추고 반동·섬광(자동 발사도 같은 방향)
     Sound.play('launch');
   }
-
-  // 조준 예측선: 실제 물리처럼 페그를 맞으면 튕기고 '통과'(맞은 페그는 이후 무시=제거된 것처럼)하며 상단까지 경로를 이어서 표시
-  function simulateAim(dir) {
-    const r = layout().pins, topY = r.y, botY = r.y + r.h, pegR = CFG.pegRadius, br = CFG.ballRadius;
-    let x = launcher().x, y = launcher().y, vx = dir.dx * CFG.launchSpeed, vy = dir.dy * CFG.launchSpeed;
-    const pts = [{ x, y }]; const dt = 1 / 120;
-    const hit = new Set(); let nHit = 0;
-    for (let i = 0; i < 1600; i++) {
-      vy += CFG.gravity * dt; x += vx * dt; y += vy * dt;
-      if (x < r.x + br) { x = r.x + br; vx = Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
-      if (x > r.x + r.w - br) { x = r.x + r.w - br; vx = -Math.abs(vx) * CFG.wallRestitution; pts.push({ x, y }); }
-      if (y > botY - br) { y = botY - br; vy = -Math.abs(vy) * CFG.wallRestitution; pts.push({ x, y }); }  // 바닥 반사
-      if (S.obstacles) for (const o of S.obstacles) {      // 고정 장애물 반사(예측선)
-        if (o.t === 'bar') {
-          const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, ow = o.fw * r.w, oh = o.fh * r.h;
-          const cx = Math.max(ox, Math.min(x, ox + ow)), cy = Math.max(oy, Math.min(y, oy + oh)), dx = x - cx, dy = y - cy;
-          if (dx * dx + dy * dy < br * br) {
-            if (Math.abs(dx) > Math.abs(dy)) { vx = (dx < 0 ? -1 : 1) * Math.abs(vx); x = cx + (dx < 0 ? -1 : 1) * (br + 0.5); }
-            else { vy = (dy < 0 ? -1 : 1) * Math.abs(vy); y = cy + (dy < 0 ? -1 : 1) * (br + 0.5); }
-            pts.push({ x, y }); if (++nHit >= 3) return pts;
-          }
-        } else {
-          const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, rr = o.r * r.w + br, dx = x - ox, dy = y - oy, d = Math.hypot(dx, dy);
-          if (d > 0 && d < rr) { const nx = dx / d, ny = dy / d; x = ox + nx * rr; y = oy + ny * rr; const dot = vx * nx + vy * ny; vx -= 2 * dot * nx; vy -= 2 * dot * ny; if (o.t === 'bumper') { vx *= 1.25; vy *= 1.25; } pts.push({ x, y }); if (++nHit >= 3) return pts; }
-        }
-      }
-      for (let pi = 0; pi < S.pegs.length; pi++) {
-        const p = S.pegs[pi]; if (!p.alive || hit.has(pi)) continue;
-        const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h, pr = p.pr || pegR;
-        const dx = x - px, dy = y - py, dist = Math.hypot(dx, dy), min = br + pr;
-        if (dist < min) {                                   // 페그 반사 후 그 페그는 무시(제거된 것처럼 통과)
-          const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : -1;
-          x += nx * (min - dist); y += ny * (min - dist);
-          const vdot = vx * nx + vy * ny;
-          vx -= (1 + CFG.restitution) * vdot * nx;
-          vy -= (1 + CFG.restitution) * vdot * ny;
-          pts.push({ x, y }); hit.add(pi); nHit++;
-          if (nHit >= 3) return pts;                        // 딱 3회 튕김까지만
-          break;
-        }
-      }
-      if (y <= topY) { pts.push({ x, y }); return pts; }
-      if (i % 2 === 0) pts.push({ x, y });
-    }
-    pts.push({ x, y }); return pts;
+  // 튜토리얼 시범 볼: 발사 횟수·턴 기록을 건드리지 않고 발사대에서 한 발(demo 표시) — 맞은 페그·들어간 칸의 효과는 실제와 같다
+  function spawnDemoBall(dir, opt) {
+    if (!S || S.phase !== 'load' || S.over) return null;
+    const L = launcher(), b = { x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed * BU, vy: dir.dy * CFG.launchSpeed * BU, r: CFG.ballRadius * BU, age: 0, combo: 0, nextBonus: COMBO_STEP, demo: true, demoOnce: !!(opt && opt.once) };
+    S.balls.push(b);
+    const base = Math.atan2(dir.dy, dir.dx); anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;
+    Sound.play('launch');
+    return b;
   }
 
-  // 고정 장애물 충돌(범퍼=강한 반사, 기둥=반사, 바=사각 반사). 반환: 맞은 타입|false
-  function hitObstacles(b, r) {
+  // ============ 물리 코어 — 실제 발사볼과 조준 예측선이 '같은 함수'로 움직인다 ============
+  // 볼은 고정 간격(PHYS_DT)으로만 움직인다. 예측선(traceShot)도 이 stepBallOnce 를 그대로 쓰므로 점선이 곧 실제 경로다.
+  // (예전엔 볼은 프레임 시간으로, 예측선은 따로 만든 단순 시뮬로 굴려서 두 번째 튕김부터 점선과 달라졌다.)
+  // w = { r: 핀볼 판 영역, u: 보드 배율(BU), dry: true 면 예측(소리·연출·점수 없음 — 페그 생존은 w.alive 배열로만 추적), alive: Uint8Array|null, hits: [] }
+  const PHYS_DT = 1 / 240;
+  const MAX_SPEED_MUL = 2.4;     // 범퍼가 거듭 가속해도 발사 속도의 이 배율을 넘지 않게 — 한 걸음에 페그를 건너뛰는 일을 막는다
+  function stepBallOnce(b, h, w) {
+    const r = w.r, u = w.u, dry = w.dry;
+    b.vy += CFG.gravity * u * h; b.x += b.vx * h; b.y += b.vy * h;
+    if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; }                  // 좌우 벽 반사
+    if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; }
+    if (!b.harvest) {                                                                                         // 수확 볼(변환된 볼)은 페그·장애물과 상호작용 없음 → 연쇄 방지
+      const pegs = S.pegs, alive = w.alive;
+      for (let i = 0; i < pegs.length; i++) {                                                                 // 페그 충돌(결정적: 랜덤 없음)
+        const p = pegs[i];
+        if (alive ? !alive[i] : !p.alive) continue;
+        const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
+        const dx = b.x - px, dy = b.y - py, min = b.r + (p.pr || CFG.pegRadius) * u;
+        if (dx * dx + dy * dy >= min * min) continue;
+        const dist = Math.hypot(dx, dy), nx = dist ? dx / dist : 0, ny = dist ? dy / dist : -1;
+        b.x += nx * (min - dist); b.y += ny * (min - dist);
+        const vdot = b.vx * nx + b.vy * ny;
+        b.vx -= (1 + CFG.restitution) * vdot * nx;
+        b.vy -= (1 + CFG.restitution) * vdot * ny;
+        if (dry) dryPegHit(b, i, p, w);
+        else { const def = PEG_TYPES[p.type] || PEG_TYPES.normal; anim.flashes.push({ x: px, y: py, t: 1, color: def.color }); Sound.play('peg'); applyPegHit(b, p, def, px, py); }
+        if (b.eaten) return 'eaten';                                                                          // 오염 페그에 흡수됨
+      }
+      if (S.obstacles && S.obstacles.length) {                                                                // 고정 장애물(범퍼/기둥/바)
+        const ht = hitObstacles(b, r, dry);
+        if (ht) {
+          if (dry) w.hits.push({ obst: ht, x: b.x, y: b.y });
+          else if (ht === 'bumper' && rv('elastic', 'p') && (b.elastic || 0) < 3 && Math.random() < rv('elastic', 'p')) {   // 탄성 코어(볼당 최대 3 — 범퍼 파밍 방지)
+            b.elastic = (b.elastic || 0) + 1; spawnBalls(b.x, b.y, 1, '#46e6d0', 1); anim.floats.push({ x: b.x, y: b.y - 12, text: '분열!', color: '#46e6d0', t: 0.8, ld: true });
+          }
+        }
+      }
+    }
+    if (b.y > r.y + r.h - b.r) { b.y = r.y + r.h - b.r; b.vy = -Math.abs(b.vy) * CFG.wallRestitution; }       // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
+    const cap = CFG.launchSpeed * u * MAX_SPEED_MUL, sp2 = b.vx * b.vx + b.vy * b.vy;
+    if (sp2 > cap * cap) { const k = cap / Math.sqrt(sp2); b.vx *= k; b.vy *= k; }
+    return b.y <= r.y ? 'land' : null;                                                                        // 상단 포켓 도달 → 충전
+  }
+  // 볼 한 개의 한 걸음 앞 규칙(오래 튕기는 볼 보정) — 실제 볼과 예측선이 똑같이 적용
+  function ballTick(b, h, w) {
+    const r = w.r, u = w.u;
+    b.px = b.x; b.py = b.y;                                                                                   // 직전 위치(그릴 때 걸음 사이를 이어 붙인다)
+    b.age = (b.age || 0) + h;
+    if (b.age > 1.2 && Math.abs(b.vx) < 60 * u) b.vx += (b.x < r.x + r.w * 0.5 ? -1 : 1) * 340 * u * h;      // 축(수직) 갇힘 방지: 오래 튕기는데 좌우 속도가 거의 0이면 가까운 벽 쪽으로 살짝 밀어 정면 반사 무한루프를 푼다
+    if (b.age > CFG.ballLifetime) { const over = b.age - CFG.ballLifetime; b.vy -= Math.min(2400, 400 + over * 800) * u * h; }   // 소멸 금지: 오래된 볼은 상단으로 점점 강하게 유도
+    return stepBallOnce(b, h, w);
+  }
+
+  // 예측용 페그 결과 — ⚠ applyPegHit/explodeBomb 와 '볼의 움직임과 페그 생존'이 같아야 한다(연출·점수만 뺀 거울)
+  function dryPegHit(b, i, p, w) {
+    const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
+    w.hits.push({ i, x: b.x, y: b.y });
+    if (def.sludge) { w.alive[i] = 0; b.eaten = true; return; }
+    if (def.boost) { const sp = Math.hypot(b.vx, b.vy) || 1, tg = CFG.launchSpeed * w.u * def.boost; b.vx = b.vx / sp * tg; b.vy = b.vy / sp * tg; return; }
+    if (def.scrap) return;
+    if (def.bomb) { dryBomb(i, w, 0); return; }
+    w.alive[i] = 0;
+  }
+  function dryBomb(bi, w, depth) {
+    const r = w.r, R = (PEG_TYPES.bomb.bomb || 0.16) * r.w, bp = S.pegs[bi], bx = r.x + bp.fx * r.w, by = r.y + bp.fy * r.h;
+    w.alive[bi] = 0;
+    for (let j = 0; j < S.pegs.length; j++) {
+      if (!w.alive[j] || j === bi) continue;
+      const q = S.pegs[j], def = PEG_TYPES[q.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost) continue;
+      if (Math.hypot(r.x + q.fx * r.w - bx, r.y + q.fy * r.h - by) > R) continue;
+      if (def.bomb && depth < 3) dryBomb(j, w, depth + 1); else w.alive[j] = 0;
+    }
+  }
+
+  // 조준 예측: 지금 판 그대로 발사볼 하나를 미리 굴려 본다(실제와 같은 stepBallOnce). maxHits 번 튕긴 뒤 tail 길이만큼 더 보여 주고 끝낸다.
+  // 반환 { pts:[{x,y,s}] (꺾이는 점 · s=누적 길이), hits:[{i,x,y}|{obst,x,y}], end:{x,y,land,eaten}, alive, steps }
+  function traceShot(dir, opt) {
+    opt = opt || {};
+    const r = layout().pins, u = BU, maxHits = opt.maxHits == null ? 3 : opt.maxHits, tailLen = opt.tail == null ? r.w * 0.3 : opt.tail;
+    const L = launcher(), n = S.pegs.length, alive = new Uint8Array(n);
+    for (let i = 0; i < n; i++) alive[i] = S.pegs[i].alive ? 1 : 0;
+    const b = { x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed * u, vy: dir.dy * CFG.launchSpeed * u, r: CFG.ballRadius * u, age: 0 };
+    const w = { r, u, dry: true, alive, hits: [] };
+    const pts = [{ x: b.x, y: b.y, s: 0 }], maxSteps = opt.maxSteps || 3600;
+    let s = 0, lx = b.x, ly = b.y, ls = 0, end = null, stop = -1, steps = 0;
+    for (; steps < maxSteps; steps++) {
+      const pvx = b.vx, pvy = b.vy, px0 = b.x, py0 = b.y;
+      const res = ballTick(b, PHYS_DT, w);
+      s += Math.hypot(b.x - px0, b.y - py0);
+      const cross = pvx * b.vy - pvy * b.vx, dot = pvx * b.vx + pvy * b.vy;                                   // 방향이 꺾였으면 꼭짓점
+      if (Math.abs(cross) > 0.004 * (Math.hypot(pvx, pvy) * Math.hypot(b.vx, b.vy)) || dot < 0 || (b.age > 1 && s - ls > 90 * u)) { pts.push({ x: b.x, y: b.y, s }); lx = b.x; ly = b.y; ls = s; }   // 방향이 꺾일 때(오래 튕기는 볼은 휘어 가므로 90px 마다도) 꼭짓점
+      if (res === 'land') { end = { x: b.x, y: b.y, land: true }; break; }
+      if (res === 'eaten') { end = { x: b.x, y: b.y, eaten: true }; break; }
+      if (stop < 0 && w.hits.length >= maxHits) stop = s + tailLen;
+      if (stop >= 0 && s >= stop) { end = { x: b.x, y: b.y }; break; }
+    }
+    if (!end) end = { x: b.x, y: b.y };
+    if (lx !== end.x || ly !== end.y) pts.push({ x: end.x, y: end.y, s });
+    return { pts, hits: w.hits, end, alive, steps };
+  }
+
+  // 고정 장애물 충돌(범퍼=강한 반사, 기둥=반사, 바=사각 반사). 반환: 맞은 타입|false. dry 면 소리·번쩍임 없이 움직임만.
+  function hitObstacles(b, r, dry) {
     for (const o of S.obstacles) {
       if (o.t === 'bar') {
         const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, ow = o.fw * r.w, oh = o.fh * r.h;
@@ -431,7 +505,8 @@
         if (dx * dx + dy * dy < b.r * b.r) {
           if (Math.abs(dx) > Math.abs(dy)) { b.vx = (dx < 0 ? -1 : 1) * Math.abs(b.vx) * CFG.wallRestitution; b.x = cx + (dx < 0 ? -1 : 1) * (b.r + 0.5); }
           else { b.vy = (dy < 0 ? -1 : 1) * Math.abs(b.vy) * CFG.wallRestitution; b.y = cy + (dy < 0 ? -1 : 1) * (b.r + 0.5); }
-          Sound.play('peg'); return 'bar';
+          if (!dry) Sound.play('peg');
+          return 'bar';
         }
       } else {
         const ox = r.x + o.fx * r.w, oy = r.y + o.fy * r.h, rr = o.r * r.w + b.r;
@@ -441,8 +516,8 @@
           const dot = b.vx * nx + b.vy * ny; b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny;
           const boost = (o.t === 'bumper') ? 1.25 : CFG.restitution;
           b.vx *= boost; b.vy *= boost;
-          if (o.t === 'bumper') { o.flash = 1; anim.flashes.push({ x: ox, y: oy, t: 1, color: '#46e6d0' }); }
-          Sound.play('peg'); return o.t;
+          if (!dry) { if (o.t === 'bumper') { o.flash = 1; anim.flashes.push({ x: ox, y: oy, t: 1, color: '#46e6d0' }); } Sound.play('peg'); }
+          return o.t;
         }
       }
     }
@@ -455,78 +530,44 @@
       S._autoT = (S._autoT || 0) + dt;
       if (S._autoT > 0.45) { S._autoT = 0; launchBall(); }
     } else S._autoT = 0;
-    const r = layout().pins; const topY = r.y, botY = r.y + r.h;
-    const pegR = CFG.pegRadius;
-    if (S.jack) {                                // 잭팟 포켓: 골칸 위를 좌우 왕복
+    const r = layout().pins;
+    if (S.jack && !S.jackHold) {                 // 잭팟 포켓: 골칸 위를 좌우 왕복(튜토리얼 시범 중엔 멈춰 둘 수 있다)
       const lo = 0.5 / 9, hi = 1 - 0.5 / 9;
       S.jack.x += S.jack.v * dt;
       if (S.jack.x > hi) { S.jack.x = hi; S.jack.v = -Math.abs(S.jack.v); }
       if (S.jack.x < lo) { S.jack.x = lo; S.jack.v = Math.abs(S.jack.v); }
     }
-    for (let i = S.balls.length - 1; i >= 0; i--) {
-      const b = S.balls[i];
-      b.age = (b.age || 0) + dt;
-      // 축(수직) 갇힘 방지: 오래 튕기는데 좌우 속도가 거의 0이면(정면 반사 무한루프)
-      // 바깥쪽으로 살짝 밀어 축을 벗어나게 함 → 영구 장애물/범퍼페그 정면충돌 무한반사 해제
-      if (b.age > 1.2 && Math.abs(b.vx) < 60) {
-        b.vx += (b.x < r.x + r.w * 0.5 ? -1 : 1) * 340 * dt;   // 가까운 벽(바깥) 방향으로 이탈
-      }
-      // 소멸 금지: 오래된 볼은 상단으로 점점 강하게 유도(상단 포켓에 실제로 도달해 충전될 때까지 사라지지 않음)
-      if (b.age > CFG.ballLifetime) {
-        const over = b.age - CFG.ballLifetime;
-        b.vy -= Math.min(2400, 400 + over * 800) * dt;   // 위로 가속(오래될수록 강하게)
-      }
-      const speed = Math.hypot(b.vx, b.vy);
-      const sub = Math.min(8, 1 + Math.floor(speed * dt / pegR));
-      const h = dt / sub;
-      let gone = false;
-      for (let s = 0; s < sub && !gone; s++) {
-        b.vy += CFG.gravity * h;
-        b.x += b.vx * h; b.y += b.vy * h;
-        // 좌우 벽 반사
-        if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; }
-        if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; }
-        // 페그 충돌(결정적: 랜덤 없음). 수확 볼(변환된 볼)은 제외 → 연쇄 방지, 발사볼 경로의 페그만 변환.
-        if (!b.harvest) for (const p of S.pegs) {
-          if (!p.alive) continue;
-          const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
-          const dx = b.x - px, dy = b.y - py, dist = Math.hypot(dx, dy), min = b.r + (p.pr || pegR);
-          if (dist < min) {
-            const nx = dist ? dx / dist : 0, ny = dist ? dy / dist : -1;
-            b.x += nx * (min - dist); b.y += ny * (min - dist);
-            const vdot = b.vx * nx + b.vy * ny;
-            b.vx -= (1 + CFG.restitution) * vdot * nx;
-            b.vy -= (1 + CFG.restitution) * vdot * ny;
-            const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-            anim.flashes.push({ x: px, y: py, t: 1, color: def.color });
-            Sound.play('peg');
-            applyPegHit(b, p, def, px, py);
-            if (b.eaten) break;
-          }
+    // 고정 간격 물리: 프레임 시간을 PHYS_DT 조각으로 나눠 흘려 보낸다(남는 시간은 다음 프레임으로) → 프레임 속도와 상관없이 같은 경로가 나온다
+    if (S.balls.length) {
+      S._acc = Math.min((S._acc || 0) + dt, PHYS_DT * 24);
+      const w = S._w || (S._w = { dry: false, alive: null });
+      w.r = r; w.u = BU;
+      while (S._acc >= PHYS_DT && S.balls.length) {
+        S._acc -= PHYS_DT;
+        for (let i = S.balls.length - 1; i >= 0; i--) {
+          const b = S.balls[i], res = ballTick(b, PHYS_DT, w);
+          if (res === 'eaten') S.balls.splice(i, 1);                       // 오염 페그에 흡수됨
+          else if (res === 'land') { landBall(b); S.balls.splice(i, 1); }  // 상단 포켓 도달 → 충전
         }
-        if (b.eaten) { S.balls.splice(i, 1); gone = true; break; }   // 오염 페그에 흡수됨
-        // 고정 장애물(범퍼/기둥/바) 충돌 — 수확 볼 제외
-        if (!b.harvest && S.obstacles && S.obstacles.length) {
-          const ht = hitObstacles(b, r);
-          if (ht) {
-            if (ht === 'bumper' && rv('elastic', 'p') && (b.elastic || 0) < 3 && Math.random() < rv('elastic', 'p')) {   // 탄성 코어(볼당 최대 3 — 범퍼 파밍 방지)
-              b.elastic = (b.elastic || 0) + 1; spawnBalls(b.x, b.y, 1, '#46e6d0', 1); anim.floats.push({ x: b.x, y: b.y - 12, text: '분열!', color: '#46e6d0', t: 0.8, ld: true });
-            }
-          }
-        }
-        // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
-        if (b.y > botY - b.r) { b.y = botY - b.r; b.vy = -Math.abs(b.vy) * CFG.wallRestitution; }
-        if (b.y <= topY) { landBall(b); S.balls.splice(i, 1); gone = true; }          // 상단 포켓 도달 → 충전
       }
     }
+    if (!S.balls.length) S._acc = 0;
     if (S.phase === 'load' && S.launchesLeft <= 0 && S.balls.length === 0) enterBattle();
   }
 
   // 페그가 변환되어 생기는 "수확 볼": 상단으로 상승해 충전만 함(다른 페그와 상호작용 X → 연쇄 없음). 배수 페그는 n개.
-  function spawnBalls(x, y, n, color, charge) {
+  // opt.toCell 이 있으면(튜토리얼 시범) 퍼짐 대신 그 칸 한가운데로 곧게 올라간다.
+  function spawnBalls(x, y, n, color, charge, opt) {
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
-      const vx = (Math.random() - 0.5) * 200;                    // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
-      S.balls.push({ x, y, vx, vy: -CFG.launchSpeed * 0.92, r: CFG.ballRadius, age: 0, color, harvest: true, charge: charge || 1 });
+      let vx = (Math.random() - 0.5) * 200 * BU;                 // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
+      const vy = -CFG.launchSpeed * 0.92 * BU;
+      let sx = x;
+      if (opt && opt.demo && n > 1) sx = x + (k - (n - 1) / 2) * CFG.ballRadius * BU * 2.5;   // 시범: 늘어난 볼이 처음부터 따로 보이게 나란히 놓는다
+      if (opt && opt.toCell != null) {
+        const g = layout().goal, tx = g.x + (opt.toCell + 0.5) * (g.w / 9) + (k - (n - 1) / 2) * g.w / 9 * 0.18, t = Math.max(0.05, (y - layout().pins.y) / -vy);
+        vx = (tx - sx) / t;
+      }
+      S.balls.push({ x: sx, y, vx, vy, r: CFG.ballRadius * BU, age: 0, color, harvest: true, charge: charge || 1, demo: !!(opt && opt.demo) });
     }
   }
 
@@ -539,7 +580,7 @@
       return;
     }
     if (def.boost) {                       // 범퍼: 속도 킥(영구·안 사라짐) — 영구 반사체는 콤보 미집계(무한 파밍 방지)
-      const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * def.boost;
+      const sp = Math.hypot(b.vx, b.vy) || 1, target = CFG.launchSpeed * BU * def.boost;
       b.vx = b.vx / sp * target; b.vy = b.vy / sp * target;
       anim.flashes.push({ x: px, y: py, t: 1, big: true, color: def.color });
       return;
@@ -547,10 +588,13 @@
     if (def.scrap) return;                 // 파편: 반사만(변환·소멸 없음)
     addCombo(b, 1, px, py);                // 콤보 = 터뜨린(소모되는) 페그 수
     if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 페그 연쇄 폭발
-    convertPeg(p, def, px, py);
+    convertPeg(p, def, px, py, b);
+    if (b.demoOnce) b.eaten = true;        // 튜토리얼 시범 볼: 첫 페그를 맞히면 사라진다(그 뒤 튕겨 다니며 판을 어지럽히지 않게)
   }
+  // 튜토리얼 시범 볼이 만든 충전 볼은 지정한 칸(S.demoCell)으로 곧게 올라가게 한다(없으면 일반 볼과 똑같이)
+  const demoOpt = (src) => (src && src.demo) ? { demo: true, toCell: S.demoCell == null ? null : S.demoCell } : null;
   // 페그 → 충전볼 변환(일반1 · ×2→2 · ×5→5 · 골드 · 증폭). 모듈(자원 회수기·과충전) 반영. 페그는 턴마다 부활.
-  function convertPeg(p, def, px, py) {
+  function convertPeg(p, def, px, py, src) {
     let n = 1 + (def.split || 0), charge = def.charge || 1;
     if (def.gold) {
       const g = def.gold * (rv('midas', 'gmul') || 1);
@@ -561,7 +605,7 @@
       charge = rv('overcharge', 'charge') || def.charge;
       anim.floats.push({ x: px, y: py, text: '충전 ×' + charge, color: def.color, t: 1, ld: true });
     }
-    spawnBalls(px, py, n, def.color, charge);
+    spawnBalls(px, py, n, def.color, charge, demoOpt(src));
     p.alive = false;
   }
   // 폭탄 페그: 반경 안 페그를 전부 터뜨림(폭탄끼리 연쇄, 깊이 3 제한). 터진 수만큼 콤보 누적.
@@ -575,7 +619,7 @@
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost) continue;
       const qx = r.x + p.fx * r.w, qy = r.y + p.fy * r.h; if (Math.hypot(qx - px, qy - py) > R) continue;
       if (def.bomb && depth < 3) explodeBomb(b, p, qx, qy, depth + 1);
-      else convertPeg(p, def, qx, qy);
+      else convertPeg(p, def, qx, qy, b);
       popped++;
     }
     if (popped) { addCombo(b, popped, px, py); anim.floats.push({ x: px, y: py - 14, text: '💥 ' + popped + '연쇄!', color: '#ff8a3a', t: 1.1, big: true, ld: true }); }
@@ -589,7 +633,7 @@
       const step = b.nextBonus || COMBO_STEP; b.nextBonus = step + COMBO_STEP;
       let ch = Math.min(COMBO_MAX, Math.floor(step / COMBO_STEP));
       if (b.first && S.setsOn.pinball) ch *= 2;
-      spawnBalls(x, y, 1, '#ffd93b', ch);
+      spawnBalls(x, y, 1, '#ffd93b', ch, demoOpt(b));
       anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ld: true });
       Sound.play('charge');
     }
@@ -662,7 +706,7 @@
     }
     // 탄환이 많으면 볼리(한 번에 여러 발) + 간격 단축으로 전투 총 시간을 battleWindow 근처로 유지
     const q = S.shotQueue.reduce((s, x) => s + (x.skill ? (x.sk.kind === 'extraShots' ? x.sk.shots : x.sk.kind === 'aoe' ? (x.sk.shots || 3) : x.sk.kind === 'bigHit' ? 1 : 0) : 1), 0);   // 스킬 사격 수 추정 포함
-    S.shotBurst = Math.max(1, Math.ceil(q / 80));   // 볼리 발사는 탄환이 아주 많을 때만(전투 늘어짐 방지)
+    S.shotBurst = Math.max(1, Math.ceil(q / 60));   // 볼리 발사는 탄환이 아주 많을 때만(전투 늘어짐 방지) — 한 번에 쏘는 수 = 60발당 1
     const volleys = Math.max(1, Math.ceil(q / S.shotBurst));
     S.shotDelay = Math.max(CFG.battleShotMinDelay, Math.min(CFG.battleShotDelay, Math.round(CFG.battleWindow / volleys)));
     S.battleTimer = 0;
@@ -1345,6 +1389,12 @@
     const wr = layout().wall, cw = wr.w / CFG.lanes;
     return { x: wr.x + (c.lane + 0.5) * cw, feetY: wr.y + wr.h * 0.72, size: Math.min(cw * 0.92, wr.h * 2.3) };
   }
+  // ── 튜토리얼이 짚는 위치들(캔버스 px) — 그리기 코드와 같은 식 ──
+  function pocketRect(i) { const g = layout().goal, pw = g.w / 9, lblH = Math.min(g.h * 0.4, 20); return { x: g.x + i * pw, y: g.y + lblH, w: pw, h: g.h - lblH }; }                       // 포켓 칸 i(0~8)
+  function jackRect() { if (!S.jack) return null; const g = layout().goal, pw = g.w / 9, lblH = Math.min(g.h * 0.4, 20), jw = pw * 0.96; return { x: g.x + S.jack.x * g.w - jw / 2, y: g.y + lblH, w: jw, h: g.h - lblH }; }   // 잭팟 틀
+  function ammoPillRect(c) { const wr = layout().wall, cw = wr.w / CFG.lanes, crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22)); return { x: wr.x + c.lane * cw + 3, y: wr.y + 3, w: Math.max(20, crad * 1.5), h: Math.max(15, crad * 0.95) }; }   // 장전 탄수 알약(캐릭터 좌상단)
+  function pegPos(i) { const r = layout().pins, p = S.pegs[i]; return { x: r.x + p.fx * r.w, y: r.y + p.fy * r.h, r: (p.pr || CFG.pegRadius) * BU }; }                                  // 페그 i 의 중심·반경
+  function dangerRowRect() { const f = layout().field, ch = f.h / CFG.fieldRows; return { x: f.x, y: f.y + f.h - ch, w: f.w, h: ch }; }                                                   // 적 필드 맨 아래 행(빨간 점선 아래)
 
   // ── 페그 모양 그리기 ──
   function polyPath(cx, cy, rad, n, rot) {
@@ -1381,6 +1431,39 @@
         break;
       default: ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.fill();
     }
+  }
+
+  // 조준 점선: 꺾이는 점을 잇고(뒤로 갈수록 흐려짐), 부딪힐 페그에 고리를 두르고, 첫 접촉 자리에 '볼 크기 그림자'를 놓는다 — 선이 아니라 볼(굵기)이 페그에 닿는다는 걸 보여 준다.
+  let aimLandIdx = -1;     // 예측 경로가 상단까지 닿을 때 들어갈 칸(0~8) — 포켓 줄에서 테두리로 표시. 아니면 -1
+  function drawAimGuide(tr, pins) {
+    const U = BU, pts = tr.pts, total = Math.max(1, pts[pts.length - 1].s), pulse = 0.65 + 0.35 * Math.sin(performance.now() / 160);
+    ctx.save(); ctx.lineCap = 'round'; ctx.lineWidth = Math.max(2.4, 2.8 * U); ctx.setLineDash([6 * U, 7 * U]);
+    for (let k = 1; k < pts.length; k++) {                               // 긴 마디는 토막 내어 부드럽게 흐려지게(점선 위상은 이어 붙인다)
+      const a = pts[k - 1], b = pts[k], len = b.s - a.s; if (len <= 0) continue;
+      const n = Math.max(1, Math.ceil(len / (36 * U)));
+      for (let c = 0; c < n; c++) {
+        const t0 = c / n, t1 = (c + 1) / n, s0 = a.s + len * t0, sm = a.s + len * (t0 + t1) / 2;
+        ctx.strokeStyle = 'rgba(255,255,255,' + Math.max(0.12, 0.95 - 0.8 * sm / total).toFixed(3) + ')';
+        ctx.lineDashOffset = s0;
+        ctx.beginPath(); ctx.moveTo(a.x + (b.x - a.x) * t0, a.y + (b.y - a.y) * t0); ctx.lineTo(a.x + (b.x - a.x) * t1, a.y + (b.y - a.y) * t1); ctx.stroke();
+      }
+    }
+    ctx.setLineDash([]); ctx.lineDashOffset = 0;
+    let first = true;
+    for (const h of tr.hits) {
+      if (h.i != null) {                                                  // 부딪힐 페그 = 고리
+        const p = S.pegs[h.i], px = pins.x + p.fx * pins.w, py = pins.y + p.fy * pins.h, pr = (p.pr || CFG.pegRadius) * U;
+        ctx.globalAlpha = first ? 0.55 + 0.4 * pulse : 0.55; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, 2.2 * U);
+        ctx.beginPath(); ctx.arc(px, py, pr + 3.5 * U, 0, 7); ctx.stroke();
+      }
+      if (first) {                                                        // 첫 접촉 자리의 볼 그림자
+        ctx.globalAlpha = 0.34; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(h.x, h.y, CFG.ballRadius * U, 0, 7); ctx.fill();
+        ctx.globalAlpha = 0.7; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(1.5, 1.6 * U); ctx.beginPath(); ctx.arc(h.x, h.y, CFG.ballRadius * U, 0, 7); ctx.stroke();
+      }
+      first = false;
+    }
+    const end = tr.end; ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4 * U, 0, 7); ctx.fill();
+    ctx.restore();
   }
 
   // 포켓 줄 테두리(assets/bg/frame_pocket.png 900×140 중 불투명 영역 x173~726 · y42~96)를 9분할로 얇게 두른다.
@@ -1551,13 +1634,13 @@
     for (const p of S.pegs) {
       const px = r.pins.x + p.fx * r.pins.w, py = r.pins.y + p.fy * r.pins.h;
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
-      const R = (p.pr || CFG.pegRadius) * (p.alive ? 1 : 0.85);
+      const PR = (p.pr || CFG.pegRadius) * BU, R = PR * (p.alive ? 1 : 0.85);
       ctx.save();
       if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 페그: 흐린 유령(다음 턴 부활)
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive, 'peg_' + p.type);
       ctx.restore();
       const pegImg = (typeof PegArt !== 'undefined') && PegArt.ready('peg_' + p.type);
-      if (p.alive && def.label && !pegImg) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round((p.pr || CFG.pegRadius) * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + (p.pr || CFG.pegRadius) * 0.35); }
+      if (p.alive && def.label && !pegImg) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round(PR * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + PR * 0.35); }
     }
     // 고정 장애물(범퍼/기둥/바)
     for (const o of S.obstacles || []) {
@@ -1584,15 +1667,17 @@
       }
     }
     // 볼(발사볼=흰색, 페그에서 변환된 볼=페그 색)
+    const palpha = S._acc ? Math.min(1, S._acc / PHYS_DT) : 0;      // 고정 걸음 사이의 남은 시간 비율 — 직전·현재 위치를 이어 그려 슬로모션에서도 매끄럽게
     for (const b of S.balls) {
-      ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, 7);
+      const bx = b.px == null ? b.x : b.px + (b.x - b.px) * palpha, by = b.py == null ? b.y : b.py + (b.y - b.py) * palpha;
+      ctx.beginPath(); ctx.arc(bx, by, b.r, 0, 7);
       ctx.fillStyle = b.color || '#eafcff'; ctx.fill();
       if (!b.harvest && b.combo >= 3) {                  // 콤보 카운터(발사볼 위)
         const big = b.combo >= 10;
-        const k = COMBO_TEXT_SCALE, ty = b.y - b.r - 10 * k;
+        const k = COMBO_TEXT_SCALE, ty = by - b.r - 10 * k;
         ctx.save(); ctx.font = 'bold ' + Math.max(10, Math.round((big ? 17 : 13) * k)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // 70%, 단 페그 위에서 읽히도록 최소 10px
-        ctx.lineWidth = 3.5 * k; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText(b.combo + ' HIT', b.x, ty);
-        ctx.fillStyle = big ? '#ffd93b' : '#fff'; ctx.fillText(b.combo + ' HIT', b.x, ty); ctx.restore();
+        ctx.lineWidth = 3.5 * k; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText(b.combo + ' HIT', bx, ty);
+        ctx.fillStyle = big ? '#ffd93b' : '#fff'; ctx.fillText(b.combo + ' HIT', bx, ty); ctx.restore();
       }
     }
     // 발사대(하단 중앙) + 조준 가이드
@@ -1600,20 +1685,11 @@
       const L = launcher(), lart = launcherArtReady();                  // 발사대 그림(받침·포신)이 준비됐으면 예측선 위에 그리고, 아니면 노란 원
       if (!lart) {
         ctx.fillStyle = S.launchesLeft > 0 ? '#ffcf5c' : '#555';
-        ctx.beginPath(); ctx.arc(L.x, L.y, 11, 0, 7); ctx.fill();
+        ctx.beginPath(); ctx.arc(L.x, L.y, CFG.ballRadius * BU * 1.2, 0, 7); ctx.fill();
       }
-      if (aimActive && S.launchesLeft > 0) {
-        const pts = simulateAim(aimDir(aimX, aimY));
-        ctx.save(); ctx.lineWidth = 2.5; ctx.setLineDash([5, 7]); ctx.lineCap = 'round';
-        for (let k = 1; k < pts.length; k++) {              // 뒤로 갈수록 흐려지는 예측선
-          const a = 0.9 * (1 - (k - 1) / pts.length);
-          ctx.strokeStyle = 'rgba(255,255,255,' + Math.max(0.07, a).toFixed(3) + ')';
-          ctx.beginPath(); ctx.moveTo(pts[k - 1].x, pts[k - 1].y); ctx.lineTo(pts[k].x, pts[k].y); ctx.stroke();
-        }
-        const end = pts[pts.length - 1];
-        ctx.setLineDash([]); ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4, 0, 7); ctx.fill();
-        ctx.restore();
-      }
+      const aimNow = S.launchesLeft > 0 ? (aimActive ? aimDir(aimX, aimY) : (demoAim ? aimDir(demoAim.x, demoAim.y) : null)) : null;
+      aimShown = aimActive ? aimNow : null;                              // 손을 떼면 방금 화면에 그려 준 이 방향 그대로 나간다(마지막 포인터 이동이 그려지기 전에 뗐어도 점선과 같다)
+      if (aimNow) { const tr = traceShot(aimNow, { maxSteps: 1800 }); drawAimGuide(tr, r.pins); aimLandIdx = tr.end.land ? Math.max(0, Math.min(8, Math.floor((tr.end.x - r.goal.x) / r.goal.w * 9))) : -1; } else aimLandIdx = -1;
       if (lart) drawLauncherArt(L, r.pins.w, lart);                      // 받침 + 포신(예측선 위 — 포신이 선의 시작을 덮는다)
     }
 
@@ -1642,6 +1718,10 @@
     }
     const fpk = BgArt.ready('frame_pocket');       // 포켓 줄 금속 테두리(얇게 — 칸을 가리지 않는다)
     if (fpk) drawPocketFrame(fpk, g.x, cellY, g.w, cellH);
+    if (aimLandIdx >= 0 && S.phase === 'load') {         // 조준선이 상단까지 닿을 때 들어갈 칸 — 하얀 테두리
+      ctx.save(); ctx.strokeStyle = '#fff'; ctx.globalAlpha = 0.6 + 0.35 * Math.sin(performance.now() / 160); ctx.lineWidth = 2.5;
+      ctx.strokeRect(g.x + aimLandIdx * pw + 1.5, cellY + 1.5, pw - 3, cellH - 4); ctx.restore();
+    }
     if (S.jack && S.phase === 'load') {                  // 움직이는 잭팟 포켓(×3)
       const jx = g.x + S.jack.x * g.w, jw = pw * 0.96, pul = 0.6 + 0.4 * Math.sin(performance.now() / 140);
       const jimg = ART.pocket.on ? PegArt.ready(ART.pocket.jackpot) : null;   // 잭팟 덮개 그림(금색 괄호 프레임, 속은 투명)
@@ -1885,7 +1965,7 @@
     for (let i = anim.flashes.length - 1; i >= 0; i--) { anim.flashes[i].t -= d * 3; if (anim.flashes[i].t <= 0) anim.flashes.splice(i, 1); }
     for (let i = anim.shots.length - 1; i >= 0; i--) { anim.shots[i].t += d * 4.6; if (anim.shots[i].t >= 1.15) anim.shots.splice(i, 1); }
     const lau = anim.lau;                                              // 발사대 포신: 조준 중이면 그쪽으로, 장전 화면이 아니면 정면(위)으로 되돌린다
-    if (aimActive && S.phase === 'load' && S.launchesLeft > 0) { const ad = aimDir(aimX, aimY); lau.tgt = Math.atan2(ad.dy, ad.dx); }
+    if ((aimActive || demoAim) && S.phase === 'load' && S.launchesLeft > 0) { const ad = aimActive ? aimDir(aimX, aimY) : aimDir(demoAim.x, demoAim.y); lau.tgt = Math.atan2(ad.dy, ad.dx); }
     else if (S.phase !== 'load') lau.tgt = -Math.PI / 2;
     { const da = Math.atan2(Math.sin(lau.tgt - lau.ang), Math.cos(lau.tgt - lau.ang)); lau.ang += da * Math.min(1, d * 22); }   // 가까운 쪽으로 보간
     lau.recoil = Math.max(0, lau.recoil - d * 6); lau.flash = Math.max(0, lau.flash - d * 7);
@@ -1900,17 +1980,23 @@
       frameEma += (raw - frameEma) * 0.03; slowMs = frameEma > 36 ? slowMs + raw : 0;
       if (slowMs > 3000) { dprCap = 2; slowMs = 0; resize(); }
     }
+    advance(d);
+    requestAnimationFrame(loop);
+  }
+  // 한 프레임 진행(d = 초). rAF 루프와 디버그 훅 step() 이 같이 쓴다 — 숨은 탭에서 수동으로 돌려도 슬로모션·일시정지가 똑같이 적용된다
+  function advance(d) {
     if (S && (!S.over || (S.tutorial && S.phase === 'done'))) {     // 튜토리얼 전투 승리 뒤(카드가 떠 있는 동안)에도 화면은 계속 그린다(루비가 서 있는 모습)
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;
       if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
+      // 시간 배율: tScale = 튜토리얼 슬로모션(볼·연출 모두 느려진다) · battleSpeed = 전투 속도 버튼(전투 phase 에서만 1배/2배)
+      const ds = d * tScale, bd = S.phase === 'battle' ? ds * battleSpeed : ds;
       if (window.__tutPause || window.__helpPause) { /* 튜토리얼 설명 카드·도움말 팝업이 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
-      else if (S.phase === 'load') stepBalls(d);
-      else if (S.phase === 'battle') { stepBattle(d); checkBossThreshold(); }
-      stepVisuals(d);
+      else if (S.phase === 'load') stepBalls(ds);
+      else if (S.phase === 'battle') { stepBattle(bd); checkBossThreshold(); }
+      stepVisuals(bd);
       if (S.phase !== 'map' && S.pockets.length) draw();   // 맵(상점·정비 포함) 중엔 캔버스 갱신 불필요
     }
-    requestAnimationFrame(loop);
   }
 
   // ============ HUD·스킬 UI ============
@@ -1944,9 +2030,10 @@
     const sx = rect.width ? canvas.clientWidth / rect.width : 1, sy = rect.height ? canvas.clientHeight / rect.height : 1;
     return { x: (e.clientX - rect.left) * sx, y: (e.clientY - rect.top) * sy };
   }
-  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0) return; e.preventDefault(); Sound.resume(); aimActive = true; const p = canvasPoint(e); aimX = p.x; aimY = p.y; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }   // 포인터 캡처: 조준 중 손가락/커서가 캔버스 밖(튜토리얼 막 등)으로 나가도 pointerup 을 받는다
+  function aimDown(e) { if (!S || S.phase !== 'load' || S.launchesLeft <= 0 || (S.layoutT || 0) > 0.03) return; e.preventDefault(); Sound.resume(); aimActive = true; aimShown = null; const p = canvasPoint(e); aimX = p.x; aimY = p.y; try { canvas.setPointerCapture(e.pointerId); } catch (_) {} }   // 포인터 캡처: 조준 중 손가락/커서가 캔버스 밖(튜토리얼 막 등)으로 나가도 pointerup 을 받는다 · 판이 아직 펼쳐지는 중(0.35초)엔 조준하지 않는다(점선과 실제 판이 어긋나지 않게)
   function aimMove(e) { if (!aimActive) return; e.preventDefault(); const p = canvasPoint(e); aimX = p.x; aimY = p.y; }
-  function aimUp(e) { if (!aimActive) return; e.preventDefault(); aimActive = false; launchBall(aimDir(aimX, aimY)); }
+  // 손을 떼면 '마지막으로 화면에 그려 준 점선의 방향'으로 쏜다 — 뗄 때 손가락이 살짝 미끄러져도(마지막 포인터 이동) 점선과 다른 쪽으로 나가지 않는다
+  function aimUp(e) { if (!aimActive) return; e.preventDefault(); const dir = aimShown || aimDir(aimX, aimY); aimActive = false; aimShown = null; launchBall(dir); }
 
   // 타이틀 중앙 연출: 편성 캐릭터(없으면 레지나)의 CG가 플랫폼 위에 서 있고 몇 초마다 부드럽게 바뀐다. 발광 색 = 그 캐릭터의 클래스 색.
   function initTitleHero() {
@@ -1992,6 +2079,9 @@
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
   $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
+  function syncSpeedBtn() { const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed === 2); }
+  $('speed-btn').onclick = () => { battleSpeed = battleSpeed === 2 ? 1 : 2; try { localStorage.setItem('pongtress_speed', String(battleSpeed)); } catch (e) {} Sound.play('click'); syncSpeedBtn(); };   // 전투 속도 ×1 ↔ ×2 (기기에 저장)
+  syncSpeedBtn();
   // 맵·상점·정비·모듈 정보
   $('map-body').onclick = (e) => { const b = e.target.closest('[data-node]'); if (!b || b.disabled || !S) return; const [f, i] = b.dataset.node.split('-').map(Number); enterNode(f, i); };
   $('map-relics').onclick = () => { if (S) openRelicInfo(); };
@@ -2036,10 +2126,17 @@
     setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(1.3, CFG.pegStep)); },
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     // 화면 연출까지 한 걸음(rAF가 멈춘 숨은 탭에서 수동 진행용): layoutT 보간 포함
-    step(dt) { if (!S || S.over) return; const tgt = S.layoutTarget || 0; if (S.layoutT !== tgt) { const st = dt / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + st) : Math.max(tgt, S.layoutT - st); } if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } stepVisuals(dt); },
+    step(dt) { if (!S || S.over) return; advance(dt); },     // 게임 루프와 같은 한 프레임(슬로모션·튜토리얼 정지·전투 속도 적용)
     render() { if (S) draw(); }, CharAnim, EnemyAnim, stepVisuals, enemyPos, renderSkills, showResult, renderEnemyBar,
     layout, launcher,           // 튜토리얼이 캔버스 영역(적 필드·방벽·포켓·핀볼 판)을 짚어 주는 데 쓴다
-    exitTutorialBattle
+    exitTutorialBattle,
+    // ── 튜토리얼 시범 도구(js/tutorial.js 의 장면이 쓴다) ──
+    traceShot, aimDir, spawnDemoBall, spawnBalls, stepBallOnce, PHYS_DT, pocketRect, jackRect, ammoPillRect, pegPos, dangerRowRect, charSpot,
+    get BU() { return BU; }, get aiming() { return aimActive; },
+    setTimeScale(x) { tScale = Math.max(0.05, Math.min(1, +x || 1)); },
+    setDemoAim(p) { demoAim = p ? { x: p.x, y: p.y } : null; },       // 시범 조준점(캔버스 px) — 조준 점선·포신만 보여 준다
+    setBattleSpeed(v) { battleSpeed = v === 2 ? 2 : 1; syncSpeedBtn(); },
+    get timeScale() { return tScale; }
   };
 
   // 헤드리스 자가 테스트: ?sim=1 로 런을 자동 진행하며 런타임 오류·상태를 #boot-error 에 남긴다.

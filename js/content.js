@@ -8,11 +8,12 @@ const CFG = {
   pegCols: 9,              // 조밀 격자 패턴의 열 수
   pegRows: 12,             // 조밀 격자 패턴의 행 수
   pegStep: 0.05,           // 패턴 선을 따라 페그를 놓는 간격(fx/fy). 작을수록 촘촘
-  pegMinGap: 0.05,         // 페그 최소 간격(겹침 방지, 세로 비율 보정). 작을수록 촘촘
+  pegMinGap: 0.055,        // 페그 최소 간격(겹침 방지, 세로 비율 보정). 작을수록 촘촘
+  pegScale: 1.22,          // 페그 성김 배율 — 열·행·줄 수를 이 값으로 나누고 간격(pegStep·pegMinGap)을 곱한다. 페그·볼을 키운 만큼 키워 판의 빽빽함(볼 한 발이 맞히는 페그 수 = 충전량)을 예전과 맞춘다(8패턴 평균 ±5%)
   normalPegHits: 1,        // (레거시) 페그는 이제 충돌 시 볼로 변환됨 — 내구도 미사용
   harvestPerBall: 8,       // 볼 하나가 이번 궤적에서 충전 볼로 바꿀 수 있는 페그 최대 수(과충전 방지, 판은 유지)
-  battleShotMinDelay: 90,  // ms, 전투 발사 최소 간격(탄환 많을 때 자동 단축 하한) — 크면 전투가 느려짐
-  battleWindow: 4500,      // ms, 전투 발사 목표 총 시간(탄환 수로 나눠 간격 자동 결정) — 크면 전투가 느려짐
+  battleShotMinDelay: 130, // ms, 전투 발사 최소 간격(탄환 많을 때 자동 단축 하한) — 크면 전투가 느려짐 (예전 90 — 너무 빨리 지나간다는 의견으로 2026-10 늦춤)
+  battleWindow: 7500,      // ms, 전투 발사 목표 총 시간(탄환 수로 나눠 간격 자동 결정) — 크면 전투가 느려짐 (예전 4500)
   fieldRows: 5,            // 적 대기 필드 세로 칸 수(레인당)
   spawnMinRow: 2,          // 새 적이 등장할 수 있는 가장 낮은 행(방벽에 바짝 붙은 0~1행엔 등장 금지). 자리가 없으면 다음 턴에 등장
   launchesPerTurn: 2,      // 한 장전 턴에 쏘는 볼 수(기본). 패시브로 증가 예정
@@ -20,14 +21,14 @@ const CFG = {
   gravity: 0,              // 무중력(퍼즐 보블): 볼은 직선+반사로 이동, 무조건 위로 올라감
   restitution: 0.98,       // 페그 반사 시 에너지 거의 유지(가라앉지 않게)
   wallRestitution: 1.0,    // 벽·바닥 완전 반사
-  ballRadius: 7,
-  pegRadius: 9,
+  ballRadius: 9,           // ⚠ 페그·볼 크기와 속도는 '기준 판 폭 311px(폰 375 화면)' 기준 값 — 실제 판 폭에 비례해 커진다(game.js BU). 폰에서 잘 보이게 예전(7/9)보다 키웠다(2026-10)
+  pegRadius: 12,
   launchSpeed: 820,        // 발사 속도(고정). 조준은 각도만
   aimMinUp: 0.3,           // 조준 하한(수평 근처)을 막아 항상 위로 향하게 (vy < -aimMinUp*speed)
   ballLifetime: 6,         // s, 이 시간 넘으면 제거하지 않고 상단으로 점점 강하게 유도(상단 포켓 도달 전엔 절대 소멸 안 함)
-  battleShotDelay: 240,    // ms, 전투 phase 공격 1발 간 간격(보이게 느리게)
-  battleStartDelay: 500,   // ms, 전투 phase 시작 후 첫 공격까지
-  battleEndDelay: 800,     // ms, 마지막 공격 후 적 전진까지
+  battleShotDelay: 380,    // ms, 전투 phase 공격 1발 간 간격(보이게 느리게) — 예전 240
+  battleStartDelay: 700,   // ms, 전투 phase 시작 후 첫 공격까지 — 예전 500
+  battleEndDelay: 1100,    // ms, 마지막 공격 후 적 전진까지 — 예전 800
   enemyContactFlash: 250
 };
 
@@ -444,7 +445,7 @@ function openBlankTemp(S) {
 //  - opts.avoidLaunch: 중앙 발사열(fx 0.42~0.58) 회피(영구 반사체용 — 수직 발사 정면충돌 방지)
 function addPegToBoard(S, type, n, opts) {
   opts = opts || {};
-  const gap = (CFG.pegMinGap || 0.06), g2 = gap * gap, asp = 1.4, out = [];
+  const gap = (CFG.pegMinGap || 0.06) * (CFG.pegScale || 1), g2 = gap * gap, asp = 1.4, out = [];
   const obst = S.obstacles || [];
   const blocked = (fx, fy) => {
     for (const o of obst) {
