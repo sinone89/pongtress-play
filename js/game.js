@@ -105,7 +105,7 @@
     CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
     $('combat').classList.toggle('tut-battle', tut);                      // 튜토리얼 전투: 레벨·경험치·스킬 열·자동 버튼을 숨긴다(css)
-    if (tut) { window.__tutPause = false; startCombat({ name: TUTORIAL.combat.name, tutorial: true, waves: TUTORIAL.combat.waves.map(w => w.slice()) }, 0, 0); }
+    if (tut) { window.__tutPause = false; renderRelicBar(); startCombat({ name: TUTORIAL.combat.name, tutorial: true, waves: TUTORIAL.combat.waves.map(w => w.slice()) }, 0, 0); }   // renderRelicBar: 직전 런의 모듈 막대가 연습 전투에 남지 않게(build 156)
     else { S.map = genMap(); showMap(); }
     if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }
   }
@@ -1089,10 +1089,11 @@
     for (let i = 0; i < 3 && pool.length; i++) pick.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
     $('reward-title').textContent = '레벨 ' + lvl + '!';
     $('reward-sub').textContent = pendingText;
+    const t0 = performance.now();                                                       // 보상 창이 뜬 직후 0.28초는 손가락 입력을 무시 — 직전 탭의 두 번째 탭(더블탭)이 새 보상 창의 카드를 바로 골라 버리는 것을 막는다(프로그램 클릭은 isTrusted=false 라 영향 없음)
     pick.forEach(rw => {
       const b = document.createElement('button'); b.className = 'reward-card';
       b.innerHTML = '<div class="rc-top"><span class="rc-ic">' + uiIcon('rw_' + rw.id, rw.name.split(' ')[0]) + '</span><span class="rc-name">' + rw.name.replace(/^\S+\s/, '') + '</span></div><div class="rc-desc">' + rw.desc + '</div>';   // 이름 앞 이모지는 폴백 — rw_<id> 아이콘이 있으면 교체
-      b.onclick = () => { rw.apply(S); $('reward').hidden = true; next(); };
+      b.onclick = (ev) => { if (ev && ev.isTrusted && performance.now() - t0 < 280) return; rw.apply(S); $('reward').hidden = true; next(); };
       box.append(b);
     });
     $('reward').hidden = false;
@@ -1133,10 +1134,11 @@
     if (!ids.length) { done && done(); return; }
     const box = $('reward-choices'); box.replaceChildren();
     $('reward-title').textContent = opts.title || '모듈 획득'; $('reward-sub').textContent = opts.sub || '';
+    const t0 = performance.now();                                                       // (위 showReward 와 같은 이유) 뜬 직후 0.28초는 손가락 입력 무시
     ids.forEach(id => {
       const b = document.createElement('button'); b.className = 'reward-card relic-card';
       b.innerHTML = relicCardHTML(id);
-      b.onclick = () => { $('reward').hidden = true; gainRelic(id); done && done(); };
+      b.onclick = (ev) => { if (ev && ev.isTrusted && performance.now() - t0 < 280) return; $('reward').hidden = true; gainRelic(id); done && done(); };
       box.append(b);
     });
     $('reward').hidden = false;
@@ -1565,7 +1567,7 @@
   // 색(tint)을 입히려면 오프스크린에 한 번 그려 두고 재사용한다(레인 색 3종 × 크기 몇 가지 — 24개를 넘으면 비운다).
   const _plateCache = {};
   function plateCanvas(img, w, h, capSrc, tint) {
-    const key = tint + '|' + Math.round(w) + 'x' + Math.round(h); let c = _plateCache[key];
+    const key = (img.src || '').slice(-22) + '|' + tint + '|' + Math.round(w) + 'x' + Math.round(h); let c = _plateCache[key];   // 그림 이름도 키에 — 같은 색·크기의 다른 그림(HP 틀 ↔ 이름표)이 서로의 캐시를 쓰지 않게
     if (c) return c;
     const ks = Object.keys(_plateCache); if (ks.length > 24) ks.forEach(function (k) { delete _plateCache[k]; });
     const dpr = 2, iw = img.naturalWidth, ih = img.naturalHeight;
@@ -1702,7 +1704,6 @@
     if (bgWall) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgWall, wr.x, wr.y, wr.w, wr.h); ctx.restore(); }
     else { ctx.fillStyle = '#ffffff10'; ctx.fillRect(wr.x, wr.y, wr.w, wr.h); }
     const crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22));
-    const cFont = Math.max(11, Math.round(crad * 0.62)), showChar = wr.h > 55;
     for (const c of S.chars) {
       const sp = charSpot(c), x = sp.x, feetY = sp.feetY;   // 발치를 방벽 HP바 위로(겹침 방지)
       // 레인색 발판(캐릭터↔같은색 탄창 매칭 인지용)
@@ -2108,14 +2109,17 @@
     for (const e of S.enemies) { if (e.hitT > 0) e.hitT = Math.max(0, e.hitT - d * 3.2); stepEnemyVis(e, d, nowS); }
     for (let i = anim.ghosts.length - 1; i >= 0; i--) { const g = anim.ghosts[i]; g.gt += d; stepEnemyVis(g, d, nowS); if (g.gt > 0.5) anim.ghosts.splice(i, 1); }   // 방벽에 닿은 적: 걸어 들어가며 사라짐
   }
+  let loopErrAt = 0;
   function loop(ts) {
-    const raw = Math.min(100, ts - lastTs || 16.7), d = Math.min(0.032, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
-    if (dpr > 2 && S && !S.over && S.phase !== 'map' && !document.hidden) {   // 배율 3 급 캔버스가 3초 넘게 ≈28fps 미만이면 한 번만 2 로 낮춘다
-      frameEma += (raw - frameEma) * 0.03; slowMs = frameEma > 36 ? slowMs + raw : 0;
-      if (slowMs > 3000) { dprCap = 2; slowMs = 0; resize(); }
-    }
-    advance(d);
-    requestAnimationFrame(loop);
+    requestAnimationFrame(loop);                                              // build 156: 먼저 예약 + try/catch — 한 프레임에서 예외가 나도 루프가 영영 멈추지 않는다(예전엔 예외 1회로 화면이 얼어붙고 복구되지 않았다)
+    try {
+      const raw = Math.min(100, ts - lastTs || 16.7), d = Math.min(0.032, (ts - lastTs) / 1000 || 0.016); lastTs = ts;
+      if (dpr > 2 && S && !S.over && S.phase !== 'map' && !document.hidden) {   // 배율 3 급 캔버스가 3초 넘게 ≈28fps 미만이면 한 번만 2 로 낮춘다
+        frameEma += (raw - frameEma) * 0.03; slowMs = frameEma > 36 ? slowMs + raw : 0;
+        if (slowMs > 3000) { dprCap = 2; slowMs = 0; resize(); }
+      }
+      advance(d);
+    } catch (e) { if (ts - loopErrAt > 3000) { loopErrAt = ts; try { console.error('[loop]', e); } catch (_) {} } }   // 같은 오류가 매 프레임 나도 3초에 한 번만 남긴다
   }
   // 한 프레임 진행(d = 초). rAF 루프와 디버그 훅 step() 이 같이 쓴다 — 숨은 탭에서 수동으로 돌려도 슬로모션·일시정지가 똑같이 적용된다
   function advance(d) {

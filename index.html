@@ -12,19 +12,36 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=155">
-  <link rel="stylesheet" href="css/skin.css?v=155">
+  <link rel="icon" type="image/png" href="assets/icon-192.png">
+  <link rel="apple-touch-icon" href="assets/icon-192.png">
+  <link rel="stylesheet" href="css/game.css?v=156">
+  <link rel="stylesheet" href="css/skin.css?v=156">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
+  <script>
+    /* 오래된 브라우저 안내(build 156): 화면 크기를 전부 cqw(컨테이너 단위)로 잡아서 지원하지 않는 브라우저(Chrome 105↓·Safari 16↓·삼성 인터넷 20↓·구형 인앱 웹뷰)에서는 레이아웃이 크게 깨진다 — 조용히 깨지는 대신 알려 준다 */
+    (function () {
+      var msgs = [];
+      try { if (!(window.CSS && CSS.supports && CSS.supports('width', '1cqw'))) msgs.push('이 브라우저는 화면을 제대로 보여 주지 못해요. 최신 Chrome(105↑) 또는 Safari(16↑)에서 열어 주세요.'); } catch (e) {}
+      try { localStorage.setItem('__pt', '1'); localStorage.removeItem('__pt'); } catch (e) { msgs.push('이 브라우저는 저장 공간을 쓸 수 없어요(시크릿 모드·저장 차단 등). 진행 상황이 저장되지 않아요.'); }   // 저장이 막히면 로그인해도 새로고침 때마다 로그인 화면으로 돌아온다
+      if (!msgs.length) return;
+      document.addEventListener('DOMContentLoaded', function () {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;left:0;right:0;top:0;z-index:99999;padding:14px 16px;background:#3a1020;color:#ffd0dc;font:700 14px/1.5 system-ui,sans-serif;text-align:center;border-bottom:2px solid #ff5d7a';
+        d.textContent = msgs.join(' ');
+        document.body.appendChild(d);
+      });
+    })();
+  </script>
   <div id="app">
     <!-- 로그인 게이트(로컬 다중 프로필: 아이디/비번) -->
     <div id="login">
       <h1 class="lg-logo logo-wrap"><span class="logo-tx">PONGTRESS</span><img class="logo-im" alt="PONGTRESS" src="assets/logo.webp" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></h1>
       <p class="lg-tag">튕겨서 장전하는 로그라이크 핀볼</p>
       <div class="lg-box">
-        <input id="lg-id" placeholder="아이디" autocomplete="off" autocapitalize="off" maxlength="16">
-        <input id="lg-pw" type="password" placeholder="비밀번호" autocomplete="off" maxlength="24">
+        <input id="lg-id" placeholder="아이디" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="16">
+        <input id="lg-pw" type="password" placeholder="비밀번호" autocomplete="current-password" maxlength="24">
         <div class="lg-msg" id="lg-msg"></div>
         <button class="lg-btn" id="lg-login">로그인 / 시작</button>
       </div>
@@ -168,14 +185,14 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=155"></script>
-  <script src="js/spritemeta.js?v=155"></script>
-  <script src="js/artmeta.js?v=155"></script>
-  <script src="js/content.js?v=155"></script>
-  <script src="js/meta.js?v=155"></script>
-  <script src="js/game.js?v=155"></script>
-  <script src="js/tutorial.js?v=155"></script>
-  <script src="js/help.js?v=155"></script>
-  <script src="js/codex.js?v=155"></script>
+  <script src="js/audio.js?v=156"></script>
+  <script src="js/spritemeta.js?v=156"></script>
+  <script src="js/artmeta.js?v=156"></script>
+  <script src="js/content.js?v=156"></script>
+  <script src="js/meta.js?v=156"></script>
+  <script src="js/game.js?v=156"></script>
+  <script src="js/tutorial.js?v=156"></script>
+  <script src="js/help.js?v=156"></script>
+  <script src="js/codex.js?v=156"></script>
 </body>
 </html>

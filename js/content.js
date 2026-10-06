@@ -125,7 +125,7 @@ const ROSTER = [
     active: { name: '방벽 전개', gauge: 18, kind: 'heal', amount: 24 },
     passive: { name: '진지 구축', kind: 'closeBlank', n: 1 } },
   { id: 'rogue', cls: 'support', name: '루미', weapon: '캐논', rarity: 'rare', atk: 6, hp: 34, gol: 2,
-    concept: '은민트 단발 다크슈트의 조용한 침투 요원. 시안 포인트 캐논',
+    concept: '은민트 단발 다크슈트의 조용한 침투 전문가. 시안 포인트 캐논',   // ('요원' 은 용어집 금지어 — 도감 프로필에 그대로 보인다)
     active: { name: '섬광 포격', gauge: 14, kind: 'stun', count: 3, turns: 1 },
     passive: { name: '지뢰 설치', kind: 'addPeg', peg: 'bumper', n: 1 } },
   { id: 'priest', cls: 'support', name: '미라', weapon: '캐논', rarity: 'epic', atk: 5, hp: 44, gol: 2,

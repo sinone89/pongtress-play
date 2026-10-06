@@ -596,7 +596,7 @@ body {
 .st-empty { min-height: 1px; }                       /* 같은 칸에 캐릭터가 없을 때의 빈 자리(격자 정렬 유지) */
 .stchar { appearance: none; display: flex; flex-direction: column; min-height: 40cqw; background: #1a1226;
   border: 2px solid #ffffff20; border-radius: 3cqw; overflow: hidden; text-align: center; cursor: grab;
-  padding: 0; color: var(--ink); font: inherit; position: relative; touch-action: none; }
+  padding: 0; color: var(--ink); font: inherit; position: relative; touch-action: pan-y; -webkit-touch-callout: none; user-select: none; -webkit-user-select: none; }   /* build 156: 터치로 카드 위에서도 목록을 위아래로 쓸어 넘길 수 있게(예전엔 none 이라 카드가 화면 대부분인 폰에서 스크롤이 거의 불가). 드래그 편성은 마우스는 그대로, 터치는 '길게 눌러서' 끈다(meta.js) */
 .stchar.placed { opacity: .55; }
 .stchar.locked { opacity: .4; filter: grayscale(1); }
 .stchar .sc-top { display: flex; justify-content: space-between; align-items: center; gap: 1cqw; padding: 1.4cqw 1.4cqw 0; }
@@ -645,7 +645,7 @@ body {
 .lane-slot .ls-g.g-l { background: linear-gradient(180deg,#e6a935,#bd7a18); text-shadow: 0 1px 2px #000a; }
 .lane-slot .ls-x { position: absolute; top: 0.8cqw; right: 0.8cqw; z-index: 3; width: 5.6cqw; height: 5.6cqw; border: 0; border-radius: 1.6cqw;
   background: #ff5db1cc; color: #fff; font-size: 3cqw; font-weight: 800; cursor: pointer; line-height: 1; padding: 0; }
-.lane-slot .ls-rlbl { position: absolute; top: 0.8cqw; left: 0.8cqw; z-index: 3; font-size: 2.2cqw; font-weight: 800; color: var(--muted);
+.lane-slot .ls-rlbl { position: absolute; top: 0.8cqw; left: 0.8cqw; z-index: 3; font-size: 2.6cqw; font-weight: 800; color: var(--muted);
   background: #0e0a18cc; padding: 0.3cqw 1.4cqw; border-radius: 1.2cqw; }
 .lane-slot.empty { align-items: center; justify-content: center; color: var(--muted); }
 .lane-slot.empty .lane-empty { font-size: 7cqw; opacity: .6; }
@@ -718,7 +718,8 @@ body {
   background: radial-gradient(120% 60% at 50% 100%, #2a1f5560, transparent 70%), linear-gradient(180deg, #080b18ee 0%, #0a0e1ce0 100%), var(--bg-lobby, url('../assets/bg/bg_lobby.webp')) center / cover no-repeat; }   /* 홈과 같은 격납고 그림을 어둡게 */
 #map[hidden] { display: none !important; }
 #map-head { display: flex; align-items: center; gap: 1.6cqw; font-size: 3.2cqw; font-weight: 800; flex-wrap: nowrap; }   /* 나가기 · 제목 · HP · 크레딧 · 레벨 · 도움말이 한 줄에 들어가야 한다 */
-#map-head b { font-size: 4.2cqw; color: var(--amber); margin-right: auto; white-space: nowrap; }
+#map-head b { font-size: 4.2cqw; color: var(--amber); margin-right: auto; white-space: nowrap; min-width: 0; overflow: hidden; text-overflow: ellipsis; }   /* 폭이 모자라면(작은 폰 + HP·크레딧 자릿수↑ + 레벨 두 자리) 제목이 먼저 줄고 도움말 버튼이 밀려 잘리지 않는다(build 156) */
+#map-head > span, #map-head > button { flex: 0 0 auto; }
 #map-head > span { display: inline-flex; align-items: center; gap: .8cqw; background: #ffffff10; border: 1px solid #ffffff22; border-radius: 999px; padding: 0.8cqw 1.9cqw; white-space: nowrap; }   /* 자식만 알약 — 안쪽 .uic 아이콘 span 까지 알약이 되면 회색 덩어리로 보임 */
 #map-relics { margin: 2cqw 0 1cqw; }
 #relic-bar:empty, #map-relics:empty, #reward-sub:empty { display: none; }   /* 내용이 없으면 자리도 차지하지 않음(안내 문구 대신) */
@@ -856,6 +857,11 @@ body {
 /* 튜토리얼 전투: 루비 1명이라 레벨·경험치·스킬 열·자동 버튼은 필요 없다 */
 #combat.tut-battle #c-level, #combat.tut-battle #exp-bar, #combat.tut-battle #battle-side { display: none !important; }
 .gbanner .sns-btn[disabled] { opacity: .45; }
+/* 보석이 모자랄 때(build 156): 10연 버튼은 살짝 흐리게 + 아래에 부족한 양·얻는 곳 안내, 눌러 보면 '💎N 부족' 으로 잠깐 바뀌며 흔들린다(예전엔 눌러도 아무 반응이 없었다) */
+.gbanner .sns-btn.short { filter: saturate(.55) brightness(.85); }
+.gbanner .sns-btn.warn { filter: hue-rotate(-40deg) saturate(.9) brightness(.9); animation: btnNo .32s ease; }
+.gbanner .gb-need { margin-top: 1.8cqw; font-size: 2.9cqw; color: var(--muted); line-height: 1.4; }
+@keyframes btnNo { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-1.2cqw); } 50% { transform: translateX(1.2cqw); } 80% { transform: translateX(-.6cqw); } }
 
 /* ═══ 도움말(js/help.js) — ? 버튼 + 주제 탭 팝업 ═══ */
 .help-btn { appearance: none; flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; margin: 0; padding: 0;
@@ -871,6 +877,10 @@ body {
 .speed-btn.on { color: var(--amber); border-color: var(--amber); background: #ffcf5c1e; }
 .speed-btn:active { transform: scale(.94); }
 #combat.tut-battle #speed-btn, #combat.tut-battle #btn-exit { display: none !important; }   /* 튜토리얼 전투는 속도를 고정(안내 속도에 맞춘다) · 나가기 대신 [건너뛰기] */
+/* 숨긴 칸(나가기·레벨·배속)이 빠지면 보이는 4개가 앞 칸에 몰려 '장전' 알약이 1fr 칸 가득 늘어났다(build 151 회귀, build 156 에서 고침) → 튜토리얼 전투 머리말은 [이름][단계] … [음소거][도움말] 로 따로 배치 */
+#combat.tut-battle #combat-top { grid-template-columns: auto auto 1fr auto auto; }
+#combat.tut-battle #combat-top .combat-mute { grid-column: 4; }
+#combat.tut-battle #combat-top .combat-help { grid-column: 5; }
 /* 나가기(‹) — 전투 머리말·분기 지도 머리말. 누르면 확인 창(#exit-modal) */
 .exit-btn { appearance: none; flex: 0 0 auto; margin: 0; padding: 0 0 .6cqw; width: 7cqw; height: 7cqw; display: inline-flex; align-items: center; justify-content: center; border: 1px solid #ffffff2e; border-radius: 50%; background: #ffffff12; color: #fff; font: inherit; font-weight: 900; font-size: 6.4cqw; line-height: 1; cursor: pointer; }
 .exit-btn:active { transform: scale(.94); }

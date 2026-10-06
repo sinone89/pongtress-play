@@ -223,7 +223,7 @@ const Help = (function () {
       + ROW(big('ic_levelup', '⬆'), '레벨업', uiCur('gold') + '크레딧으로 올려요. 레벨 상한은 ★마다 늘어요(' + GROWTH.levelCapByStar.slice(1).join(' → ') + ').')
       + ROW(big('ic_promote', '⏫'), '승급', uiCur('shards') + '조각과 ' + uiCur('mats') + '재료로 ★을 올려요(최대 ★' + GROWTH.starMax + '). 능력치가 크게 오르고 레벨 상한도 늘어요. ★1→2: ' + uiCur('shards') + pc.shards + ' · ' + uiCur('mats') + pc.mats + '.')
       + H('편성')
-      + P('<b>편성</b> 탭에서 동료를 <b>3개 레인</b>에 배치해요. 목록의 카드를 빈 레인으로 <b>끌어다 놓거나</b>, 카드를 눌러 상세 화면에서 <b>[편성]</b>을 눌러요. 레인 색은 전투 때 포켓 색과 이어져요.');
+      + P('<b>편성</b> 탭에서 동료를 <b>3개 레인</b>에 배치해요. 목록의 카드를 빈 레인으로 <b>끌어다 놓거나</b>(터치는 카드를 <b>길게 누른 뒤</b> 끌어요), 카드를 눌러 상세 화면에서 <b>[편성]</b>을 눌러요. 레인 색은 전투 때 포켓 색과 이어져요.');
   }
 
   function tEcon() {

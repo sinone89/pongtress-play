@@ -314,7 +314,7 @@ const Tutorial = (function () {
       target: (pi) => pi === 0 ? statRows(0, 1) : pi === 1 ? statRows(2, 2) : q('#char-modal .cd-skills') },
     { id: 'c2-close', ch: 2, sec: '능력치', ctx: 'lobby', kind: 'do', modal: 'char-modal', tap: '[닫기]를 눌러요', skip: () => !vis('char-modal'),
       msg: '다 봤으면 <b>닫기</b>를 눌러요.', target: () => q('#char-modal .cd-x'), done: () => !vis('char-modal') },
-    { id: 'c2-place', ch: 2, sec: '편성', ctx: 'lobby', kind: 'do', tab: 'formation', dlg: 'bottom', tap: '카드를 끌어다 놓거나, 탭한 뒤 [편성]을 눌러요',
+    { id: 'c2-place', ch: 2, sec: '편성', ctx: 'lobby', kind: 'do', tab: 'formation', dlg: 'bottom', tap: '카드를 (길게 눌러) 끌어다 놓거나, 탭한 뒤 [편성]을 눌러요',
       skip: () => !q('#lane-slots .lane-slot.empty') || !q('#owned-list .stchar:not(.locked):not(.placed)'),
       msg: '<b>' + charName(TUTORIAL.pullId) + '</b>를 <b>빈 레인</b>에 배치해요!',
       target: () => $('tab-formation'),
@@ -830,7 +830,12 @@ const Tutorial = (function () {
     const t = tut(); if (!t) return null;
     if (!t.done) return tourStep(t);
     if (!t.offered) return lobbyOn() ? OFFER : null;
-    if (active && !t.seen[active.id]) { if (ctxOk(active)) return active; return null; }   // 이미 뜬 팁은 닫을 때까지 유지
+    if (active && !t.seen[active.id]) {                                                      // 이미 뜬 팁은 닫을 때까지 유지 — 단 그 화면·팝업에 머무는 동안만
+      let keep = ctxOk(active) && (!active.modal || vis(active.modal));
+      if (keep && !active.pause) { let w = false; try { w = !!active.when(); } catch (e) { w = false; } if (w) active._offAt = 0; else { active._offAt = active._offAt || Date.now(); if (Date.now() - active._offAt > 1500) keep = false; } }   // 조건이 잠깐 깜박이는 건 봐 주고(1.5초), 계속 아니면 놓는다 — 게임을 멈추고 띄운(pause) 팁은 조건이 순간 연출(예: 판 방해 알림 글자 2.4초)에 걸려 있어도 읽는 중에 사라지지 않게 이 판정을 건너뛴다
+      if (keep) return active;
+      active._offAt = 0; active = null;                                                     // ⚠ 팁을 띄운 화면·팝업을 팁 버튼 없이 벗어나면(예: 캐릭터 상세를 ✕ 로 닫음) 놓아 준다 — 안 놓으면 이 팁이 다른 모든 팁(지도·전투·스킬·보상 …)을 영영 막는다. 못 본 팁은 다시 그 화면에 가면 뜬다
+    }
     active = null;
     if (Date.now() - (T.lastTipAt || 0) < TIP_GAP) return null;                            // 한 번에 하나 — 방금 본 팁과 20초는 간격을 둔다
     for (const d of TIPS) { if (t.seen[d.id] || !ctxOk(d)) continue; let ok = false; try { ok = !!d.when(); } catch (e) { ok = false; } if (ok) { active = d; return d; } }

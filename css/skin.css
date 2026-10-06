@@ -136,7 +136,7 @@ html.skin .stchar .sc-top { flex-wrap: nowrap; gap: .6cqw; }
 html.skin .stchar .sc-star { flex: 1 1 0; min-width: 0; justify-content: flex-end; gap: .15cqw; }
 html.skin .stchar .sc-star .sc-st { flex: 1 1 0; min-width: 0; max-width: 2.3cqw; font-size: 2cqw; line-height: 0; }
 html.skin .stchar .sc-st .uic { display: block; width: 100% !important; height: auto !important; aspect-ratio: 1 / 1; }   /* 별 그림이 칸 폭을 따라 함께 줄어든다(인라인 1.15em 은 !important 로 덮음) */
-html.skin .stchar .onbadge { font-size: 2.2cqw; }
+html.skin .stchar .onbadge { font-size: 2.5cqw; }
 html.skin .lane-slot .ls-g { font-size: 2cqw; }
 html.skin .cd-modal .cd-grade { font-size: 3.2cqw; }
 html.skin .g-tag { font-size: 2.6cqw; }

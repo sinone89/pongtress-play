@@ -47,7 +47,8 @@ const Meta = (function () {
         else if (b.dataset.acct === 'logout') logout();
       };
     }
-    $('acct-box').innerHTML = '<h2>' + uiIcon('ic_account', '👤', 'width:1.2em;height:1.2em;vertical-align:-0.2em') + ' ' + curAcct + '</h2>'
+    const nm = String(curAcct).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));   // 아이디는 사용자가 입력한 글자라 HTML 로 넣기 전에 이스케이프(자기 기기 안의 일이지만 위생상)
+    $('acct-box').innerHTML = '<h2>' + uiIcon('ic_account', '👤', 'width:1.2em;height:1.2em;vertical-align:-0.2em') + ' ' + nm + '</h2>'
       + '<div class="cd-btns"><button class="btn" data-acct="tut">' + ui('ic_info', '❔') + ' 튜토리얼 다시 보기</button><button class="btn" data-acct="logout">로그아웃</button></div>'
       + '<button class="btn primary" data-close="1">닫기</button>';
     m.hidden = false;
@@ -196,12 +197,12 @@ const Meta = (function () {
   }
   function gacha(n, free) {
     if (tutOn()) return null;                    // 튜토리얼 진행 중엔 일반 뽑기 잠금(튜토리얼 가챠 1회만 — 동료가 먼저 뽑혀 선물과 겹치는 것을 막는다)
-    if (free) { const today = new Date().toISOString().slice(0, 10); if (M.daily.freeGachaDate === today) return null; M.daily.freeGachaDate = today; }
+    if (free) { const today = todayKey(); if (M.daily.freeGachaDate === today) return null; M.daily.freeGachaDate = today; }   // 기기 현지 날짜(자정에 갱신) — 예전엔 UTC(한국은 오전 9시 갱신)라 일일 도전과 날짜 기준이 어긋났다
     else { const cost = n === 10 ? GACHA.cost10 : GACHA.cost1; if (M.currencies.gems < cost) return null; M.currencies.gems -= cost; }
     const res = []; for (let i = 0; i < n; i++) res.push(pullOne());
     save(); return res;
   }
-  function freeAvailable() { return M.daily.freeGachaDate !== new Date().toISOString().slice(0, 10); }
+  function freeAvailable() { return M.daily.freeGachaDate !== todayKey(); }
 
   // ── 문서 상점 ──
   function buyShards(id) {
@@ -397,7 +398,8 @@ const Meta = (function () {
   function idleEnsure() { if (!M.idle) M.idle = { last: 0 }; if (!M.idle.last) { M.idle.last = Date.now(); save(); } }
   function idlePending() {
     idleEnsure();
-    const cap = IDLE.capHours * 60, mins = Math.min(cap, (Date.now() - M.idle.last) / 60000), mul = IDLE.mul(M.maxStage);
+    if (M.idle.last > Date.now()) M.idle.last = Date.now();                    // 기기 시계를 과거로 돌렸을 때 '-1시간' 같은 음수 시간·보상이 나오지 않게(미래의 마지막 정산 시각은 지금으로 당긴다)
+    const cap = IDLE.capHours * 60, mins = Math.max(0, Math.min(cap, (Date.now() - M.idle.last) / 60000)), mul = IDLE.mul(M.maxStage);
     return { mins: mins, gold: Math.floor(mins * IDLE.goldPerMin * mul), mats: Math.floor(mins * IDLE.matsPerMin * mul), capped: mins >= cap };
   }
   function claimIdle() { const p = idlePending(); if (p.gold <= 0 && p.mats <= 0) return null; M.currencies.gold += p.gold; M.currencies.mats += p.mats; M.idle.last = Date.now(); save(); return p; }
@@ -658,8 +660,10 @@ const Meta = (function () {
       + '<div class="gb-btns">'
       +   (tutPull ? '<button class="sns-btn" data-gacha="tutorial">튜토리얼 뽑기 · 무료</button>'
             : '<button class="sns-btn" data-gacha="' + (free ? 'free' : '1') + '"' + (lock ? ' disabled' : '') + '>단일 ' + (free ? '무료' : uiCur('gems') + GACHA.cost1) + '</button>')
-      +   (tutPull ? '' : '<button class="sns-btn" data-gacha="10"' + (lock ? ' disabled' : '') + '>10연 ' + uiCur('gems') + GACHA.cost10 + '</button>')
-      + '</div></div>';
+      +   (tutPull ? '' : '<button class="sns-btn' + (!lock && M.currencies.gems < GACHA.cost10 ? ' short' : '') + '" data-gacha="10"' + (lock ? ' disabled' : '') + '>10연 ' + uiCur('gems') + GACHA.cost10 + '</button>')
+      + '</div>'
+      + (!tutPull && !lock && M.currencies.gems < GACHA.cost10 ? '<div class="gb-need">10연까지 ' + uiCur('gems') + (GACHA.cost10 - M.currencies.gems) + ' 더 필요해요 · 스테이지 클리어와 미션으로 모을 수 있어요</div>' : '')   // 보석이 모자랄 때 어디서 얻는지 알려 준다(예전엔 누르면 아무 반응이 없었다)
+      + '</div>';
   }
   function shopDocBody() {
     // 스틸앤샷式: 캐릭터 조각만 판매 · 커먼 제외 · 등급별 조각 1개당 문서 비용 · 보유 요원만 구매(미보유=잠금)
@@ -740,7 +744,7 @@ const Meta = (function () {
       + '<button class="btn" data-cheat="max">전 동료 Lv·★ 최대</button>'
       + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
       + '<button class="btn" data-cheat="relics">전 모듈 해금</button>'
-      + '<button class="btn" data-cheat="mission">미션 스탯 채우기</button>'
+      + '<button class="btn" data-cheat="mission">미션 수치 채우기</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
       + '<button class="btn" data-cheat="tut">튜토리얼 다시 보기</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
@@ -894,23 +898,35 @@ const Meta = (function () {
     const fmtGhost = () => { let g = $('drag-ghost'); if (!g) { g = document.createElement('div'); g.id = 'drag-ghost'; document.body.appendChild(g); } return g; };
     const fmtHi = (x, y) => { const s = fmtSlotAt(x, y); document.querySelectorAll('#lane-slots [data-slot]').forEach(el => el.classList.toggle('drop-hi', +el.dataset.slot === s)); };
     const fmtClearHi = () => document.querySelectorAll('#lane-slots .drop-hi').forEach(el => el.classList.remove('drop-hi'));
+    // 마우스: 12px 넘게 끌면 바로 드래그. 터치(build 156): 짧게 누름 = 상세 · 위아래로 쓸기 = 목록 스크롤(브라우저가 맡는다) · 0.32초 길게 눌렀다가 끌기 = 레인에 편성
+    // (예전엔 카드의 touch-action 이 none 이라 폰에서는 카드 위에서 스크롤이 안 됐고, 스크롤하려던 손가락이 캐릭터를 끌고 다녔다)
+    const LONGPRESS_MS = 320;
+    // 길게 눌러 끄는 동안에는 화면이 같이 스크롤되지 않게 막는다 — 비수동(non-passive) touchmove 리스너는 켜 있는 동안 모든 스크롤을 느리게 하므로 끄는 동안에만 붙인다
+    const blockScroll = (e) => { if (e.cancelable) e.preventDefault(); };
+    const fmtStopBlock = () => { document.removeEventListener('touchmove', blockScroll, { passive: false }); };
+    const fmtStartDrag = (d, x, y) => { d.moved = true; d.armed = true; const g = fmtGhost(), b = base(d.id); g.innerHTML = clsIcon(b.cls) + ' ' + b.name; g.style.display = 'block'; g.style.left = x + 'px'; g.style.top = y + 'px'; fmtHi(x, y); if (d.touch) document.addEventListener('touchmove', blockScroll, { passive: false }); };
     $('owned-list').addEventListener('pointerdown', (e) => {
       const el = e.target.closest('[data-char]'); if (!el || el.classList.contains('locked')) return;
-      fDrag = { id: el.dataset.char, pid: e.pointerId, sx: e.clientX, sy: e.clientY, moved: false };
+      if (fDrag && fDrag.lp) clearTimeout(fDrag.lp);
+      const d = fDrag = { id: el.dataset.char, pid: e.pointerId, sx: e.clientX, sy: e.clientY, x: e.clientX, y: e.clientY, moved: false, touch: e.pointerType === 'touch' || e.pointerType === 'pen', armed: false, slid: false, lp: 0 };
+      if (d.touch) d.lp = setTimeout(() => { if (fDrag === d && !d.slid) { fmtStartDrag(d, d.x, d.y); try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) {} } }, LONGPRESS_MS);
     });
     window.addEventListener('pointermove', (e) => {
       if (!fDrag || e.pointerId !== fDrag.pid) return;
-      if (!fDrag.moved) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) < 12) return; fDrag.moved = true; const g = fmtGhost(); const b = base(fDrag.id); g.innerHTML = clsIcon(b.cls) + ' ' + b.name; g.style.display = 'block'; }
+      fDrag.x = e.clientX; fDrag.y = e.clientY;
+      if (fDrag.touch && !fDrag.armed) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) > 10) { fDrag.slid = true; clearTimeout(fDrag.lp); } return; }   // 길게 누르기 전에 움직였다 = 스크롤하려는 것(드래그 아님)
+      if (!fDrag.moved) { if (Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) < 12) return; fmtStartDrag(fDrag, e.clientX, e.clientY); }
+      if (!fDrag.dragged && Math.hypot(e.clientX - fDrag.sx, e.clientY - fDrag.sy) > 10) fDrag.dragged = true;     // 길게 누른 채 실제로 끌었는가
       const g = fmtGhost(); g.style.left = e.clientX + 'px'; g.style.top = e.clientY + 'px'; fmtHi(e.clientX, e.clientY);
     });
     window.addEventListener('pointerup', (e) => {
-      if (!fDrag || e.pointerId !== fDrag.pid) return; const d = fDrag; fDrag = null;
+      if (!fDrag || e.pointerId !== fDrag.pid) return; const d = fDrag; fDrag = null; clearTimeout(d.lp); fmtStopBlock();
       const g = fmtGhost(); g.style.display = 'none'; fmtClearHi();
-      if (!d.moved) { openChar(d.id); return; }              // 탭 = 상세
+      if (!d.moved || (d.touch && d.armed && !d.dragged)) { if (!d.slid) openChar(d.id); return; }  // 탭 = 상세(쓸었다면 스크롤이었으니 열지 않는다 · 조금 길게 눌렀다 떼도 끌지 않았다면 탭으로 본다)
       const s = fmtSlotAt(e.clientX, e.clientY);              // 드래그 = 드롭한 레인에 배치
       if (s >= 0 && M.owned[d.id]) { assignPartySlot(s, d.id); renderFormation(); if (typeof Sound !== 'undefined') Sound.play('click'); }
     });
-    window.addEventListener('pointercancel', (e) => { if (fDrag && e.pointerId === fDrag.pid) { fDrag = null; fmtGhost().style.display = 'none'; fmtClearHi(); } });
+    window.addEventListener('pointercancel', (e) => { if (fDrag && e.pointerId === fDrag.pid) { clearTimeout(fDrag.lp); fmtStopBlock(); fDrag = null; fmtGhost().style.display = 'none'; fmtClearHi(); } });
     // 상점 탭(서브탭: 가챠/문서/패키지)
     $('shop-body').onclick = (e) => {
       const st = e.target.closest('[data-stab]'); if (st) { shopTab = st.dataset.stab; renderShop(); return; }
@@ -925,6 +941,10 @@ const Meta = (function () {
         const which = gc.dataset.gacha;
         const res = which === 'tutorial' ? tutorialPull() : which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
         if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
+        else if (which === '1' || which === '10') {                                  // 보석이 모자라 못 뽑음 → 말없이 무시하지 않고 버튼에 부족한 만큼 알린다
+          const need = (which === '10' ? GACHA.cost10 : GACHA.cost1) - M.currencies.gems;
+          if (need > 0) { gc.classList.add('warn'); gc.innerHTML = uiCur('gems') + need + ' 부족'; if (typeof Sound !== 'undefined') Sound.play('click'); setTimeout(() => { if (activeTab === 'shop') renderShop(); }, 1300); }
+        }
         return;
       }
       const dc = e.target.closest('[data-doc]'); if (dc && !dc.disabled) { buyShards(dc.dataset.doc); renderShop(); renderBar(); }
