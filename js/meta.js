@@ -138,7 +138,7 @@ const Meta = (function () {
     const hm = 1 + (lv - 1) * GROWTH.hpPct + (st - 1) * GROWTH.starHpPct;
     return Object.assign({}, b, { level: lv, star: st, atk: Math.round(b.atk * am), hp: Math.round(b.hp * hm) });
   }
-  // 임의 레벨/성급의 스탯(현재→다음 비교용). gol(골칸)은 고정.
+  // 임의 레벨/성급의 스탯(현재→다음 비교용). gol(탄창)은 고정.
   function statAt(id, lv, st) {
     const b = base(id);
     const am = 1 + (lv - 1) * GROWTH.atkPct + (st - 1) * GROWTH.starAtkPct;
@@ -240,15 +240,19 @@ const Meta = (function () {
   function clearPartySlot(lane) { if (lane >= 0 && lane <= 2) { M.party[lane] = null; save(); } }
 
   // ── 런 종료 정산 ──
-  function onRunEnd(r) {
-    // r = { won, kills, floors, gold, stage, mode, loop, maxCombo, score, relics }
-    const mode = r.mode || 'normal';
+  // 정산액 계산(부작용 없음) — 나가기 확인 창이 '지금 나가면 받는 보상'을 미리 보여 줄 때도 쓴다
+  function runEarn(r) {
     const mul = stageScale(r.stage || 1).reward * (1 + (r.loop || 0) * 0.5);
-    const earn = {
+    return {
       gold: Math.round(((r.gold || 0) + (r.floors || 0) * 20) * mul),
       mats: Math.round(((r.floors || 0) * 8 + (r.won ? 30 : 0)) * mul),
       gems: r.won ? Math.round(30 * mul) : 0, docs: Math.floor((r.loop || 0) * 4 + (r.won ? 2 : 0))
     };
+  }
+  function onRunEnd(r) {
+    // r = { won, kills, floors, gold, stage, mode, loop, maxCombo, score, relics }
+    const mode = r.mode || 'normal';
+    const earn = runEarn(r);
     gain(earn);
     M.stats.kills += (r.kills || 0);
     M.stats.floors += (r.floors || 0);
@@ -325,7 +329,7 @@ const Meta = (function () {
   }
 
   // 홈 = 자동전투 연출(풀블리드) + 방치 보상
-  function renderHome() { renderIdleCard(); idleStart(); }
+  function renderHome() { renderIdleCard(); idleStart(); if (typeof Codex !== 'undefined') Codex.badge(); }   // 도감 버튼의 NEW 점도 함께
 
   // 출격 = 스테이지 선택 + 편성 부대 + 출격 버튼
   function renderSortie() {
@@ -771,7 +775,6 @@ const Meta = (function () {
   function renderLobby() { renderBar(); renderTab(); }
 
   // ── 캐릭터 상세 모달 (스틸앤샷式: 프레임 초상화 + 정보 + 스킬 + 레벨업/승급 탭) ──
-  const PEG_NM = { mult2: '×2 증식', mult5: '×5 증식', bumper: '범퍼', attack: '공격', gold: '크레딧' };
   function skillText(sk) {
     switch (sk.kind) {
       case 'bigHit': return '맨 앞 적에게 공격력 ×' + sk.mult + ' 강타';
@@ -779,9 +782,9 @@ const Meta = (function () {
       case 'aoe': return '앞 ' + sk.count + '기에게 광역 포격 (공격 ×' + (sk.mult || 1) + ')';
       case 'heal': return '방벽 HP +' + sk.amount + ' 회복';
       case 'stun': return '앞 ' + sk.count + '기 ' + (sk.turns || 1) + '턴 기절';
-      case 'addPeg': return '핀볼 판에 ' + (PEG_NM[sk.peg] || sk.peg) + ' 페그 +' + sk.n;
-      case 'addBall': return '전투 시작 장전 볼 +' + sk.n;
-      case 'closeBlank': return '전투 시작 시 꽝 칸 ' + sk.n + '개를 충전 칸으로';
+      case 'addPeg': { const nm = (PEG_TYPES[sk.peg] || {}).name || sk.peg; return '핀볼 판에 ' + nm + (sk.peg === 'bumper' ? '' : ' 탄약') + ' +' + sk.n; }
+      case 'addBall': return '매 장전 발사 볼 +' + sk.n;
+      case 'closeBlank': return '전투 시작 시 꽝 칸 ' + sk.n + '개를 탄창으로';
       default: return '';
     }
   }
@@ -801,7 +804,7 @@ const Meta = (function () {
     const gcls = RAR_G[b.rarity] || 'g-n';
     let stars = ''; for (let s = 1; s <= GROWTH.starMax; s++) stars += '<span class="st' + (s <= o.star ? ' on' : '') + '">' + ui('ic_star', '★') + '</span>';
     // 현재 → 다음 스탯 비교 박스 + 성장 액션(스틸앤샷式)
-    const STAT = [[ui('stat_atk', '💥'), '공격', 'atk'], [ui('stat_hp', '🛡'), '체력', 'hp'], [ui('stat_gol', '🎯'), '골칸', 'gol']];
+    const STAT = [[ui('stat_atk', '💥'), '공격', 'atk'], [ui('stat_hp', '🛡'), '체력', 'hp'], [ui('stat_gol', '🎯'), '탄창', 'gol']];
     const cur = statAt(id, o.level, o.star);
     let box6, box7, actLabel, actAttr, actEnabled;
     if (cdTab === 'promote') {
@@ -958,7 +961,7 @@ const Meta = (function () {
     };
   }
 
-  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug,
+  return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, runEarn, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug, skillText,   // skillText = 도감도 쓴다
     tutOn, tutPullDue, tutorialPull, tutRewardPlan, tutGrantRewards, grantChar,           // 튜토리얼 보상·가챠(js/tutorial.js 가 사용)
     get state() { return M; } };
 })();

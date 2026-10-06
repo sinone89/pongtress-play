@@ -5,14 +5,14 @@
  *    한 카드 = 한 가지(40자 안팎). 세부는 도움말(?)과 '처음 만났을 때 팁'으로 넘긴다.
  *  · ① TOUR = 온보딩 3챕터(말풍선 위 1/3 · 구역 이름 표시)
  *       1 첫 전투  — 튜토리얼 전투: 분기 지도 없이 1회 · 루비 1명 · 약한 적 · 패배 불가(game.js startRun mode 'tutorial').
- *                    화면 → 페그(시범) → ×2·×5(시범) → 잭팟(시범) → 조준(점선) → 직접 쏘기 → 전투 → 적 전진 → 승리
+ *                    화면 → 탄약(시범) → ×2·×5(시범) → 잭팟(시범) → 조준(점선) → 직접 쏘기 → 전투 → 적 전진 → 승리
  *       2 영입과 편성 — 상점의 튜토리얼 가챠 1회(보라 확정) → 능력치 → 편성 탭에서 직접 배치
  *       3 홈 · 출격 · 미션 → 완료 선물(기존 재화 + 코코). 코코는 자동 배치하지 않는다(플레이어가 편성 탭에서 직접).
  *    ② TIPS = 처음 만났을 때 한 번(투어가 끝난 뒤 · 한 번에 하나(20초 간격) · [자세히 ›] → 도움말).
  *  · 시범 장면(scene): 한 단계 안에 '박자(beat)'가 여러 개 — 박자 종류
  *       next  카드 + [다음](pause:true 면 게임을 멈춘다)   do  직접 해 보기   watch  카드 없이 지켜보기(until 이 참이면 다음 박자 · slow 로 슬로모션)
- *    시범은 게임이 실제로 쓰는 물리·충전 규칙 그대로다 — 루비가 시범 볼(demo)을 한 발 쏘고(발사 횟수는 안 줄어듦), 맞은 페그·들어간 칸의 효과도 진짜다.
- *    game.js 가 열어 둔 도구: traceShot(미리 굴려 첫 접촉 페그 찾기) · spawnDemoBall · spawnBalls(demo) · setTimeScale(슬로모션) · setDemoAim(점선만 보이기) · pegPos/pocketRect/jackRect/ammoPillRect.
+ *    시범은 게임이 실제로 쓰는 물리·장전 규칙 그대로다 — 루비가 시범 볼(demo)을 한 발 쏘고(발사 횟수는 안 줄어듦), 맞은 탄약·들어간 칸의 효과도 진짜다.
+ *    game.js 가 열어 둔 도구: traceShot(미리 굴려 첫 접촉 탄약 찾기) · spawnDemoBall · spawnBalls(demo) · setTimeScale(슬로모션) · setDemoAim(점선만 보이기) · pegPos/pocketRect/jackRect/ammoPillRect.
  *  · 건너뛰기: 확인 팝업(경고 + 지금 받는 보상)에서 [확인]을 눌러야만 건너뛴다 — 그 순간 아직 못 받은 동료(보라·코코)와 완료 재화를 받는다(자동 배치 없음).
  *  · 다시 보기(계정 메뉴·도움말): 챕터 선택. 보상·가챠 잠금 없음(review).
  *  · 진행·본 안내는 계정 세이브(Meta.state.tut = { v:2, at, done, offered, seen, battle, pulled, rewarded, review })에 저장 → 새로고침해도 이어진다(at = 단계 id, 장면은 처음 박자부터 다시).
@@ -71,7 +71,7 @@ const Tutorial = (function () {
   // 캔버스 px → 뷰포트 좌표(스테이지 scale 보정)
   function cvPt(x, y) { const cv = $('stage'); if (!cv) return null; const c = cv.getBoundingClientRect(), k = cv.clientWidth ? c.width / cv.clientWidth : 1; return { x: c.left + x * k, y: c.top + y * k, k }; }
   function cvRect(R) { const p = R && cvPt(R.x, R.y); return p ? { l: p.x, t: p.y, w: R.w * p.k, h: R.h * p.k } : null; }
-  // 전투 캔버스의 영역 → 뷰포트 좌표. 이름: field · wall · goal · pins · danger(적 필드 맨 아래 행) · wallbar(방벽 HP 막대) · jack(잭팟 틀) · ammo(루비 탄수 알약) · pocket:N(포켓 칸) · peg:N(페그)
+  // 전투 캔버스의 영역 → 뷰포트 좌표. 이름: field · wall · goal · pins · danger(적 필드 맨 아래 행) · wallbar(방벽 HP 막대) · jack(잭팟 틀) · ammo(루비 탄수 알약) · pocket:N(포켓 칸) · peg:N(탄약)
   function canvasRect(name) {
     const g = game(); if (!g || !$('stage') || !run()) return null;
     let R = null;
@@ -95,19 +95,19 @@ const Tutorial = (function () {
   const charName = (id) => { const b = ROSTER.find(c => c.id === id); return b ? b.name : id; };
 
   // ═════════ 시범 도구(장면이 쓰는 것들) ═════════
-  const SC = {};                                                  // 장면 임시 상태(저장 안 함): 고른 페그·시범 볼·기준 탄수 …
+  const SC = {};                                                  // 장면 임시 상태(저장 안 함): 고른 탄약·시범 볼·기준 탄수 …
   const smooth = (x) => { x = Math.max(0, Math.min(1, x)); return x * x * (3 - 2 * x); };
   const demoBalls = () => { const s = run(); return s ? s.balls.filter(b => b.demo) : []; };
   const demoHarvest = () => demoBalls().filter(b => b.harvest);
   const pegAlive = (i) => { const s = run(); return !!s && !!s.pegs[i] && s.pegs[i].alive; };
-  // 발사대에서 위로 훑어(0.5° 간격) '첫 접촉 페그'가 조건에 맞는 방향 중 가장 볼 만한 것을 고른다 — 곧게 날아가고, 너무 가깝지도 멀지도 않고, 중앙에 가까운 것
+  // 발사대에서 위로 훑어(0.5° 간격) '첫 접촉 탄약'가 조건에 맞는 방향 중 가장 볼 만한 것을 고른다 — 곧게 날아가고, 너무 가깝지도 멀지도 않고, 중앙에 가까운 것
   function pickShot(match, opt) {
     opt = opt || {};
     const g = game(), s = run(); if (!g || !s) return null;
     const L = g.launcher(), bu = g.BU; let best = null;
     for (let deg = -150; deg <= -30; deg += 0.5) {
       const a = deg * Math.PI / 180, dir = { dx: Math.cos(a), dy: Math.sin(a) };
-      const tr = g.traceShot(dir, { maxHits: 1, tail: 0, maxSteps: 1500 });
+      const tr = g.traceShot(dir, { maxHits: 1, tail: 0, maxSteps: 1500, walls: false });   // walls:false = 벽 튕김은 세지 않고 '첫 탄약 접촉'만 본다
       const h = tr.hits[0]; if (!h || h.i == null || tr.end.eaten) continue;
       const p = s.pegs[h.i]; if (!p.alive || !match(p, h.i)) continue;
       const dist = Math.hypot(h.x - L.x, h.y - L.y) / bu, straight = tr.pts.length <= 2;
@@ -116,19 +116,19 @@ const Tutorial = (function () {
     }
     return best;
   }
-  // 시범 샷 관리: 방향은 '지금 판 크기'에 묶여 있으므로 화면 크기·배율이 바뀌면(회전·창 크기) 다시 고른다. 같은 페그를 되도록 유지한다.
+  // 시범 샷 관리: 방향은 '지금 판 크기'에 묶여 있으므로 화면 크기·배율이 바뀌면(회전·창 크기) 다시 고른다. 같은 탄약를 되도록 유지한다.
   function shotFor(key, match, plant) {
     const g = game(); if (!g || !run()) return null;
     const P = g.layout().pins, sig = [P.x, P.y, P.w, P.h, g.BU].map(v => Math.round(v * 10)).join(',');
     const cur = SC[key];
     if (!cur || cur.sig !== sig) {
       let ns = pickShot(match, { prefer: cur ? cur.i : -1 });
-      if (!ns && plant) { plantPeg(plant); ns = pickShot(match, { prefer: -1 }); }       // 직접 닿는 그런 페그가 판에 없으면 하나 심는다
+      if (!ns && plant) { plantPeg(plant); ns = pickShot(match, { prefer: -1 }); }       // 직접 닿는 그런 탄약가 판에 없으면 하나 심는다
       if (ns) { ns.sig = sig; SC[key] = ns; } else if (cur) cur.sig = sig;
     }
     return SC[key] || null;
   }
-  // 시범용으로 type 페그 하나를 심는다: 발사대에서 곧게 닿는 일반 페그 중 판 아래쪽·가운데 가까운 것을 type 으로 바꾼다(원래 판의 ×2·×5 는 위쪽 페그에 가려 직접 닿지 않을 때가 많다). 튜토리얼 전투 판에만 영향
+  // 시범용으로 type 탄약 하나를 심는다: 발사대에서 곧게 닿는 일반 탄약 중 판 아래쪽·가운데 가까운 것을 type 으로 바꾼다(원래 판의 ×2·×5 는 위쪽 탄약에 가려 직접 닿지 않을 때가 많다). 튜토리얼 전투 판에만 영향
   function plantPeg(type) {
     const s = run(); if (!s) return;
     const sh = pickShot((p) => p.type === 'normal' && !p.planted && p.fy > 0.4 && p.fx > 0.22 && p.fx < 0.78, { dist: 230 }); if (!sh) return;
@@ -136,7 +136,7 @@ const Tutorial = (function () {
     p.type = np.type; p.pr = np.pr; p.shape = np.shape; p.planted = true; p.alive = true;
   }
   const refreshShots = (d) => { const sh = d && d.step && d.step.shot; if (sh) shotFor(sh.key, sh.match, sh.plant); };
-  // 시범 볼이 첫 페그를 맞혀 사라졌다(예상한 페그가 아니어도 이 박자는 끝낸다) · 맞기 전까지 목표 페그에 다가갈수록 시간이 느려진다
+  // 시범 볼이 첫 탄약를 맞혀 사라졌다(예상한 탄약가 아니어도 이 박자는 끝낸다) · 맞기 전까지 목표 탄약에 다가갈수록 시간이 느려진다
   const shotHit = () => { const s = run(); return !!s && !!SC.ball && s.balls.indexOf(SC.ball) < 0; };
   const demoSlow = () => { const g = game(); return SC.ball && SC.peg && g ? slowToward(SC.ball, g.pegPos(SC.peg.i), 6, 130, 0.18) : 1; };
   const M_NORMAL = (p) => p.type === 'normal' && p.fy > 0.3 && p.fx > 0.15 && p.fx < 0.85, M_X2 = (p) => p.type === 'mult2' && p.fy > 0.2, M_X5 = (p) => p.type === 'mult5' && p.fy > 0.2;
@@ -146,7 +146,7 @@ const Tutorial = (function () {
   function releaseJack() { const s = run(); if (s) s.jackHold = false; }
   // 표식: {x,y,r} 고리 · {x,y,w,h,sq:true} 사각 테두리 · {x,y,text,below} 말풍선 — 모두 캔버스 px
   const ring = (x, y, r) => ({ x, y, r });
-  const pegRing = (i, k) => { const p = game().pegPos(i); return ring(p.x, p.y, p.r * (k || 1.9)); };   // 이미 터진 페그도 그 자리에 고리를 둘 수 있다
+  const pegRing = (i, k) => { const p = game().pegPos(i); return ring(p.x, p.y, p.r * (k || 1.9)); };   // 이미 터진 탄약도 그 자리에 고리를 둘 수 있다
   const ballRings = () => { const hs = demoBalls().filter(b => b.harvest); return hs.map(b => ring(b.x, b.y, b.r * (hs.length > 2 ? 1.55 : 2.3))); };
   const cellMark = (i, text) => { const g = game(), R = g.pocketRect(i); return [{ x: R.x, y: R.y, w: R.w, h: R.h, sq: true }].concat(text ? [{ x: R.x + R.w / 2, y: R.y - 4, text }] : []); };
   const enemyRect = (e) => { const g = game(), s = run(); if (!g || !s || !e) return null; const p = g.enemyPos(e), f = g.layout().field, cw = f.w / CFG.fieldLanes, ch = f.h / CFG.fieldRows; return cvRect({ x: p.x - cw / 2, y: p.y - ch / 2, w: cw, h: ch }); };
@@ -176,62 +176,62 @@ const Tutorial = (function () {
       msg: ['적이 <b>빨간 점선</b>을 넘으면 <b>방벽</b>을 공격해요.', '아래 <b>초록 막대</b>가 방벽의 <b>HP</b>예요. 0이 되면 패배해요!'],
       target: (pi) => canvasRect(pi === 0 ? 'danger' : 'wallbar') },
     { id: 'c1-board', ch: 1, sec: '화면', ctx: 'run', kind: 'next', pause: true, ready: loadReady,
-      msg: '아래는 <b>핀볼 판</b>이에요. 여기서 쏜 볼이 <b>페그</b>를 맞히며 <b>탄환</b>을 모아 줘요.', target: () => [canvasRect('pins'), canvasRect('goal')] },
+      msg: '아래는 <b>핀볼 판</b>이에요. 여기서 쏜 볼이 <b>탄약</b>을 맞히면 동료의 <b>탄환</b>이 <b>장전</b>돼요.', target: () => [canvasRect('pins'), canvasRect('goal')] },
 
-    // 장면 · 페그 → 충전 볼 → 충전 칸 (시범 볼 1발, 슬로모션)
-    { id: 'c1-peg', ch: 1, sec: '페그', ctx: 'run', kind: 'scene', ready: () => loadReady() && noBalls(), shot: { key: 'peg', match: M_NORMAL },
+    // 장면 · 탄약 → 장전 볼 → 탄창 (시범 볼 1발, 슬로모션)
+    { id: 'c1-peg', ch: 1, sec: '탄약', ctx: 'run', kind: 'scene', ready: () => loadReady() && noBalls(), shot: { key: 'peg', match: M_NORMAL },
       onEnter: () => { cleanupScene(); const s = run(); if (!s) return; s.demoCell = 2; parkJack(8); SC.a0 = ammo0(); shotFor('peg', M_NORMAL); },
       skip: () => !SC.peg, onLeave: () => { cleanupScene(); },
       beats: [
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '보여 주세요', marks: () => [pegRing(SC.peg.i)],
-          msg: '볼이 <b>페그</b>(동그란 장애물)를 맞히면 어떻게 될까요? 제가 한 발 쏠게요!' },
+          msg: '볼이 <b>탄약</b>(동그란 장애물)을 맞히면 어떻게 될까요? 제가 한 발 쏠게요!' },
         { kind: 'watch', caption: '잘 봐요!', run: () => { SC.ball = game().spawnDemoBall(SC.peg.dir, { once: true }); },
           slow: demoSlow, until: shotHit, maxMs: 9000 },
-        { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '다음', marks: () => { const rs = ballRings(); return rs.concat(rs.length ? [{ x: rs[0].x, y: rs[0].y - rs[0].r - 6, text: '충전 볼' }] : []); },
-          msg: '맞은 페그가 <b>충전 볼</b>로 바뀌었어요! 볼은 위쪽으로 올라가요.' },
+        { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '다음', marks: () => { const rs = ballRings(); return rs.concat(rs.length ? [{ x: rs[0].x, y: rs[0].y - rs[0].r - 6, text: '장전 볼' }] : []); },
+          msg: '맞은 탄약이 <b>장전 볼</b>로 바뀌었어요! 볼은 위쪽으로 올라가요.' },
         { kind: 'watch', caption: '위로 올라가요', slow: () => (demoHarvest()[0] ? 0.4 : 1), marks: () => ballRings(),
           until: () => { const b = demoHarvest()[0], g = game(); return !b || b.y < g.layout().pins.y + 105 * g.BU; }, maxMs: 6000 },
-        { kind: 'next', pause: true, lock: true, dim: false, dlg: 'bottom', label: '다음', marks: () => cellMark(2, '충전 칸').concat(cellMark(7, '빈 칸').slice(1), ballRings()),
-          msg: '위쪽의 <b>색 칸</b>이 루비의 <b>충전 칸</b>이에요. <b>X 칸</b>은 충전이 안 돼요.' },
+        { kind: 'next', pause: true, lock: true, dim: false, dlg: 'bottom', label: '다음', marks: () => cellMark(2, '탄창').concat(cellMark(7, '꽝 칸').slice(1), ballRings()),
+          msg: '위쪽에서 <b>루비 색</b>으로 빛나는 칸이 루비의 <b>탄창</b>이에요. 붉은 사선의 <b>꽝 칸</b>은 장전이 안 돼요.' },
         { kind: 'watch', caption: '들어가요!', slow: 0.22, marks: () => ballRings(), until: () => ammo0() > SC.a0, after: 900, maxMs: 6000 },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'bottom', label: '다음', marks: () => ammoMark('탄환 +' + Math.max(1, ammo0() - SC.a0)),
-          msg: () => '루비의 탄환이 <b>+' + Math.max(1, ammo0() - SC.a0) + '</b>! 이 숫자만큼 루비가 사격해요.' }
+          msg: () => '루비의 탄환이 <b>+' + Math.max(1, ammo0() - SC.a0) + '</b> 장전됐어요! 이 숫자만큼 루비가 사격해요.' }
       ] },
 
-    // 장면 · ×2 페그
+    // 장면 · ×2 탄약
     { id: 'c1-x2', ch: 1, sec: '증식', ctx: 'run', kind: 'scene', ready: () => loadReady() && noBalls(), shot: { key: 'peg', match: M_X2, plant: 'mult2' },
       onEnter: () => { cleanupScene(); const s = run(); if (!s) return; s.demoCell = 3; parkJack(8); SC.a0 = ammo0(); shotFor('peg', M_X2, 'mult2'); },
       skip: () => !SC.peg, onLeave: () => { cleanupScene(); },
       beats: [
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '보여 주세요', marks: () => [pegRing(SC.peg.i), calloutAtPeg(SC.peg.i, '×2')],
-          msg: '<b>보라색 마름모</b>는 <b>×2 페그</b>예요. 맞히면 볼이 <b>2개</b>로 늘어나요!' },
-        { kind: 'watch', caption: '×2 페그!', run: () => { SC.ball = game().spawnDemoBall(SC.peg.dir, { once: true }); },
+          msg: '<b>보라색 마름모</b>는 <b>×2 탄약</b>이에요. 맞히면 볼이 <b>2개</b>로 늘어나요!' },
+        { kind: 'watch', caption: '×2 탄약!', run: () => { SC.ball = game().spawnDemoBall(SC.peg.dir, { once: true }); },
           slow: demoSlow, until: shotHit, maxMs: 9000 },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '다음', marks: () => ballRings(),
           msg: '봐요, 볼이 <b>2개</b>가 됐죠?' },
         { kind: 'watch', caption: '올라가요', until: () => demoHarvest().length === 0, after: 500, maxMs: 6000 }
       ] },
 
-    // 장면 · ×5 페그
+    // 장면 · ×5 탄약
     { id: 'c1-x5', ch: 1, sec: '증식', ctx: 'run', kind: 'scene', ready: () => loadReady() && noBalls(), shot: { key: 'peg', match: M_X5, plant: 'mult5' },
       onEnter: () => { cleanupScene(); const s = run(); if (!s) return; s.demoCell = 4; parkJack(8); SC.a0 = ammo0(); shotFor('peg', M_X5, 'mult5'); },
       skip: () => !SC.peg, onLeave: () => { cleanupScene(); },
       beats: [
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '보여 주세요', marks: () => [pegRing(SC.peg.i, 2.1), calloutAtPeg(SC.peg.i, '×5')],
-          msg: '<b>별 모양</b>은 <b>×5 페그</b>! 맞히면 볼이 <b>5개</b>나 돼요!' },
-        { kind: 'watch', caption: '×5 페그!', run: () => { SC.ball = game().spawnDemoBall(SC.peg.dir, { once: true }); },
+          msg: '<b>별 모양</b>은 <b>×5 탄약</b>! 맞히면 볼이 <b>5개</b>나 돼요!' },
+        { kind: 'watch', caption: '×5 탄약!', run: () => { SC.ball = game().spawnDemoBall(SC.peg.dir, { once: true }); },
           slow: demoSlow, until: shotHit, maxMs: 9000 },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '다음', marks: () => ballRings(),
-          msg: '<b>5개</b>예요! 이런 페그를 많이 맞힐수록 탄환이 쑥쑥 늘어요.' },
+          msg: '<b>5개</b>예요! 이런 탄약을 많이 맞힐수록 탄환이 쑥쑥 늘어요.' },
         { kind: 'watch', caption: '올라가요', until: () => demoHarvest().length === 0, after: 500, maxMs: 6000 }
       ] },
 
-    // 그 밖의 특수 페그(시범 없이 짚어 주기)
-    { id: 'c1-others', ch: 1, sec: '페그', ctx: 'run', kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '알겠어요', ready: () => loadReady() && noBalls(),
+    // 그 밖의 특수 탄약(시범 없이 짚어 주기)
+    { id: 'c1-others', ch: 1, sec: '탄약', ctx: 'run', kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '알겠어요', ready: () => loadReady() && noBalls(),
       onEnter: () => { cleanupScene(); SC.gold = nearestPeg('gold'); SC.chg = nearestPeg('charge'); },
       skip: () => SC.gold == null && SC.chg == null, onLeave: () => { cleanupScene(); },
-      marks: () => [].concat(SC.gold != null ? [pegRing(SC.gold), calloutAtPeg(SC.gold, '골드')] : [], SC.chg != null ? [pegRing(SC.chg), calloutAtPeg(SC.chg, '충전 ×3')] : []),
-      msg: '<b>황금빛 육각형</b>은 <b>골드</b>를, <b>초록 삼각형</b>은 <b>충전 ×3</b> 볼을 줘요.' },
+      marks: () => [].concat(SC.gold != null ? [pegRing(SC.gold), calloutAtPeg(SC.gold, '크레딧')] : [], SC.chg != null ? [pegRing(SC.chg), calloutAtPeg(SC.chg, '장전 ×3')] : []),
+      msg: '<b>황금빛 육각형</b>은 <b>크레딧</b>을, <b>초록 삼각형</b>은 <b>장전 ×3</b> 볼을 줘요.' },
 
     // 장면 · 잭팟
     { id: 'c1-jack', ch: 1, sec: '잭팟', ctx: 'run', kind: 'scene', ready: () => loadReady() && noBalls(),
@@ -247,10 +247,10 @@ const Tutorial = (function () {
           slow: () => { const b = demoHarvest()[0], g = game(); return b ? 0.45 : 1; },
           until: () => { const b = demoHarvest()[0], g = game(); return !b || b.y < g.layout().pins.y + 110 * g.BU; }, maxMs: 6000, marks: () => jackMark('').concat(ballRings()) },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'bottom', label: '보기', marks: () => jackMark('잭팟 칸!').concat(ballRings()),
-          msg: '<b>잭팟 칸</b>에 들어간 볼은 충전이 <b>3배</b>예요! 어떻게 되는지 봐요.' },
+          msg: '<b>잭팟 칸</b>에 들어간 볼은 장전이 <b>3배</b>예요! 어떻게 되는지 봐요.' },
         { kind: 'watch', caption: '들어가요!', slow: 0.2, until: () => ammo0() > SC.a0, after: 1100, maxMs: 6000, marks: () => jackMark('').concat(ballRings()) },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'bottom', label: '다음', marks: () => ammoMark('탄환 +' + Math.max(1, ammo0() - SC.a0)),
-          msg: () => '<b>+1</b>짜리 볼이 <b>+' + Math.max(1, ammo0() - SC.a0) + '</b>이 됐어요! 타이밍을 맞춰 잭팟을 노려 봐요.' }
+          msg: () => ['<b>+1</b>짜리 볼이 <b>+' + Math.max(1, ammo0() - SC.a0) + '</b>이 됐어요! 타이밍을 맞춰 잭팟을 노려 봐요.', '잭팟은 <b>탄창</b> 위에서만 터져요. <b>꽝 칸</b>이면 크레딧 +10만 줘요.'] }
       ] },
 
     // 장면 · 조준과 점선
@@ -262,7 +262,7 @@ const Tutorial = (function () {
           msg: '판을 <b>끌어서 조준</b>해요. <b>점선</b>이 볼이 갈 길을 미리 보여 줘요.' },
         { kind: 'next', pause: true, lock: true, dim: false, dlg: 'top', label: '다음', aimFix: () => { const g = game(), P = g.layout().pins; return { x: P.x + P.w * 0.6, y: P.y + P.h * 0.3 }; },
           marks: () => aimHitCall(),
-          msg: '<b>하얀 고리</b>는 볼이 <b>맞힐 페그</b>예요. 점선은 <b>3번 튕길 때까지</b> 보여 줘요.' },
+          msg: '<b>하얀 고리</b>는 볼이 <b>맞힐 탄약</b>이에요. 점선은 <b>3번 튕길 때까지</b>만 보여 줘요.' },
         { kind: 'do', tap: '표시된 판 위에서 끌었다 놓아요', target: () => canvasRect('pins'), hand: aimHand(0.7), done: () => launched() >= 1,
           msg: '이제 직접 쏴 봐요! <b>끌어서 조준</b>하고, 손을 떼면 <b>발사</b>!' }
       ] },
@@ -272,12 +272,12 @@ const Tutorial = (function () {
       marks: () => ammoMark('탄환 ×' + ammo0()),
       msg: () => '볼이 다 들어왔어요! 루비의 탄환은 지금 <b>×' + ammo0() + '</b>이에요. 볼이 <b>한 발</b> 남았어요.' },
     { id: 'c1-aim2', ch: 1, sec: '조준', ctx: 'run', kind: 'do', ready: loadReady, tap: '아까처럼 끌었다 놓아요',
-      msg: '<b>한 발 더</b> 쏴요! 페그를 많이 맞힐수록 볼이 늘어나요.', target: () => canvasRect('pins'), hand: aimHand(0.3),
+      msg: '<b>한 발 더</b> 쏴요! 탄약을 많이 맞힐수록 볼이 늘어나요.', target: () => canvasRect('pins'), hand: aimHand(0.3),
       done: () => { const s = run(); return !s || s.launchesLeft <= 0 || s.phase !== 'load'; } },
 
     // 전투
     { id: 'c1-battle', ch: 1, sec: '전투', ctx: 'run', kind: 'next', pause: true, ready: () => { const s = run(); return !!s && s.phase === 'battle' && !vis('reward'); },
-      msg: '볼을 다 쏘면 <b>전투</b>가 시작돼요. 충전한 만큼 루비가 <b>자동으로 사격</b>해요!',
+      msg: '볼을 다 쏘면 <b>전투</b>가 시작돼요. 장전한 만큼 루비가 <b>자동으로 사격</b>해요!',
       target: () => [canvasRect('field'), canvasRect('wall')], onEnter: () => { T.fought = true; } },
     { id: 'c1-hit', ch: 1, sec: '전투', ctx: 'run', kind: 'scene', ready: () => { const s = run(); return !!s && s.phase === 'battle' && s.battleStage === 'shooting'; },
       expire: () => { const s = run(); return !!s && s.phase === 'load' && !!T.fought; }, onLeave: () => { cleanupScene(); },
@@ -310,7 +310,7 @@ const Tutorial = (function () {
     { id: 'c2-card', ch: 2, sec: '능력치', ctx: 'lobby', kind: 'do', tab: 'formation', tap: '동료 카드를 눌러요', skip: () => reviewing() || !cardEl(),
       msg: () => '<b>' + charName(TUTORIAL.pullId) + '</b> 카드를 눌러 <b>능력치</b>를 봐요.', target: () => cardEl(), done: () => vis('char-modal') },
     { id: 'c2-stats', ch: 2, sec: '능력치', ctx: 'lobby', kind: 'next', modal: 'char-modal', skip: () => !vis('char-modal'),
-      msg: ['<b>공격</b>은 한 발의 피해, <b>체력</b>은 방벽 HP에 더해져요.', '<b>골칸</b>은 이 동료의 <b>충전 칸 수</b>예요. 많을수록 탄환이 잘 차요!', '아래에는 <b>스킬</b>이 있어요. 전투 중 게이지가 차면 쓸 수 있어요.'],
+      msg: ['<b>공격</b>은 한 발의 피해, <b>체력</b>은 방벽 HP에 더해져요.', '<b>탄창</b> 수가 많을수록 이 동료의 탄환이 잘 <b>장전</b>돼요!', '아래에는 <b>스킬</b>이 있어요. 전투 중 게이지가 차면 쓸 수 있어요.'],
       target: (pi) => pi === 0 ? statRows(0, 1) : pi === 1 ? statRows(2, 2) : q('#char-modal .cd-skills') },
     { id: 'c2-close', ch: 2, sec: '능력치', ctx: 'lobby', kind: 'do', modal: 'char-modal', tap: '[닫기]를 눌러요', skip: () => !vis('char-modal'),
       msg: '다 봤으면 <b>닫기</b>를 눌러요.', target: () => q('#char-modal .cd-x'), done: () => !vis('char-modal') },
@@ -323,7 +323,7 @@ const Tutorial = (function () {
     { id: 'c2-lanes', ch: 2, sec: '편성', ctx: 'lobby', kind: 'next', tab: 'formation',
       msg: ['레인마다 <b>한 명</b>씩 설 수 있어요.', '부대 <b>체력의 합</b>이 곧 <b>방벽 HP</b>예요!'], target: () => $('lane-slots') },
     { id: 'c2-color', ch: 2, sec: '편성', ctx: 'lobby', kind: 'next', tab: 'formation',
-      msg: '레인은 <b>색</b>이 달라요. 전투에서 <b>같은 색 칸</b>에 볼이 들어가면 그 동료가 충전돼요!', target: () => $('lane-slots') },
+      msg: '레인은 <b>색</b>이 달라요. 전투에서 <b>같은 색 탄창</b>에 볼이 들어가면 그 동료의 탄환이 장전돼요!', target: () => $('lane-slots') },
 
     // ── 챕터 3 · 홈 · 출격 · 미션 ──
     { id: 'c3-home', ch: 3, sec: '홈', ctx: 'lobby', kind: 'next', tab: 'home',
@@ -334,8 +334,6 @@ const Tutorial = (function () {
       msg: '<b>출격</b> 탭에서 <b>스테이지</b>와 <b>모드</b>를 골라요.', target: () => [$('mode-select'), $('stage-select')] },
     { id: 'c3-party', ch: 3, sec: '출격', ctx: 'lobby', kind: 'next', tab: 'sortie',
       msg: '편성한 <b>부대</b>를 확인하고 <b>[출격]</b>을 누르면 전장으로 나가요!', target: () => [$('sortie-party'), $('btn-sortie')] },
-    { id: 'c3-run', ch: 3, sec: '출격', ctx: 'lobby', kind: 'next', tab: 'sortie',
-      msg: ['출격하면 <b>분기 지도</b>가 열려요. 길을 골라 <b>전투 → 상점 → 정비</b>를 지나요.', '맨 위의 <b>보스</b>를 쓰러뜨리면 스테이지 클리어! 중간에 얻는 <b>모듈</b>로 점점 강해져요.'] },
     { id: 'c3-mission', ch: 3, sec: '미션', ctx: 'lobby', kind: 'next', tab: 'mission',
       msg: '<b>미션</b>을 달성하면 보상을 받아요.', target: () => $('mission-list') },
     { id: 'c3-claim', ch: 3, sec: '미션', ctx: 'lobby', kind: 'next', tab: 'mission',
@@ -356,11 +354,11 @@ const Tutorial = (function () {
 
   // ── 장면 도우미(TOUR 정의에서 쓴다) ──
   const cardEl = () => q('#owned-list .stchar[data-char="' + TUTORIAL.pullId + '"]');                    // 튜토리얼 가챠로 받은 동료의 카드
-  function statRows(a, b) {                                                                             // 능력치 상자의 a~b 번째 줄(0=공격 1=체력 2=골칸)
+  function statRows(a, b) {                                                                             // 능력치 상자의 a~b 번째 줄(0=공격 1=체력 2=탄창)
     const rows = document.querySelectorAll('#char-modal .cd-cur .sc-row'); if (!rows.length) return q('#char-modal .cd-cmp');
     return [rows[Math.min(a, rows.length - 1)], rows[Math.min(b, rows.length - 1)]];
   }
-  function nearestPeg(type) {                                                                           // 판 중앙에 가장 가까운 살아 있는 type 페그 번호(없으면 null)
+  function nearestPeg(type) {                                                                           // 판 중앙에 가장 가까운 살아 있는 type 탄약 번호(없으면 null)
     const s = run(); if (!s) return null; let best = null, bd = 9;
     s.pegs.forEach((p, i) => { if (p.type !== type || !p.alive) return; const d = Math.hypot(p.fx - 0.5, (p.fy - 0.4) * 1.2); if (d < bd) { bd = d; best = i; } });
     return best;
@@ -369,12 +367,12 @@ const Tutorial = (function () {
   function ammoMark(text) { const r = canvasRectRaw('ammo'); return r ? [{ x: r.x, y: r.y, w: r.w, h: r.h, sq: true }, { x: r.x + r.w / 2, y: r.y + r.h + 4, text, below: true }] : []; }
   function jackMark(text) { const r = canvasRectRaw('jack'); return r ? [{ x: r.x, y: r.y, w: r.w, h: r.h, sq: true }].concat(text ? [{ x: r.x + r.w / 2, y: r.y - 4, text }] : []) : []; }
   function canvasRectRaw(name) { const g = game(), s = run(); if (!g || !s) return null; if (name === 'jack') return g.jackRect(); if (name === 'ammo') { const c = lane0(); return c ? g.ammoPillRect(c) : null; } return null; }
-  function aimHitCall() {                                                                               // 시범 조준 점선이 처음 맞힐 페그 위에 '맞힐 페그' 말풍선
+  function aimHitCall() {                                                                               // 시범 조준 점선이 처음 맞힐 탄약 위에 '맞힐 탄약' 말풍선
     const g = game(), s = run(); if (!g || !s || !SC.aimPt) return [];
-    const tr = g.traceShot(g.aimDir(SC.aimPt.x, SC.aimPt.y), { maxHits: 1, tail: 0 }), h = tr.hits[0];
+    const tr = g.traceShot(g.aimDir(SC.aimPt.x, SC.aimPt.y), { maxHits: 1, tail: 0, walls: false }), h = tr.hits[0];
     if (!h || h.i == null) return [];
     const p = g.pegPos(h.i), top = g.layout().pins.y;
-    return [p.y - p.r * 2.4 < top + 24 ? { x: p.x, y: p.y + p.r * 2.1, text: '맞힐 페그', below: true } : { x: p.x, y: p.y - p.r * 2.1, text: '맞힐 페그' }];
+    return [p.y - p.r * 2.4 < top + 24 ? { x: p.x, y: p.y + p.r * 2.1, text: '맞힐 탄약', below: true } : { x: p.x, y: p.y - p.r * 2.1, text: '맞힐 탄약' }];
   }
 
   // ═════════ TIPS — 처음 만났을 때 한 번(투어가 끝난 뒤 · 안 본 것만 · 조건이 맞으면 뜸 · 한 번에 하나) ═════════
@@ -397,11 +395,14 @@ const Tutorial = (function () {
       msg: '달성한 미션이 있어요! <b>[받기]</b>를 눌러 보상을 챙겨요.' },
     // ── 런 ──
     { id: 'run.map', ctx: 'run', help: 'map', modal: 'map', when: () => { const s = run(); return !!s && !s.tutorial && vis('map') && !vis('reward') && !vis('run-modal'); }, target: () => $('map-body'),
-      msg: ['<b>분기 지도</b>예요. 갈래 길 중 하나를 골라 위로 올라가요!', '{ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스<br>전투에서는 모듈을 얻고, 상점·정비에서는 장비를 사고 방벽을 고쳐요.'] },
+      msg: ['<b>분기 지도</b>예요. 빛나는 노드 중 하나를 골라 위로 올라가요!', '{ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스<br>맨 위의 <b>보스</b>를 쓰러뜨리면 스테이지 클리어예요!'] },
+    { id: 'combat.ui', ctx: 'run', pause: true, help: 'battle',
+      when: () => { const s = run(); return !!s && !s.tutorial && s.phase === 'load' && loadReady() && vis('combat-top'); }, target: () => $('combat-top'),
+      msg: ['왼쪽 위 <b>‹</b> 버튼은 런을 끝내고 <b>로비로 나가는</b> 버튼이에요. 나가기 전에 한 번 더 물어봐요.', '<b>×1</b> 버튼은 <b>배속</b>이에요. 누를 때마다 ×1.5 → ×2 → ×3으로 바뀌고, 장전 볼과 전투가 모두 빨라져요.'] },
     { id: 'skill', ctx: 'run', pause: true, help: 'battle',
       when: () => { const s = run(); return !!s && !s.tutorial && s.phase === 'load' && loadReady() && s.chars.some(c => c.gauge >= c.ref.active.gauge) && vis('battle-side'); },
       target: (pi) => pi === 0 ? $('skill-col') : pi === 1 ? (q('#skill-col .skillbtn.ready') || $('skill-col')) : $('auto-skill-btn'),
-      msg: ['<b>스킬 게이지</b>는 탄환을 충전할 때 함께 차올라요. 가득 차면 버튼이 <b>빛나요</b>.', '빛나는 <b>스킬 버튼</b>을 눌러 두면 이번 전투에 스킬이 발동해요. 직접 켜면 피해가 <b>+' + Math.round(MANUAL_SKILL_BONUS * 100) + '%</b>예요.', '<b>[스킬 자동]</b>을 켜 두면 게이지가 찰 때마다 알아서 써요.'] },
+      msg: ['<b>스킬 게이지</b>는 탄환을 장전할 때 함께 차올라요. 가득 차면 버튼이 <b>빛나요</b>.', '빛나는 <b>스킬 버튼</b>을 눌러 두면 이번 전투에 스킬이 발동해요. 직접 켜면 피해가 <b>+' + Math.round(MANUAL_SKILL_BONUS * 100) + '%</b>예요.', '<b>[스킬 자동]</b>을 켜 두면 게이지가 찰 때마다 알아서 써요.'] },
     { id: 'lvl.relic', ctx: 'run', modal: 'reward', help: 'relic', when: () => vis('reward') && !!q('#reward-choices .relic-card'), target: () => q('#reward .modal-box'),
       msg: () => /레벨/.test(($('reward-title') && $('reward-title').textContent) || '')
         ? ['<b>레벨업!</b> 보상 <b>3개 중 1개</b>를 골라요.', '짝수 레벨엔 이번 런 동안 쓰는 특수 장비 <b>모듈</b>이 나와요. 같은 모듈을 또 고르면 <b>개량</b>돼요!']
@@ -426,9 +427,7 @@ const Tutorial = (function () {
       when: () => { const s = run(), g = game(); return !!s && !!g && loadReady() && g.anim.floats.some(f => f.note && /교란|오염|파편/.test(f.text)); }, target: () => canvasRect('pins'),
       msg: '적이 <b>핀볼 판을 방해</b>해요! 해킹드론·슬러지·헤비아머를 먼저 잡으면 판이 깨끗해져요.' },
     { id: 'result', ctx: 'run', modal: 'result', when: () => vis('result'), target: () => $('result-box'),
-      msg: () => ($('result-box') && $('result-box').classList.contains('win'))
-        ? '<b>승리!</b> 스테이지를 <b>처음 클리어</b>하면 다음 스테이지와 새 모듈이 열려요.'
-        : '방벽이 무너져도 모은 보상은 받아요. 동료를 키워 다시 도전해요!' }
+      msg: () => { const k = ($('result-box') && $('result-box').dataset.kind) || ''; return k === 'win' ? '<b>승리!</b> 스테이지를 <b>처음 클리어</b>하면 다음 스테이지와 새 모듈이 열려요.' : k === 'abandon' ? '중간에 나가도 지금까지 모은 보상은 받아요. 다음엔 끝까지 도전해 봐요!' : '방벽이 무너져도 모은 보상은 받아요. 동료를 키워 다시 도전해요!'; } }
   ];
 
   // ═════════ 카드 화면(스포트라이트 + 말풍선 + 표식) ═════════
@@ -500,7 +499,7 @@ const Tutorial = (function () {
     const doTap = (k === 'do' && !shown.fallback);
     $('tut-tap').textContent = doTap ? (d.tap || '표시된 곳을 눌러요') : '';
     $('tut-tap').style.display = doTap ? 'block' : 'none';
-    const pg = $('tut-prog');                                       // 챕터 진행 표시(투어 카드만): 1/3 · 페그 (구역 이름이 없으면 챕터 이름)
+    const pg = $('tut-prog');                                       // 챕터 진행 표시(투어 카드만): 1/3 · 탄약 (구역 이름이 없으면 챕터 이름)
     if (d.ch && !isTip(d) && k !== 'offer') { pg.textContent = d.ch + '/' + CHAPTERS.length + ' · ' + (d.sec || CHAPTERS[d.ch - 1].name) + (reviewing() ? ' · 다시 보기' : ''); pg.style.display = 'block'; } else pg.style.display = 'none';
     let btns = '';
     if (k === 'offer') {

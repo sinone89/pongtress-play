@@ -1,8 +1,8 @@
 'use strict';
 /* PONGTRESS 프로토타입 0.2 — 전투 코어 슬라이스
  * content.js(CFG·ROSTER·ENEMIES·BOSSES·COMBATS·REWARDS·expToNext) 이후 로드.
- * 한 턴 = 장전 phase(플런저로 볼을 쏘아 배수 페그로 불리고 9칸 골 포켓에 떨어뜨려 캐릭터 탄환 충전)
- *        → 전투 phase(충전된 캐릭터가 맨 앞 적 자동 공격, EXP·레벨업·보상, 적 전진).
+ * 한 턴 = 장전 phase(플런저로 볼을 쏘아 배수 탄약로 불리고 9칸 탄창에 떨어뜨려 캐릭터 탄환 장전)
+ *        → 전투 phase(장전된 캐릭터가 맨 앞 적 자동 공격, EXP·레벨업·보상, 적 전진).
  */
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -26,9 +26,10 @@
   const CUT_DUR = 0.95;   // 스킬 컷인 연출 길이(초)
   let aimActive = false, aimX = 0, aimY = 0;
   let aimShown = null, demoAim = null;   // aimShown = 마지막으로 화면에 그려 준 조준 방향(손을 떼면 이 방향으로 쏜다 — 보이는 대로 나간다) · demoAim = 튜토리얼 시범 조준점(손가락 시범에 맞춰 점선만 보여 줌)
-  let tScale = 1, battleSpeed = 1;       // tScale = 튜토리얼 슬로모션 배율(0.1~1) · battleSpeed = 전투 속도 버튼(1배/2배 — 기기에 저장)
-  try { battleSpeed = localStorage.getItem('pongtress_speed') === '2' ? 2 : 1; } catch (e) {}
-  // 보드 배율: 페그·볼의 크기와 속도는 '기준 판 폭(폰 375 화면)' 기준 px 로 정하고, 실제 핀볼 판 폭에 비례해 키운다 → 화면이 커도 판의 모양·난이도·볼 속도는 그대로
+  const SPEEDS = [1, 1.5, 2, 3];         // 배속 버튼이 한 번 누를 때마다 돌아가는 배속 목록(1배 → 1.5배 → 2배 → 3배 → 1배 …)
+  let tScale = 1, battleSpeed = 1;       // tScale = 튜토리얼 슬로모션 배율(0.1~1) · battleSpeed = 배속 버튼(전투 화면 전체 — 장전 볼·전투 사격·연출 · 기기에 저장)
+  try { const v = parseFloat(localStorage.getItem('pongtress_speed')); if (SPEEDS.indexOf(v) >= 0) battleSpeed = v; } catch (e) {}
+  // 보드 배율: 탄약·볼의 크기와 속도는 '기준 판 폭(폰 375 화면)' 기준 px 로 정하고, 실제 핀볼 판 폭에 비례해 키운다 → 화면이 커도 판의 모양·난이도·볼 속도는 그대로
   const REF_PINS_W = 311;
   let BU = 1;
   let lastTs = 0, loopStarted = false;   // 루프는 1회만 시작(런마다 rAF 중복 등록 → 속도 배가 버그 방지)
@@ -40,9 +41,9 @@
   }
 
   // ============ 레이아웃(phase별 영역 비율) ============
-  // 위→아래: 적 필드 / 방벽(캐릭터) / 골 포켓(방벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
+  // 위→아래: 적 필드 / 방벽(캐릭터) / 탄창(방벽 바로 아래) / 핀볼 필드(하단 중앙에서 위로 발사)
   // 장전(0) ↔ 전투(1) 영역 비율. 전투에선 핀볼(goal·pins)이 거의 0 → 페이드로 사라짐
-  const LOAD_FRAC = { field: .15, wall: .13, goal: .13, pins: .59 };   // 골칸 영역 확대(캐릭터 이름 라벨 공간)
+  const LOAD_FRAC = { field: .15, wall: .13, goal: .13, pins: .59 };   // 탄창 영역 확대(캐릭터 이름 라벨 공간)
   const BATTLE_FRAC = { field: .72, wall: .24, goal: .02, pins: .02 };
   const SIDE_FR = 0.17;   // 우측 스킬 사이드바 폭(보드/포켓 영역 기준) — 좁혀서 보드를 넓힘
   const lerp = (a, b, t) => a + (b - a) * t;
@@ -74,7 +75,7 @@
     canvas.width = Math.floor(W * dpr); canvas.height = Math.floor(H * dpr);
     canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    BU = Math.max(0.55, (W * (1 - SIDE_FR)) / REF_PINS_W);   // 보드 배율(페그·볼 크기·볼 속도에 곱한다)
+    BU = Math.max(0.55, (W * (1 - SIDE_FR)) / REF_PINS_W);   // 보드 배율(탄약·볼 크기·볼 속도에 곱한다)
   }
 
   // ============ 런 시작 ============
@@ -89,7 +90,7 @@
       mode, tutorial: tut, stage, scale, seedBase: opts.seed || 0, loop: 0,
       combatIndex: 0, nodeIdx: 0, level: 1, exp: 0, expNext: tut ? Infinity : expToNext(1),
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0], buffBonus: 0,
-      runKills: 0, floorsCleared: 0, runMaxCombo: 0,
+      runKills: 0, floorsCleared: 0, runMaxCombo: 0, codexNew: [],      // codexNew = 이번 런에 도감에 처음 올린 적·모듈 이름(결과 화면에 알림)
       wallBase: wallMax, wallHpMax: wallMax, wallHp: wallMax,
       relics: {}, setsOn: {}, rewardQueue: [], guardUsed: false, nextBoardFx: [],
       map: null, mapPos: { f: -1, i: -1 },
@@ -100,6 +101,7 @@
       combat: null, over: false
     };
     tScale = 1; demoAim = null; aimShown = null; aimActive = false;      // 튜토리얼 슬로모션·시범 조준은 새 런에 들고 가지 않는다
+    if ($('exit-modal')) closeExit();                                    // 나가기 확인 창이 열린 채 새 런이 시작되지 않게
     CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
     $('combat').classList.toggle('tut-battle', tut);                      // 튜토리얼 전투: 레벨·경험치·스킬 열·자동 버튼을 숨긴다(css)
@@ -123,7 +125,7 @@
 
   const roster = (id) => ROSTER.find(c => c.id === id);
 
-  // 페그 종류 가중치 추첨
+  // 탄약 종류 가중치 추첨
   const PEG_KEYS = Object.keys(PEG_TYPES);
   const PEG_WEIGHT_TOTAL = PEG_KEYS.reduce((s, k) => s + PEG_TYPES[k].weight, 0);
   function pickPegType() {
@@ -131,7 +133,7 @@
     for (const k of PEG_KEYS) { r -= PEG_TYPES[k].weight; if (r <= 0) return k; }
     return 'normal';
   }
-  // 이번 턴 캐릭터 발당 피해(런 버프 + 이번 턴 공격 페그 버프 포함)
+  // 이번 턴 캐릭터 발당 피해(런 버프 + 이번 턴 공격 탄약 버프 포함)
   function charDmg(c) { return c.ref.atk + S.atkBonus + (S.turnAtk || 0); }
 
   // ============ 전투 시작 ============
@@ -147,7 +149,7 @@
     S.passiveBalls = 0;
     S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null; anim.fx = []; anim.shake = 0; anim.ghosts = []; anim.lau = { ang: -Math.PI / 2, tgt: -Math.PI / 2, recoil: 0, flash: 0 };
     buildBoard();
-    // 패시브(보드 효과) 적용 — 페그 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
+    // 패시브(보드 효과) 적용 — 탄약 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
     { const _r = Math.random; Math.random = makeRng(boardSeed() + 31);
       try { for (const c of S.chars) applyPassive(c.ref.passive); } finally { Math.random = _r; } }
     // 적/웨이브
@@ -162,7 +164,7 @@
       }
     }
     S.waveIdx = 0;
-    $('c-name').textContent = S.tutorial ? '튜토리얼 전투' : runLabel() + ' · ' + combat.name;
+    $('c-name').textContent = S.tutorial ? '튜토리얼 전투' : runLabel() + (combat.name === '전투' ? '' : (combat.boss ? '\n' : ' · ') + combat.name);   // 보스는 이름이 길어 두 번째 줄로(헤더 폭이 좁아 어중간한 곳에서 접히지 않게)   // 일반 전투는 '전투' 를 빼 머리말이 좁아도 한 줄에 들어간다(오른쪽 단계 알약이 장전/전투를 알려 준다)
     enterLoad();
     syncHud();
   }
@@ -170,31 +172,54 @@
 
   // 판 시드: 스테이지·층·노드(+일일 도전 시드·무한 막) 고정 → 같은 노드는 항상 같은 판(밸런스 재현성)
   function boardSeed() { return ((S.seedBase || 0) + (S.stage || 1) * 100003 + (S.combatIndex + 1) * 619 + (S.nodeIdx || 0) * 37 + (S.loop || 0) * 7919) >>> 0; }
-  // 시드 난수(mulberry32) — 스테이지·전투별 고정 페그판을 재현 가능하게
+  // 시드 난수(mulberry32) — 스테이지·전투별 고정 핀볼 판을 재현 가능하게
   function makeRng(seed) {
     let t = (seed >>> 0) || 1;
     return () => { t = (t + 0x6D2B79F5) >>> 0; let x = Math.imul(t ^ (t >>> 15), 1 | t); x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) >>> 0; return ((x ^ (x >>> 14)) >>> 0) / 4294967296; };
   }
 
-  // ============ 페그 배치 패턴(선/그림) ============
-  // 경로(꼭짓점 목록)를 일정 간격(step)으로 채워 점 배열 반환
-  function alongPath(verts, closed, step) {
-    const pts = [], segs = closed ? verts.length : verts.length - 1;
+  // ============ 탄약 배치 패턴(선/그림) — 반듯하게 정렬 ============
+  // 모든 패턴은 '기준 판'(가로 REF_PINS_W px · 세로는 같은 화면 비율)의 px 좌표로 만들고 마지막에 (fx, fy) 로 바꾼다 → 화면 크기와 상관없이 모양·간격이 같다.
+  // 이웃한 탄약의 중심 간격 = CFG.pegSpacing(px). 꺾은선은 꼭짓점마다 한 개씩 놓고 그 사이를 같은 간격으로 나누며(polyPts), 곡선은 호 길이를 같은 간격으로 나누고(curvePts),
+  // 그림(하트·별)은 같은 간격의 육각 격자를 마스크로 잘라(latticePts) 줄이 반듯하게 선다. 너무 붙은 점은 마지막에 걸러 낸다(thinPts).
+  function boardRef() { const pw = W * (1 - SIDE_FR), ph = H * LOAD_FRAC.pins; return { w: REF_PINS_W, h: REF_PINS_W * ph / pw }; }
+  const PEG_REG = (R) => ({ x0: 28, x1: R.w - 28, y0: 40, y1: R.h * 0.70 });   // 탄약을 놓을 영역(px) — 아래 30% 는 발사 부채꼴로 비워 발사대와 붙지 않게
+  // 꺾은선: 꼭짓점마다 한 개 + 마디 사이를 sp 에 가깝게 같은 간격으로 나눈 점(closed 면 처음으로 돌아옴)
+  function polyPts(verts, closed, sp) {
+    const pts = [], n = verts.length, segs = closed ? n : n - 1;
     for (let s = 0; s < segs; s++) {
-      const a = verts[s], b = verts[(s + 1) % verts.length];
-      const dx = b.fx - a.fx, dy = b.fy - a.fy, len = Math.hypot(dx, dy), n = Math.max(1, Math.round(len / step));
-      for (let i = 0; i < n; i++) pts.push({ fx: a.fx + dx * i / n, fy: a.fy + dy * i / n });
+      const a = verts[s], b = verts[(s + 1) % n], len = Math.hypot(b.x - a.x, b.y - a.y), k = Math.max(1, Math.round(len / sp));
+      for (let i = 0; i < k; i++) pts.push({ x: a.x + (b.x - a.x) * i / k, y: a.y + (b.y - a.y) * i / k });
+    }
+    if (!closed) pts.push({ x: verts[n - 1].x, y: verts[n - 1].y });
+    return pts;
+  }
+  // 곡선(닫힌 다각형으로 촘촘히 근사한 것): 전체 호 길이를 같은 간격으로 나눈다
+  function curvePts(verts, sp) {
+    const n = verts.length, lens = []; let total = 0;
+    for (let i = 0; i < n; i++) { const a = verts[i], b = verts[(i + 1) % n], l = Math.hypot(b.x - a.x, b.y - a.y); lens.push(l); total += l; }
+    const cnt = Math.max(3, Math.round(total / sp)), ds = total / cnt, pts = [];
+    for (let k = 0; k < cnt; k++) { let t = k * ds, i = 0; while (i < n - 1 && t > lens[i]) { t -= lens[i]; i++; } const a = verts[i], b = verts[(i + 1) % n], f = lens[i] ? t / lens[i] : 0; pts.push({ x: a.x + (b.x - a.x) * f, y: a.y + (b.y - a.y) * f }); }
+    return pts;
+  }
+  const ellipseVerts = (cx, cy, rx, ry, m) => Array.from({ length: m || 96 }, (_, i) => { const a = i / (m || 96) * Math.PI * 2; return { x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry }; });
+  // 육각 격자(가로 간격 ≈ sp, 세로 간격 .866 가로간격)를 영역에 꼭 맞게 깔고 inside(x,y) 가 참인 점만 남긴다(없으면 전부)
+  function latticePts(R, sp, inside) {
+    const g = PEG_REG(R), cols = Math.max(2, Math.floor((g.x1 - g.x0) / sp) + 1), dx = (g.x1 - g.x0) / (cols - 1);
+    const rows = Math.max(2, Math.floor((g.y1 - g.y0) / (dx * 0.866)) + 1), dy = (g.y1 - g.y0) / (rows - 1), pts = [];
+    for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+      const odd = r % 2; if (odd && c === cols - 1) continue;                   // 엇갈린 줄은 한 개 적다(양쪽 여백이 같게)
+      const x = g.x0 + c * dx + (odd ? dx / 2 : 0), y = g.y0 + r * dy;
+      if (!inside || inside(x, y)) pts.push({ x, y });
     }
     return pts;
   }
-  function ellipsePts(cx, cy, rx, ry, n) { const pts = []; for (let i = 0; i < n; i++) { const a = i / n * Math.PI * 2; pts.push({ fx: cx + Math.cos(a) * rx, fy: cy + Math.sin(a) * ry }); } return pts; }
-  // 너무 가까운 점 제거(겹침 방지). asp=영역 높이/너비(px)로 세로 비율 보정
-  function dedupePts(pts, asp, minGap) {
-    const out = [], g2 = minGap * minGap;
-    for (const p of pts) { let ok = true; for (const q of out) { const dx = p.fx - q.fx, dy = (p.fy - q.fy) * asp; if (dx * dx + dy * dy < g2) { ok = false; break; } } if (ok) out.push(p); }
+  // 먼저 놓인 점에서 minD(px) 안에 든 점은 뺀다(겹침·뭉침 제거)
+  function thinPts(pts, minD) {
+    const out = [], d2 = minD * minD;
+    for (const p of pts) { let ok = true; for (const q of out) { const dx = p.x - q.x, dy = p.y - q.y; if (dx * dx + dy * dy < d2) { ok = false; break; } } if (ok) out.push(p); }
     return out;
   }
-
   // 점이 다각형 내부인지(레이 캐스팅)
   function pointInPoly(x, y, poly) {
     let inside = false;
@@ -204,105 +229,99 @@
     }
     return inside;
   }
-  // 도형 실루엣을 격자로 채움. insideFn(u,v): u,v ∈ [-1,1] 중심좌표(빈 공간 최소화)
-  function fillShape(insideFn) {
-    const pts = [], nx = 24, ny = 30, hw = 0.42, hh = 0.39, cx = 0.5, cy = 0.47;
-    for (let iy = 0; iy <= ny; iy++) for (let ix = 0; ix <= nx; ix++) {
-      const off = (iy % 2) ? (1 / nx) : 0;                       // 엇갈림 배치
-      const u = ((ix / nx) + off) * 2 - 1, v = (iy / ny) * 2 - 1;
-      if (u >= -1 && u <= 1 && insideFn(u, v)) pts.push({ fx: cx + u * hw, fy: cy + v * hh });
-    }
-    return pts;
-  }
 
-  // 패턴 라이브러리. asp로 둥근 도형을 화면상 둥글게 보정, cx/cy 중심
-  function pegPatterns(asp, step) {
-    const cx = 0.5, cy = 0.47;
-    const kk = CFG.pegScale || 1, sc = (n) => Math.max(2, Math.round(n / kk));   // kk = 페그 성김 배율(페그·볼을 키운 만큼 같이 키워 판의 빽빽함을 맞춘다) — 열·행·줄 수를 kk 로 나눈다
-    const ax = (rr) => Math.min(0.42, rr * asp);   // x반경(과도 확장 방지)
-    const radii = (lo, hi, n) => Array.from({ length: n }, (_, i) => n < 2 ? lo : lo + (hi - lo) * i / (n - 1));   // 동심 도형의 반경 목록(개수가 줄어도 바깥 크기는 그대로)
-    // 좌우 레일: 중앙 집중형 그림 패턴에서도 양옆 레인(좌/우 캐릭터)이 장전할 수 있도록 가장자리 기둥 페그
-    const rails = (rows = sc(8)) => { const p = []; for (const fx of [0.10, 0.90]) for (let i = 0; i < rows; i++) p.push({ fx, fy: 0.11 + i * (0.74 / (rows - 1)) }); return p; };
+  // 패턴 라이브러리(8종). 반환 = [{x,y}] (px). 모양이 읽히도록 줄 사이는 진폭·간격을 넉넉히 띄우고, 동심 도형은 2겹(+중심)만 둔다.
+  function pegPatterns(R, sp) {
+    const g = PEG_REG(R), cx = R.w / 2, cy = (g.y0 + g.y1) / 2, hw = (g.x1 - g.x0) / 2, hh = (g.y1 - g.y0) / 2;
+    const uv = (x, y) => [(x - cx) / hw, (y - cy) / hh];
+    // 좌우 레일: 중앙 집중형 그림 패턴에서도 양옆 레인(좌/우 동료)이 장전할 수 있도록 가장자리 기둥 탄약
+    const rails = (gap) => { const n = Math.max(3, Math.round((g.y1 - g.y0) / (sp * (gap || 1.3))) + 1), pts = []; for (const x of [g.x0 + 4, g.x1 - 4]) for (let i = 0; i < n; i++) pts.push({ x, y: g.y0 + i * (g.y1 - g.y0) / (n - 1) }); return pts; };
     return {
-      grid() {
-        const pts = [], cols = sc(CFG.pegCols), rows = sc(CFG.pegRows);
-        for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const off = (r % 2) ? 0.5 / cols : 0; pts.push({ fx: (c + 0.5) / cols + off, fy: 0.10 + r * (0.76 / (rows - 1)) }); }
+      grid() { return latticePts(R, sp); },
+      chevrons() {     // ∨ 여러 줄: 모든 줄이 같은 가로 칸(열)에 서고, 가운데 열이 가장 아래로 처진다 → 세로로도 반듯하게 정렬
+        const A = 22, pts = [], nC0 = Math.round((g.x1 - g.x0) / (sp * 1.2)) + 1, nC = nC0 % 2 ? nC0 : nC0 + 1, span = g.y1 - g.y0 - A, nR = Math.max(2, Math.round(span / (sp * 1.45)) + 1);
+        for (let r = 0; r < nR; r++) { const y = g.y0 + r * span / (nR - 1); for (let i = 0; i < nC; i++) { const u = Math.abs(2 * i / (nC - 1) - 1); pts.push({ x: g.x0 + i * (g.x1 - g.x0) / (nC - 1), y: y + A * (1 - u) }); } }
         return pts;
       },
-      chevrons() {   // ∨ 여러 줄(진폭 크게)
-        const pts = [], rows = sc(8), per = sc(13);
-        for (let r = 0; r < rows; r++) { const fy0 = 0.11 + r * (0.74 / (rows - 1)); for (let i = 0; i < per; i++) { const t = i / (per - 1), vv = Math.abs(t - 0.5) * 2; pts.push({ fx: 0.08 + t * 0.84, fy: fy0 + (0.5 - vv) * 0.06 }); } }
+      zigzag() {       // 톱니 여러 줄: 줄 사이를 진폭만큼 띄워 모양이 읽히게
+        const A = 20, m = 5, pts = [], span = g.y1 - g.y0 - 2 * A, nR = Math.max(2, Math.round(span / (2 * A + sp * 0.7)) + 1);
+        for (let r = 0; r < nR; r++) { const y = g.y0 + A + r * span / (nR - 1), v = []; for (let i = 0; i <= m; i++) v.push({ x: g.x0 + i * (g.x1 - g.x0) / m, y: y + (i % 2 ? A : -A) }); pts.push(...polyPts(v, false, sp * 1.05)); }
         return pts;
       },
-      zigzag() {     // 톱니(삼각파) 여러 줄 — 행 간격·진폭 크게 해서 모양이 보이게
-        let pts = []; const rows = sc(6), seg = 5;
-        for (let r = 0; r < rows; r++) { const fy = 0.13 + r * (0.68 / (rows - 1)), verts = []; for (let i = 0; i <= seg; i++) { const t = i / seg, up = (i % 2 === 0) ? -1 : 1; verts.push({ fx: 0.09 + t * 0.82, fy: fy + up * 0.05 }); } pts = pts.concat(alongPath(verts, false, step)); }
-        return pts;
+      diamonds() {     // 채운 다이아(마름모) + 좌우 레일 — 육각 격자를 마름모로 오려 줄이 반듯하다
+        return latticePts(R, sp * 0.95, (x, y) => { const [u, v] = uv(x, y); return Math.abs(u) + Math.abs(v) <= 1.12; }).concat(rails(1.4));
       },
-      diamonds() {   // 동심 다이아(촘촘) + 좌우 레일(중앙 반경 축소로 레일 공간 확보)
-        let pts = [];
-        for (const rr of radii(0.09, 0.33, sc(4))) { const rx = ax(rr); pts = pts.concat(alongPath([{ fx: cx, fy: cy - rr }, { fx: cx + rx, fy: cy }, { fx: cx, fy: cy + rr }, { fx: cx - rx, fy: cy }], true, step)); }
-        pts.push({ fx: cx, fy: cy });
-        return pts.concat(rails());
+      rings() {        // 동심 타원 2겹 + 중심 + 좌우 레일
+        const pts = [], rx = hw - sp * 0.5;
+        for (const k of [0.5, 1]) pts.push(...curvePts(ellipseVerts(cx, cy, rx * k, hh * k), sp * 1.05));
+        pts.push({ x: cx, y: cy });
+        return pts.concat(rails(1.35));
       },
-      rings() {      // 동심 원(촘촘) + 좌우 레일
-        let pts = [];
-        for (const rr of radii(0.09, 0.30, sc(4))) pts = pts.concat(ellipsePts(cx, cy, ax(rr), rr, Math.max(8, Math.round(rr * 2 * Math.PI / step))));
-        pts.push({ fx: cx, fy: cy });
-        return pts.concat(rails());
+      heart() {        // 채운 하트 + 좌우 레일(격자를 하트 모양으로 오려 줄이 반듯하다)
+        return latticePts(R, sp * 0.9, (x, y) => { const [u, v] = uv(x, y), X = u * 1.05, Y = -v * 1.05 + 0.1, a = X * X + Y * Y - 1; return a * a * a - X * X * Y * Y * Y < 0; }).concat(rails(1.4));
       },
-      heart() {      // 채운 하트 실루엣 + 좌우 레일
-        return fillShape((u, v) => { const x = u * 1.15, y = -v * 1.15 + 0.15; const a = x * x + y * y - 1; return a * a * a - x * x * y * y * y < 0; }).concat(rails());
-      },
-      star() {       // 채운 5각 별 실루엣 + 좌우 레일
-        const verts = [];
-        for (let k = 0; k < 10; k++) { const a = -Math.PI / 2 + k * Math.PI / 5, rr = (k % 2) ? 0.45 : 1.0; verts.push([Math.cos(a) * rr, Math.sin(a) * rr]); }
-        return fillShape((u, v) => pointInPoly(u, v, verts)).concat(rails());
-      },
-      cross() {      // X + 테두리
-        let pts = [];
-        pts = pts.concat(alongPath([{ fx: 0.13, fy: 0.12 }, { fx: 0.87, fy: 0.86 }], false, step));
-        pts = pts.concat(alongPath([{ fx: 0.87, fy: 0.12 }, { fx: 0.13, fy: 0.86 }], false, step));
-        pts = pts.concat(alongPath([{ fx: 0.13, fy: 0.12 }, { fx: 0.87, fy: 0.12 }, { fx: 0.87, fy: 0.86 }, { fx: 0.13, fy: 0.86 }], true, step));
+      cross() {        // X + 테두리
+        const pts = [];
+        pts.push(...polyPts([{ x: g.x0, y: g.y0 }, { x: g.x1, y: g.y0 }, { x: g.x1, y: g.y1 }, { x: g.x0, y: g.y1 }], true, sp * 1.12));
+        pts.push(...polyPts([{ x: g.x0, y: g.y0 }, { x: g.x1, y: g.y1 }], false, sp * 1.12));
+        pts.push(...polyPts([{ x: g.x1, y: g.y0 }, { x: g.x0, y: g.y1 }], false, sp * 1.12));
         return pts;
       }
     };
   }
 
   let forcedPattern = null;   // 디버그: 특정 패턴 고정
-  // 이번 판의 페그 좌표: 패턴 하나를 골라 생성 → 경계 클램프 → 겹침 제거
-  // ⚠ 항상 '장전' 영역 비율로 생성(전투 시작 시 layoutT=1이면 핀볼 영역이 납작해 dedupe가 판을 뭉갬 — 전투2+ 페그 급감 버그)
+  // 이번 판의 탄약 좌표(fx,fy): 패턴 하나를 골라 생성 → 영역 밖 제거 → 겹침·뭉침 제거
+  // ⚠ 항상 '장전' 영역 비율로 생성(전투 시작 시 layoutT=1이면 핀볼 영역이 납작해 판이 뭉개짐 — 전투2+ 탄약 급감 버그)
   function pegLayout() {
-    const asp = ((H * LOAD_FRAC.pins) / W) || 1.3, kk = CFG.pegScale || 1, step = CFG.pegStep * kk;
-    const P = pegPatterns(asp, step), keys = Object.keys(P);
+    const R = boardRef(), keys = Object.keys(pegPatterns(R, CFG.pegSpacing));
     let key;
-    if (forcedPattern && P[forcedPattern]) key = forcedPattern;   // 디버그: 강제 패턴
+    if (forcedPattern && keys.indexOf(forcedPattern) >= 0) key = forcedPattern;   // 디버그: 강제 패턴
     else {
       const board = STAGE_BOARDS[S.stage] || STAGE_BOARDS[1];     // 스테이지·층·노드별 고정 판(보스=마지막 판)
       const bi = (S.combat && S.combat.boss) ? board.length - 1 : (S.combatIndex + (S.nodeIdx || 0) + (S.loop || 0)) % (board.length - 1);
       key = board[bi];
-      if (!P[key]) key = keys[0];
+      if (keys.indexOf(key) < 0) key = keys[0];
     }
     S._layoutName = key;
-    let pts = P[key]().filter(p => p.fx > 0.06 && p.fx < 0.94 && p.fy > 0.08 && p.fy < 0.87);
-    // 페그를 상단 ~72%로 압축 → 하단에 발사 부채꼴 공간 확보(발사대와 밀착 방지)
-    for (const p of pts) p.fy = 0.05 + p.fy * 0.74;
-    return dedupePts(pts, asp, CFG.pegMinGap * kk);
+    const sp = CFG.pegSpacing * ((CFG.patSpacing || {})[key] || 1);   // 패턴마다 간격 배율을 따로 둬서 판마다 볼 한 발의 장전량을 비슷하게 맞춘다
+    const g = PEG_REG(R);
+    let pts = pegPatterns(R, sp)[key]().filter(p => p.x >= g.x0 - 0.5 && p.x <= g.x1 + 0.5 && p.y >= g.y0 - 0.5 && p.y <= g.y1 + 0.5);
+    pts = thinPts(pts, sp * 0.84);
+    return pts.map(p => ({ fx: p.x / R.w, fy: p.y / R.h }));
+  }
+  // 점마다 탄약 종류·크기를 정한다(시드 난수 — 같은 노드는 늘 같은 판). 큰 보상(×5·증폭)은 한 판에 몇 개까지, 서로 떨어뜨려, 발사대 가까운(아래쪽) 줄을 피해서 둔다.
+  function assignPegs(pts) {
+    const R = boardRef(), sp = CFG.pegSpacing, g = PEG_REG(R), cap = { mult5: 3, charge: 3 }, used = { mult5: 0, charge: 0 }, placed = [];
+    for (const pt of pts) {
+      let type = pickPegType();
+      if (type === 'mult5' || type === 'charge') {
+        const low = pt.fy * R.h > g.y0 + (g.y1 - g.y0) * 0.72;
+        const near = placed.some(q => q.type === type && Math.hypot((q.fx - pt.fx) * R.w, (q.fy - pt.fy) * R.h) < sp * 2.3);
+        if (low || near || used[type] >= cap[type]) type = type === 'mult5' ? 'mult2' : 'normal';
+      }
+      if (type in used) used[type]++;
+      const p = makePeg(pt.fx, pt.fy, type); S.pegs.push(p); placed.push(p);
+    }
+    // 서로 닿은 탄약 정리: 반경 합 + 여유보다 가까우면 늦게 놓인 쪽을 뺀다(큰 탄약끼리 붙는 드문 경우)
+    const keep = [];
+    for (const p of S.pegs) { let ok = true; for (const q of keep) { if (Math.hypot((p.fx - q.fx) * R.w, (p.fy - q.fy) * R.h) < p.pr + q.pr + 3) { ok = false; break; } } if (ok) keep.push(p); }
+    S.pegs = keep;
   }
 
-  // ============ 보드(페그·포켓) 생성 ============
+  // ============ 보드(탄약·포켓) 생성 ============
   function buildBoard() {
     S.pegs = [];
-    // 페그 종류·크기·모양도 스테이지·전투별로 고정(시드 난수) → 같은 스테이지는 항상 동일한 판
+    // 탄약 종류·크기·모양도 스테이지·전투별로 고정(시드 난수) → 같은 스테이지는 항상 동일한 판
     const seed = boardSeed();
     const _rand = Math.random; Math.random = makeRng(seed);
-    try { for (const pt of pegLayout()) S.pegs.push(makePeg(pt.fx, pt.fy, pickPegType())); }
+    try { assignPegs(pegLayout()); }
     finally { Math.random = _rand; }
     // 스테이지별 고정 장애물(범퍼/기둥) — 실제 핀볼판처럼
     S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
-    // 장애물과 겹치는 페그 제거(겹침 방지) — px 공간에서 판정
+    // 장애물과 겹치는 탄약 제거(겹침 방지) — px 공간에서 판정
     if (S.obstacles.length) {
-      const rp = layout().pins, mg = (CFG.ballRadius + 3) * BU;
+      const rp = layout().pins, mg = CFG.obstMargin * BU;
       S.pegs = S.pegs.filter(p => {
         const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius) * BU;
         for (const o of S.obstacles) {
@@ -318,19 +337,19 @@
         return true;
       });
     }
-    // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 충전
+    // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 장전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
       const lane = Math.floor(i / 3), sub = i % 3;
       const c = S.chars.find(ch => ch.lane === lane);
-      const golN = c ? Math.min(3, c.ref.gol + ((S.pocketBonus && S.pocketBonus[lane]) || 0)) : 0;   // 보상으로 연 골칸은 다음 전투에도 유지
+      const golN = c ? Math.min(3, c.ref.gol + ((S.pocketBonus && S.pocketBonus[lane]) || 0)) : 0;   // 보상으로 연 탄창은 다음 전투에도 유지
       const type = (c && sub < golN) ? 'charge' : 'blank';
       S.pockets.push({ lane, type });
     }
-    // 버프 칸(보상): 꽝칸 일부를 버프(방벽 회복) 칸으로
+    // 버프 칸(보상): 꽝 칸 일부를 버프(방벽 회복) 칸으로
     let bb = S.buffBonus || 0;
     for (const p of S.pockets) { if (bb <= 0) break; if (p.type === 'blank') { p.type = 'buff'; bb--; } }
-    // 튜토리얼 전투: 루비 혼자라 충전 칸 6칸(모두 루비 색) + 꽝 3칸 — 루비 골칸 1칸으론 너무 느리고, 꽝 칸이 있어야 "색 칸만 충전"이 보인다
+    // 튜토리얼 전투: 루비 혼자라 탄창 6칸(모두 루비 색) + 꽝 3칸 — 루비 탄창 1칸으론 너무 느리고, 꽝 칸이 있어야 "색 칸만 장전"이 보인다
     if (S.tutorial) S.pockets = S.pockets.map((p, i) => ({ lane: 0, type: i < 6 ? 'charge' : 'blank' }));
   }
 
@@ -345,9 +364,9 @@
   function enterLoad() {
     S.phase = 'load';
     S.layoutTarget = 0;                             // 핀볼 화면으로 부드럽게 복귀
-    S.turnAtk = 0;                                  // 공격 페그 버프는 이번 턴 한정
+    S.turnAtk = 0;                                  // 공격 탄약 버프는 이번 턴 한정
     for (const c of S.chars) { c.ammo = 0; c.armed = false; CharAnim.toIdle(c.anim); }   // 정면 대기로 복귀(뒷모습이었다면 돌아선다)
-    for (const p of S.pegs) p.alive = true;   // 특수·일반 페그 턴마다 부활
+    for (const p of S.pegs) p.alive = true;   // 특수·일반 탄약 턴마다 부활
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
     S.balls = []; S.launchedThisTurn = 0; S.turnMaxCombo = 0;
     const heal = rv('steel', 'heal');          // 재생 방벽: 매 턴 회복
@@ -384,7 +403,7 @@
     anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;   // 발사대 포신: 쏜 방향으로 맞추고 반동·섬광(자동 발사도 같은 방향)
     Sound.play('launch');
   }
-  // 튜토리얼 시범 볼: 발사 횟수·턴 기록을 건드리지 않고 발사대에서 한 발(demo 표시) — 맞은 페그·들어간 칸의 효과는 실제와 같다
+  // 튜토리얼 시범 볼: 발사 횟수·턴 기록을 건드리지 않고 발사대에서 한 발(demo 표시) — 맞은 탄약·들어간 칸의 효과는 실제와 같다
   function spawnDemoBall(dir, opt) {
     if (!S || S.phase !== 'load' || S.over) return null;
     const L = launcher(), b = { x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed * BU, vy: dir.dy * CFG.launchSpeed * BU, r: CFG.ballRadius * BU, age: 0, combo: 0, nextBonus: COMBO_STEP, demo: true, demoOnce: !!(opt && opt.once) };
@@ -397,17 +416,17 @@
   // ============ 물리 코어 — 실제 발사볼과 조준 예측선이 '같은 함수'로 움직인다 ============
   // 볼은 고정 간격(PHYS_DT)으로만 움직인다. 예측선(traceShot)도 이 stepBallOnce 를 그대로 쓰므로 점선이 곧 실제 경로다.
   // (예전엔 볼은 프레임 시간으로, 예측선은 따로 만든 단순 시뮬로 굴려서 두 번째 튕김부터 점선과 달라졌다.)
-  // w = { r: 핀볼 판 영역, u: 보드 배율(BU), dry: true 면 예측(소리·연출·점수 없음 — 페그 생존은 w.alive 배열로만 추적), alive: Uint8Array|null, hits: [] }
+  // w = { r: 핀볼 판 영역, u: 보드 배율(BU), dry: true 면 예측(소리·연출·점수 없음 — 탄약 생존은 w.alive 배열로만 추적), alive: Uint8Array|null, hits: [] }
   const PHYS_DT = 1 / 240;
-  const MAX_SPEED_MUL = 2.4;     // 범퍼가 거듭 가속해도 발사 속도의 이 배율을 넘지 않게 — 한 걸음에 페그를 건너뛰는 일을 막는다
+  const MAX_SPEED_MUL = 2.4;     // 범퍼가 거듭 가속해도 발사 속도의 이 배율을 넘지 않게 — 한 걸음에 탄약를 건너뛰는 일을 막는다
   function stepBallOnce(b, h, w) {
     const r = w.r, u = w.u, dry = w.dry;
     b.vy += CFG.gravity * u * h; b.x += b.vx * h; b.y += b.vy * h;
-    if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; }                  // 좌우 벽 반사
-    if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; }
-    if (!b.harvest) {                                                                                         // 수확 볼(변환된 볼)은 페그·장애물과 상호작용 없음 → 연쇄 방지
+    if (b.x < r.x + b.r) { b.x = r.x + b.r; b.vx = Math.abs(b.vx) * CFG.wallRestitution; if (dry && !w.noWalls) w.hits.push({ wall: true, x: b.x, y: b.y }); }                  // 좌우 벽 반사(예측선은 이것도 튕김 1회로 센다)
+    if (b.x > r.x + r.w - b.r) { b.x = r.x + r.w - b.r; b.vx = -Math.abs(b.vx) * CFG.wallRestitution; if (dry && !w.noWalls) w.hits.push({ wall: true, x: b.x, y: b.y }); }
+    if (!b.harvest) {                                                                                         // 수확 볼(변환된 볼)은 탄약·장애물과 상호작용 없음 → 연쇄 방지
       const pegs = S.pegs, alive = w.alive;
-      for (let i = 0; i < pegs.length; i++) {                                                                 // 페그 충돌(결정적: 랜덤 없음)
+      for (let i = 0; i < pegs.length; i++) {                                                                 // 탄약 충돌(결정적: 랜덤 없음)
         const p = pegs[i];
         if (alive ? !alive[i] : !p.alive) continue;
         const px = r.x + p.fx * r.w, py = r.y + p.fy * r.h;
@@ -420,7 +439,7 @@
         b.vy -= (1 + CFG.restitution) * vdot * ny;
         if (dry) dryPegHit(b, i, p, w);
         else { const def = PEG_TYPES[p.type] || PEG_TYPES.normal; anim.flashes.push({ x: px, y: py, t: 1, color: def.color }); Sound.play('peg'); applyPegHit(b, p, def, px, py); }
-        if (b.eaten) return 'eaten';                                                                          // 오염 페그에 흡수됨
+        if (b.eaten) return 'eaten';                                                                          // 오염 탄약에 흡수됨
       }
       if (S.obstacles && S.obstacles.length) {                                                                // 고정 장애물(범퍼/기둥/바)
         const ht = hitObstacles(b, r, dry);
@@ -432,10 +451,10 @@
         }
       }
     }
-    if (b.y > r.y + r.h - b.r) { b.y = r.y + r.h - b.r; b.vy = -Math.abs(b.vy) * CFG.wallRestitution; }       // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
+    if (b.y > r.y + r.h - b.r) { b.y = r.y + r.h - b.r; b.vy = -Math.abs(b.vy) * CFG.wallRestitution; if (dry && !w.noWalls) w.hits.push({ wall: true, x: b.x, y: b.y }); }       // 바닥은 반사 벽(무중력이라 볼은 사라지지 않고 위로 되돌아감)
     const cap = CFG.launchSpeed * u * MAX_SPEED_MUL, sp2 = b.vx * b.vx + b.vy * b.vy;
     if (sp2 > cap * cap) { const k = cap / Math.sqrt(sp2); b.vx *= k; b.vy *= k; }
-    return b.y <= r.y ? 'land' : null;                                                                        // 상단 포켓 도달 → 충전
+    return b.y <= r.y ? 'land' : null;                                                                        // 상단 포켓 도달 → 장전
   }
   // 볼 한 개의 한 걸음 앞 규칙(오래 튕기는 볼 보정) — 실제 볼과 예측선이 똑같이 적용
   function ballTick(b, h, w) {
@@ -443,11 +462,15 @@
     b.px = b.x; b.py = b.y;                                                                                   // 직전 위치(그릴 때 걸음 사이를 이어 붙인다)
     b.age = (b.age || 0) + h;
     if (b.age > 1.2 && Math.abs(b.vx) < 60 * u) b.vx += (b.x < r.x + r.w * 0.5 ? -1 : 1) * 340 * u * h;      // 축(수직) 갇힘 방지: 오래 튕기는데 좌우 속도가 거의 0이면 가까운 벽 쪽으로 살짝 밀어 정면 반사 무한루프를 푼다
-    if (b.age > CFG.ballLifetime) { const over = b.age - CFG.ballLifetime; b.vy -= Math.min(2400, 400 + over * 800) * u * h; }   // 소멸 금지: 오래된 볼은 상단으로 점점 강하게 유도
+    if (b.age > CFG.ballLifetime && !b.harvest) {                                                             // 소멸 금지: 오래 튕긴 볼은 상단으로 점점 강하게 꺾어 보낸다 — 속도는 그대로 두고 '방향'을 위쪽(-90°)으로 돌린다(속도 상한 때문에 가속은 먹히지 않는다)
+      const over = b.age - CFG.ballLifetime, turn = Math.min(6, 0.7 + over * 1.1) * h, sp = Math.hypot(b.vx, b.vy) || 1, ang = Math.atan2(b.vy, b.vx);
+      const da = Math.max(-turn, Math.min(turn, Math.atan2(Math.sin(-Math.PI / 2 - ang), Math.cos(-Math.PI / 2 - ang))));
+      b.vx = Math.cos(ang + da) * sp; b.vy = Math.sin(ang + da) * sp;
+    }
     return stepBallOnce(b, h, w);
   }
 
-  // 예측용 페그 결과 — ⚠ applyPegHit/explodeBomb 와 '볼의 움직임과 페그 생존'이 같아야 한다(연출·점수만 뺀 거울)
+  // 예측용 탄약 결과 — ⚠ applyPegHit/explodeBomb 와 '볼의 움직임과 탄약 생존'이 같아야 한다(연출·점수만 뺀 거울)
   function dryPegHit(b, i, p, w) {
     const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
     w.hits.push({ i, x: b.x, y: b.y });
@@ -468,15 +491,16 @@
     }
   }
 
-  // 조준 예측: 지금 판 그대로 발사볼 하나를 미리 굴려 본다(실제와 같은 stepBallOnce). maxHits 번 튕긴 뒤 tail 길이만큼 더 보여 주고 끝낸다.
-  // 반환 { pts:[{x,y,s}] (꺾이는 점 · s=누적 길이), hits:[{i,x,y}|{obst,x,y}], end:{x,y,land,eaten}, alive, steps }
+  // 조준 예측: 지금 판 그대로 발사볼 하나를 미리 굴려 본다(실제와 같은 stepBallOnce). 튕김(탄약·장애물·벽·바닥 — 방향이 바뀌는 모든 충돌)을 maxHits(기본 3)번 세고 딱 그 자리에서 끝낸다.
+  // opt: maxHits · tail(마지막 튕김 뒤 더 보여 줄 길이 px, 기본 0) · walls(false 면 벽·바닥 튕김은 세지 않음 — 튜토리얼이 '첫 탄약'을 고를 때) · maxSteps
+  // 반환 { pts:[{x,y,s}] (꺾이는 점 · s=누적 길이), hits:[{i,x,y}|{obst,x,y}|{wall,x,y}], end:{x,y,land,eaten}, alive, steps }
   function traceShot(dir, opt) {
     opt = opt || {};
-    const r = layout().pins, u = BU, maxHits = opt.maxHits == null ? 3 : opt.maxHits, tailLen = opt.tail == null ? r.w * 0.3 : opt.tail;
+    const r = layout().pins, u = BU, maxHits = opt.maxHits == null ? 3 : opt.maxHits, tailLen = opt.tail == null ? 0 : opt.tail;
     const L = launcher(), n = S.pegs.length, alive = new Uint8Array(n);
     for (let i = 0; i < n; i++) alive[i] = S.pegs[i].alive ? 1 : 0;
     const b = { x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed * u, vy: dir.dy * CFG.launchSpeed * u, r: CFG.ballRadius * u, age: 0 };
-    const w = { r, u, dry: true, alive, hits: [] };
+    const w = { r, u, dry: true, alive, hits: [], noWalls: opt.walls === false };
     const pts = [{ x: b.x, y: b.y, s: 0 }], maxSteps = opt.maxSteps || 3600;
     let s = 0, lx = b.x, ly = b.y, ls = 0, end = null, stop = -1, steps = 0;
     for (; steps < maxSteps; steps++) {
@@ -531,7 +555,7 @@
       if (S._autoT > 0.45) { S._autoT = 0; launchBall(); }
     } else S._autoT = 0;
     const r = layout().pins;
-    if (S.jack && !S.jackHold) {                 // 잭팟 포켓: 골칸 위를 좌우 왕복(튜토리얼 시범 중엔 멈춰 둘 수 있다)
+    if (S.jack && !S.jackHold) {                 // 잭팟 포켓: 탄창 위를 좌우 왕복(튜토리얼 시범 중엔 멈춰 둘 수 있다)
       const lo = 0.5 / 9, hi = 1 - 0.5 / 9;
       S.jack.x += S.jack.v * dt;
       if (S.jack.x > hi) { S.jack.x = hi; S.jack.v = -Math.abs(S.jack.v); }
@@ -546,8 +570,8 @@
         S._acc -= PHYS_DT;
         for (let i = S.balls.length - 1; i >= 0; i--) {
           const b = S.balls[i], res = ballTick(b, PHYS_DT, w);
-          if (res === 'eaten') S.balls.splice(i, 1);                       // 오염 페그에 흡수됨
-          else if (res === 'land') { landBall(b); S.balls.splice(i, 1); }  // 상단 포켓 도달 → 충전
+          if (res === 'eaten') S.balls.splice(i, 1);                       // 오염 탄약에 흡수됨
+          else if (res === 'land') { landBall(b); S.balls.splice(i, 1); }  // 상단 포켓 도달 → 장전
         }
       }
     }
@@ -555,7 +579,7 @@
     if (S.phase === 'load' && S.launchesLeft <= 0 && S.balls.length === 0) enterBattle();
   }
 
-  // 페그가 변환되어 생기는 "수확 볼": 상단으로 상승해 충전만 함(다른 페그와 상호작용 X → 연쇄 없음). 배수 페그는 n개.
+  // 탄약가 변환되어 생기는 "수확 볼": 상단으로 상승해 장전만 함(다른 탄약와 상호작용 X → 연쇄 없음). 배수 탄약는 n개.
   // opt.toCell 이 있으면(튜토리얼 시범) 퍼짐 대신 그 칸 한가운데로 곧게 올라간다.
   function spawnBalls(x, y, n, color, charge, opt) {
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
@@ -571,10 +595,10 @@
     }
   }
 
-  // 페그 충돌 처리(반사는 호출 전에 이미 적용됨). 페그는 볼로 변환되며 사라짐(볼이 지나갈 길이 뚫려 끼지 않음), 턴마다 부활.
+  // 탄약 충돌 처리(반사는 호출 전에 이미 적용됨). 탄약는 볼로 변환되며 사라짐(볼이 지나갈 길이 뚫려 끼지 않음), 턴마다 부활.
   function applyPegHit(b, p, def, px, py) {
-    if (b.harvest) return;                 // 수확 볼은 페그를 변환하지 않음(연쇄 방지)
-    if (def.sludge) {                      // 오염: 발사볼을 삼킴(충전 없음) — 슬러지 간섭
+    if (b.harvest) return;                 // 수확 볼은 탄약를 변환하지 않음(연쇄 방지)
+    if (def.sludge) {                      // 오염: 발사볼을 삼킴(장전 없음) — 슬러지 간섭
       p.alive = false; b.eaten = true;
       anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1, ld: true }); Sound.play('wall');
       return;
@@ -586,14 +610,14 @@
       return;
     }
     if (def.scrap) return;                 // 파편: 반사만(변환·소멸 없음)
-    addCombo(b, 1, px, py);                // 콤보 = 터뜨린(소모되는) 페그 수
-    if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 페그 연쇄 폭발
+    addCombo(b, 1, px, py);                // 콤보 = 터뜨린(소모되는) 탄약 수
+    if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 탄약 연쇄 폭발
     convertPeg(p, def, px, py, b);
-    if (b.demoOnce) b.eaten = true;        // 튜토리얼 시범 볼: 첫 페그를 맞히면 사라진다(그 뒤 튕겨 다니며 판을 어지럽히지 않게)
+    if (b.demoOnce) b.eaten = true;        // 튜토리얼 시범 볼: 첫 탄약를 맞히면 사라진다(그 뒤 튕겨 다니며 판을 어지럽히지 않게)
   }
-  // 튜토리얼 시범 볼이 만든 충전 볼은 지정한 칸(S.demoCell)으로 곧게 올라가게 한다(없으면 일반 볼과 똑같이)
+  // 튜토리얼 시범 볼이 만든 장전 볼은 지정한 칸(S.demoCell)으로 곧게 올라가게 한다(없으면 일반 볼과 똑같이)
   const demoOpt = (src) => (src && src.demo) ? { demo: true, toCell: S.demoCell == null ? null : S.demoCell } : null;
-  // 페그 → 충전볼 변환(일반1 · ×2→2 · ×5→5 · 골드 · 증폭). 모듈(자원 회수기·과충전) 반영. 페그는 턴마다 부활.
+  // 탄약 → 장전볼 변환(일반1 · ×2→2 · ×5→5 · 골드 · 증폭). 모듈(자원 회수기·과장전) 반영. 탄약는 턴마다 부활.
   function convertPeg(p, def, px, py, src) {
     let n = 1 + (def.split || 0), charge = def.charge || 1;
     if (def.gold) {
@@ -603,12 +627,12 @@
     }
     if (def.charge > 1) {
       charge = rv('overcharge', 'charge') || def.charge;
-      anim.floats.push({ x: px, y: py, text: '충전 ×' + charge, color: def.color, t: 1, ld: true });
+      anim.floats.push({ x: px, y: py, text: '장전 ×' + charge, color: def.color, t: 1, ld: true });
     }
     spawnBalls(px, py, n, def.color, charge, demoOpt(src));
     p.alive = false;
   }
-  // 폭탄 페그: 반경 안 페그를 전부 터뜨림(폭탄끼리 연쇄, 깊이 3 제한). 터진 수만큼 콤보 누적.
+  // 폭탄 탄약: 반경 안 탄약를 전부 터뜨림(폭탄끼리 연쇄, 깊이 3 제한). 터진 수만큼 콤보 누적.
   function explodeBomb(b, bp, px, py, depth) {
     const r = layout().pins, R = (PEG_TYPES.bomb.bomb || 0.16) * r.w;
     bp.alive = false;
@@ -624,7 +648,7 @@
     }
     if (popped) { addCombo(b, popped, px, py); anim.floats.push({ x: px, y: py - 14, text: '💥 ' + popped + '연쇄!', color: '#ff8a3a', t: 1.1, big: true, ld: true }); }
   }
-  // 콤보: 발사볼 1개가 연속으로 맞힌 페그·장애물 수. COMBO_STEP마다 보너스 충전볼(핀볼 세트: 첫 볼 ×2). 연쇄 반응 모듈.
+  // 콤보: 발사볼 1개가 연속으로 맞힌 탄약·장애물 수. COMBO_STEP마다 보너스 장전볼(핀볼 세트: 첫 볼 ×2). 연쇄 반응 모듈.
   function addCombo(b, k, x, y) {
     if (!b || b.harvest) return;
     b.combo = (b.combo || 0) + k;
@@ -637,7 +661,7 @@
       anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ld: true });
       Sound.play('charge');
     }
-    const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 페그 생성
+    const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 탄약 생성
     if (every && (S.chainAdded || 0) < 6 && Math.floor(b.combo / every) > Math.floor((b.combo - k) / every)) {
       const added = addPegToBoard(S, 'charge', 1);
       if (added.length) { S.chainAdded = (S.chainAdded || 0) + 1; added[0].alive = true; anim.floats.push({ x: x, y: y - 30, text: '⛓ 증폭 생성', color: '#7ef29a', t: 1, ld: true }); }
@@ -651,7 +675,8 @@
     const pk = S.pockets[idx];
     const fx = (b.x - g.x) / g.w, jack = S.jack && Math.abs(fx - S.jack.x) < 0.5 / 9;   // 잭팟 포켓 위 착지
     const px = g.x + (idx + 0.5) * (g.w / 9);
-    if (jack) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ld: true }); }
+    const live = !!pk && (pk.type === 'charge' || pk.type === 'buff');                 // 꽝 칸은 잭팟 연출(고리·JACKPOT 글자)을 내지 않는다 — 꽝인데 잭팟이라고 뜨면 어색하다(꽝 칸의 크레딧 +10 만 작게 뜬다)
+    if (jack && live) { anim.fx.push({ type: 'ring', x: px, y: g.y + g.h * 0.6, t: 1, r: g.w / 9, color: '#ffd93b' }); anim.floats.push({ x: px, y: g.y - 6, text: 'JACKPOT ×' + JACKPOT_MUL, color: '#ffd93b', t: 1.2, big: true, ld: true }); }
     if (pk && pk.type === 'charge') {
       const c = S.chars.find(ch => ch.lane === pk.lane);
       let amt = (b.charge || 1) + (S.setsOn.harvest ? 1 : 0);                            // 보급 세트: +1
@@ -868,6 +893,7 @@
   function killEnemy(e, shot, dmg) {
     const idx = S.enemies.indexOf(e); if (idx < 0) return; S.enemies.splice(idx, 1);
     S.runKills = (S.runKills || 0) + 1;
+    if (typeof Codex !== 'undefined' && Codex.kill(e) && !S.tutorial) S.codexNew.push(e.name.replace(/^정예 /, ''));   // 도감 기록(처음 만난 종류면 결과 화면에 알린다)
     Sound.play('kill');
     { const kp = enemyPos(e); anim.fx.push({ type: 'boom', x: kp.x, y: kp.y, t: 1, color: e.color || '#ffcf5c', sm: !e.isBoss && !e.elite }); if (e.isBoss || e.elite) anim.shake = Math.max(anim.shake, 12); }   // 처치 폭발
     gainExp(e.exp);
@@ -990,12 +1016,17 @@
     if (!S.bossDef || S.enemies.length >= 22) return;
     const cell = spawnCell(Math.floor(Math.random() * CFG.fieldLanes), CFG.fieldRows - 2);   // 맨 위 두 행의 빈 칸에만 등장
     if (!cell) return;
-    const def = ENEMIES[S.bossDef.addType || 'sentry'], lane = cell.lane, hp = Math.round(def.hp * S.scale.hp);
+    const def = ENEMIES[S.bossDef.addType || 'sentry'], lane = cell.lane, hp = enemyHp(def);
     const boss = S.enemies.find(x => x.isBoss); if (boss && !(boss.pose && performance.now() / 1000 < boss.pose.t0 + boss.pose.total)) EnemyAnim.pose(boss, 'launch');   // 해치를 열고 투하
-    S.enemies.push({ type: S.bossDef.addType || 'sentry', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0, from: bossFrom() });
+    S.enemies.push({ type: S.bossDef.addType || 'sentry', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: enemyDmg(def), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0, from: bossFrom() });
   }
   // 보스가 내보낸 적(분리체·경비봇)이 보스 위치에서 나와 제 칸으로 걸어가도록 하는 출발점(필드 기준 0~1 좌표)
   function bossFrom() { const b = S.enemies.find(x => x.isBoss); if (!b) return undefined; return (b.vx !== undefined) ? { x: b.vx, y: b.vy } : enemyCellN(b); }
+
+  // 적 체력·공격 = 종류 기본값 × 스테이지 배수 × 이 전투의 층 배수(nodeCombat 의 hpMul·dmgMul — 보스 전투엔 없음)
+  function bossMul() { const f = CFG.bossFloor; return { hpMul: floorHpMul(f), dmgMul: floorDmgMul(f) }; }   // 보스는 'bossFloor 층의 적'처럼 — 보스 체력이 너무 부풀어 한 판의 1/3 을 먹지 않게 맨 위 층(5)보다 낮춘 층 배수를 쓴다
+  function enemyHp(def) { return Math.round(def.hp * S.scale.hp * ((S.combat && S.combat.hpMul) || 1)); }
+  function enemyDmg(def) { return Math.round(def.dmg * S.scale.dmg * ((S.combat && S.combat.dmgMul) || 1)); }
 
   function spawnWave() {
     const w = S.waves.shift(); if (!w) return;
@@ -1003,8 +1034,8 @@
     for (let k = 0; k < w.length; k++) {
       const cell = spawnCell(k % CFG.fieldLanes); if (!cell) break;   // 빈 칸에만 등장(앞 웨이브와 겹치지 않음)
       const type = ENEMIES[w[k]] ? w[k] : pickEnemyType(S.stage), def = ENEMIES[type];   // 종류는 스테이지 풀에서 (웨이브 길이=마릿수) — 원소가 적 종류 id 면 그 종류(튜토리얼 전투)
-      const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type, name: def.name, lane: cell.lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
+      const hp = enemyHp(def);
+      S.enemies.push({ type, name: def.name, lane: cell.lane, row: cell.row, hp, maxHp: hp, dmg: enemyDmg(def), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: def.armor || 0 });
       placed++;
     }
     if (placed < w.length) S.waves.unshift(new Array(w.length - placed).fill('x'));   // 자리가 모자라면 남은 수는 다음 턴에 마저 등장
@@ -1012,8 +1043,8 @@
 
   function spawnBoss() {
     const b = BOSSES[stageBoss(S.stage)]; S.bossDef = b;
-    const hp = Math.round(b.hp * S.scale.hp);
-    S.enemies.push({ isBoss: true, kind: b.kind, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: Math.round(b.dmg * S.scale.dmg), exp: Math.round(b.exp * S.scale.exp), color: b.color, stun: 0, thHit: 0, speed: 1, armor: 0 });
+    const hp = enemyHp(b);
+    S.enemies.push({ isBoss: true, kind: b.kind, name: b.name, lane: Math.floor(CFG.fieldLanes / 2), row: CFG.fieldRows - 1, hp, maxHp: hp, dmg: enemyDmg(b), exp: Math.round(b.exp * S.scale.exp), color: b.color, stun: 0, thHit: 0, speed: 1, armor: 0 });
     const bi = BOSS_INTENT[b.kind]; S.bossIntent = bi ? { left: bi.every } : null;   // 보스 예고 카운트다운
   }
 
@@ -1041,8 +1072,8 @@
       const want = Math.max(0, Math.min(CFG.fieldLanes - 1, e.lane + (i - Math.floor(n / 2))));
       const cell = nearestFree(want, e.row, (l, r) => cellFree(l, r)); if (!cell) break;   // 분리체도 빈 칸에 (겹침 없음)
       const lane = cell.lane;
-      const hp = Math.round(def.hp * S.scale.hp);
-      S.enemies.push({ type: 'sludge', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: Math.round(def.dmg * S.scale.dmg), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0, from: (e.vx !== undefined) ? { x: e.vx, y: e.vy } : enemyCellN(e) });
+      const hp = enemyHp(def);
+      S.enemies.push({ type: 'sludge', name: def.name, lane, row: cell.row, hp, maxHp: hp, dmg: enemyDmg(def), exp: Math.round(def.exp * S.scale.exp), color: def.color, stun: 0, speed: def.speed || 1, armor: 0, from: (e.vx !== undefined) ? { x: e.vx, y: e.vy } : enemyCellN(e) });
     }
   }
 
@@ -1115,6 +1146,7 @@
     const d = RELICS[id]; if (!d) return;
     const before = rl(id); if (before >= 2) return;
     const lv = before + 1; S.relics[id] = lv;
+    if (typeof Codex !== 'undefined' && Codex.relic(id, lv)) S.codexNew.push(d.name);   // 도감 기록(처음 얻은 모듈이면 결과 화면에 알린다)
     if (id === 'steel') {                       // 최대 HP 증가분(레벨 간 차이만큼)
       const pct = (lv >= 2 ? d.lv2.pct : d.lv1.pct) - (before ? d.lv1.pct : 0), add = Math.round(S.wallBase * pct);
       S.wallHpMax += add; S.wallHp += add;
@@ -1183,7 +1215,8 @@
     $('map').hidden = true; $('run-modal').hidden = true; $('reward').hidden = true;
     const e = o.e || {}, fmt = (n) => Math.round(n).toLocaleString();
     const ic = (name, emoji) => uiIcon(name, emoji, 'width:100%;height:100%');
-    $('result-box').className = 'modal-box result-box ' + (o.win ? 'win' : o.endless ? 'endless' : 'lose');
+    $('result-box').className = 'modal-box result-box ' + (o.win ? 'win' : (o.endless || o.abandon) ? 'endless' : 'lose');
+    $('result-box').dataset.kind = o.abandon ? 'abandon' : o.win ? 'win' : o.endless ? 'endless' : 'lose';   // 튜토리얼 팁이 결과 종류에 맞는 문구를 고르는 데 쓴다
     $('result-title').textContent = o.title; $('result-body').textContent = o.sub;
     const stats = [
       [ic('ic_battle', '💥'), '처치', fmt(S.runKills || 0)], [ic('node_battle', '⚔'), '돌파한 전투', fmt(S.floorsCleared || 0)],
@@ -1198,10 +1231,32 @@
     (e.relicsUnlocked || []).forEach(id => notes.push(ui('relic_' + id, RELICS[id].icon) + ' 모듈 해금 · ' + RELICS[id].name));
     if (e.record) notes.push(ui('ic_star', '⭐') + ' 신기록!');
     if (e.dailyReward) notes.push(uiCur('gems') + ' 일일 보상 +' + e.dailyReward);
+    if (S.codexNew && S.codexNew.length) notes.push(ui('ic_codex', '📖') + ' 도감 등록 · ' + S.codexNew.join(' · '));
     $('result-notes').innerHTML = notes.map((t, i) => '<div class="rs-note" style="animation-delay:' + (0.8 + i * 0.07).toFixed(2) + 's">' + t + '</div>').join('');
     $('result').hidden = false;
-    Sound.play(o.win ? 'win' : 'lose');
+    Sound.play(o.win ? 'win' : o.abandon ? 'click' : 'lose');
   }
+
+  // ============ 나가기(뒤로가기) — 전투 화면·분기 지도의 ‹ 버튼 ============
+  // 런을 도중에 끝내고 로비로 돌아간다. 정산은 패배와 같다(모은 보상은 받음) — 그래서 확인 창에서 '지금 받는 보상'을 미리 보여 준다.
+  function abandonRun() {
+    if (!S || S.over || S.tutorial) return;
+    S.over = true; aimActive = false;
+    const e = Meta.onRunEnd(runInfo(false));
+    const where = S.mode === 'endless' ? '무한 ' + (S.loop + 1) + '막 ' + (S.combatIndex + 1) + '층' : runLabel();
+    showResult({ win: false, abandon: true, title: '런 종료', sub: where + '에서 나왔어요', e });
+  }
+  function openExit() {
+    if (!S || S.over || S.tutorial || !$('exit-modal').hidden) return;
+    const earn = Meta.runEarn(runInfo(false)), fmt = (n) => Math.round(n).toLocaleString();
+    const chips = [['gold', earn.gold], ['mats', earn.mats], ['docs', earn.docs]].filter(x => x[1] > 0).map(x => '<span class="rs-chip">' + uiCur(x[0]) + ' +' + fmt(x[1]) + '</span>').join('');
+    $('exit-box').innerHTML = '<h2>로비로 돌아갈까요?</h2>'
+      + '<p class="ex-body">지금 나가면 이번 런이 <b>여기서 끝나요</b>. 모은 보상은 패배했을 때처럼 받아요.</p>'
+      + (chips ? '<div class="ex-earn"><span class="ex-lb">지금 받는 보상</span>' + chips + '</div>' : '<p class="muted">지금 나가면 받을 보상이 없어요.</p>')
+      + '<div class="ex-row"><button class="btn primary" data-exit-no="1">계속하기</button><button class="btn" data-exit-yes="1">나가기</button></div>';
+    $('exit-modal').hidden = false; window.__exitPause = true; Sound.play('click');
+  }
+  function closeExit() { $('exit-modal').hidden = true; window.__exitPause = false; }
 
   // ============ 분기 맵(A안) ============
   // 층0=전투 → 층1~4 갈림길(전투/정예/상점/정비) → 층5=보스. 일반 모드는 판마다 맵이 다름, 일일 도전은 시드 고정.
@@ -1262,7 +1317,7 @@
         + '<span class="mn-ic">' + uiIcon('node_' + n.type, T.icon) + '</span><span class="mn-nm">' + T.name + '</span></button>';
     }));
     $('map-body').innerHTML = svg + nodes;
-    $('map-head').innerHTML = '<b>' + (S.mode === 'endless' ? ui('ic_promote', '♾') + ' 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? ui('ic_timer', '📅') + ' 일일 도전' : '스테이지 ' + S.stage) + '</b>'
+    $('map-head').innerHTML = '<button class="exit-btn map-exit" data-exit="1" aria-label="로비로 나가기">‹</button><b>' + (S.mode === 'endless' ? ui('ic_promote', '♾') + ' 무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? ui('ic_timer', '📅') + ' 일일 도전' : '스테이지 ' + S.stage) + '</b>'
       + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>' + helpBtn('map-help');
     renderRelicBar();
     $('map').hidden = false;
@@ -1271,7 +1326,7 @@
     const n = S.map.floors[f][i]; n.visited = true; S.mapPos = { f, i }; S.combatIndex = f; S.nodeIdx = i;
     Sound.play('click');
     if (n.type === 'battle' || n.type === 'elite') { $('map').hidden = true; startCombat(nodeCombat(n.type, f), f, i); }
-    else if (n.type === 'boss') { $('map').hidden = true; startCombat({ name: '보스 · ' + BOSSES[stageBoss(S.stage)].name, boss: true }, f, i); }
+    else if (n.type === 'boss') { $('map').hidden = true; startCombat(Object.assign({ name: '보스 · ' + BOSSES[stageBoss(S.stage)].name, boss: true }, bossMul()), f, i); }
     else if (n.type === 'shop') { showMap(); openShop(); }
     else if (n.type === 'rest') { showMap(); openRest(); }
   }
@@ -1323,7 +1378,7 @@
 
   // ============ 판 변화: 스킬 흔적 + 적 간섭 (매 장전 시작) ============
   function applyBoardEffects() {
-    S.pegs = S.pegs.filter(p => !p.temp);                                          // 지난 턴 임시 페그 제거
+    S.pegs = S.pegs.filter(p => !p.temp);                                          // 지난 턴 임시 탄약 제거
     for (const p of S.pegs) if (p.stolen) { p.type = p.stolen; p.shape = (PEG_TYPES[p.type] || {}).shape || 'circle'; delete p.stolen; }   // 도난 복구
     for (const pk of S.pockets) if (pk.tempBuff) { pk.type = 'blank'; delete pk.tempBuff; }
     const notes = [];
@@ -1393,10 +1448,10 @@
   function pocketRect(i) { const g = layout().goal, pw = g.w / 9, lblH = Math.min(g.h * 0.4, 20); return { x: g.x + i * pw, y: g.y + lblH, w: pw, h: g.h - lblH }; }                       // 포켓 칸 i(0~8)
   function jackRect() { if (!S.jack) return null; const g = layout().goal, pw = g.w / 9, lblH = Math.min(g.h * 0.4, 20), jw = pw * 0.96; return { x: g.x + S.jack.x * g.w - jw / 2, y: g.y + lblH, w: jw, h: g.h - lblH }; }   // 잭팟 틀
   function ammoPillRect(c) { const wr = layout().wall, cw = wr.w / CFG.lanes, crad = Math.max(11, Math.min(cw * 0.26, wr.h * 0.22)); return { x: wr.x + c.lane * cw + 3, y: wr.y + 3, w: Math.max(20, crad * 1.5), h: Math.max(15, crad * 0.95) }; }   // 장전 탄수 알약(캐릭터 좌상단)
-  function pegPos(i) { const r = layout().pins, p = S.pegs[i]; return { x: r.x + p.fx * r.w, y: r.y + p.fy * r.h, r: (p.pr || CFG.pegRadius) * BU }; }                                  // 페그 i 의 중심·반경
+  function pegPos(i) { const r = layout().pins, p = S.pegs[i]; return { x: r.x + p.fx * r.w, y: r.y + p.fy * r.h, r: (p.pr || CFG.pegRadius) * BU }; }                                  // 탄약 i 의 중심·반경
   function dangerRowRect() { const f = layout().field, ch = f.h / CFG.fieldRows; return { x: f.x, y: f.y + f.h - ch, w: f.w, h: ch }; }                                                   // 적 필드 맨 아래 행(빨간 점선 아래)
 
-  // ── 페그 모양 그리기 ──
+  // ── 탄약 모양 그리기 ──
   function polyPath(cx, cy, rad, n, rot) {
     ctx.beginPath();
     for (let i = 0; i < n; i++) { const a = rot + i * 2 * Math.PI / n, x = cx + Math.cos(a) * rad, y = cy + Math.sin(a) * rad; i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }
@@ -1410,7 +1465,7 @@
   function drawPeg(px, py, R, shape, color, alive, imgName) {
     const pspr = (imgName && typeof PegArt !== 'undefined') ? PegArt.ready(imgName) : null;
     if (pspr) { const s = R * 2.4; ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(pspr, px - s / 2, py - s / 2, s, s); return; }
-    const col = color;   // 죽은 페그는 caller가 낮은 알파(유령)로 그림
+    const col = color;   // 죽은 탄약는 caller가 낮은 알파(유령)로 그림
     ctx.fillStyle = col;
     switch (shape) {
       case 'diamond': polyPath(px, py, R * 1.18, 4, -Math.PI / 2); ctx.fill(); break;
@@ -1433,7 +1488,7 @@
     }
   }
 
-  // 조준 점선: 꺾이는 점을 잇고(뒤로 갈수록 흐려짐), 부딪힐 페그에 고리를 두르고, 첫 접촉 자리에 '볼 크기 그림자'를 놓는다 — 선이 아니라 볼(굵기)이 페그에 닿는다는 걸 보여 준다.
+  // 조준 점선: 꺾이는 점을 잇고(뒤로 갈수록 흐려짐), 부딪힐 탄약에 고리를 두르고, 첫 접촉 자리에 '볼 크기 그림자'를 놓는다 — 선이 아니라 볼(굵기)이 탄약에 닿는다는 걸 보여 준다.
   let aimLandIdx = -1;     // 예측 경로가 상단까지 닿을 때 들어갈 칸(0~8) — 포켓 줄에서 테두리로 표시. 아니면 -1
   function drawAimGuide(tr, pins) {
     const U = BU, pts = tr.pts, total = Math.max(1, pts[pts.length - 1].s), pulse = 0.65 + 0.35 * Math.sin(performance.now() / 160);
@@ -1451,7 +1506,8 @@
     ctx.setLineDash([]); ctx.lineDashOffset = 0;
     let first = true;
     for (const h of tr.hits) {
-      if (h.i != null) {                                                  // 부딪힐 페그 = 고리
+      if (h.wall) { ctx.globalAlpha = 0.75; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(h.x, h.y, 3.4 * U, 0, 7); ctx.fill(); continue; }   // 벽·바닥 튕김 = 작은 점(튕김 3번까지만 그린다)
+      if (h.i != null) {                                                  // 부딪힐 탄약 = 고리
         const p = S.pegs[h.i], px = pins.x + p.fx * pins.w, py = pins.y + p.fy * pins.h, pr = (p.pr || CFG.pegRadius) * U;
         ctx.globalAlpha = first ? 0.55 + 0.4 * pulse : 0.55; ctx.strokeStyle = '#fff'; ctx.lineWidth = Math.max(2, 2.2 * U);
         ctx.beginPath(); ctx.arc(px, py, pr + 3.5 * U, 0, 7); ctx.stroke();
@@ -1463,6 +1519,26 @@
       first = false;
     }
     const end = tr.end; ctx.globalAlpha = 0.6; ctx.fillStyle = '#fff'; ctx.beginPath(); ctx.arc(end.x, end.y, 4 * U, 0, 7); ctx.fill();
+    ctx.restore();
+  }
+
+  // 꽝 칸 표시: 탄창(레인 색 칸)은 색이 있고 반짝이는 반면, 꽝 칸은 색이 없는 붉은 사선 줄무늬 + 굵은 ✕ 로 '여긴 아님'을 강조한다.
+  // art=true 면 칸 그림 위에 같은 표시를 덮는다(그림의 둥근 모서리 밖으로 번지지 않게 안쪽으로 조금 줄여서).
+  function drawBlankMark(x, y, w, h, art) {
+    const ix = art ? w * 0.1 : 0, iy = art ? h * 0.06 : 0, X = x + ix, Y = y + iy, Wd = w - ix * 2, Ht = h - iy * 2;
+    ctx.save();
+    ctx.beginPath(); ctx.rect(X, Y, Wd, Ht); ctx.clip();
+    ctx.fillStyle = art ? 'rgba(70,6,22,0.55)' : '#2a0b14'; ctx.fillRect(X, Y, Wd, Ht);                         // 바탕: 어두운 적갈색(그림 위에서는 반투명 막)
+    ctx.strokeStyle = 'rgba(255,84,104,' + (art ? '0.34' : '0.30') + ')'; ctx.lineWidth = Math.max(2, Wd * 0.13); ctx.lineCap = 'butt';
+    const st = Math.max(7, Wd * 0.44);
+    for (let d = -Ht; d < Wd + Ht; d += st) { ctx.beginPath(); ctx.moveTo(X + d, Y + Ht); ctx.lineTo(X + d + Ht, Y); ctx.stroke(); }   // 사선 줄무늬
+    ctx.restore();
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,92,112,0.78)'; ctx.lineWidth = 1.5; ctx.strokeRect(X + 0.5, Y + 0.5, Wd - 1, Ht - 1);   // 붉은 테두리
+    const cx = X + Wd / 2, cy = Y + Ht / 2, s = Math.min(Wd, Ht) * 0.27;
+    ctx.lineCap = 'round'; ctx.shadowColor = 'rgba(255,50,84,0.95)'; ctx.shadowBlur = 7;                              // ✕: 연한 분홍 흰색 + 붉은 글로우
+    ctx.strokeStyle = '#ffe3e8'; ctx.lineWidth = Math.max(3, Wd * 0.15);
+    ctx.beginPath(); ctx.moveTo(cx - s, cy - s); ctx.lineTo(cx + s, cy + s); ctx.moveTo(cx + s, cy - s); ctx.lineTo(cx - s, cy + s); ctx.stroke();
     ctx.restore();
   }
 
@@ -1603,7 +1679,7 @@
     const cFont = Math.max(11, Math.round(crad * 0.62)), showChar = wr.h > 55;
     for (const c of S.chars) {
       const sp = charSpot(c), x = sp.x, feetY = sp.feetY;   // 발치를 방벽 HP바 위로(겹침 방지)
-      // 레인색 발판(캐릭터↔같은색 골칸 매칭 인지용)
+      // 레인색 발판(캐릭터↔같은색 탄창 매칭 인지용)
       ctx.save(); ctx.globalAlpha = 0.5; ctx.fillStyle = laneHex(c.lane);
       ctx.beginPath(); ctx.ellipse(x, feetY, cw * 0.34, Math.max(4, wr.h * 0.06), 0, 0, 7); ctx.fill(); ctx.restore();
       if (!CharAnim.draw(ctx, c.anim, x, feetY, sp.size)) {   // 폴백: 원형(시트·썸네일 모두 없을 때)
@@ -1628,7 +1704,7 @@
     const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
     if (pinAlpha > 0.01) {
     ctx.save(); ctx.globalAlpha = pinAlpha;
-    // 핀볼 필드(페그판)
+    // 핀볼 필드(핀볼 판)
     if (bgBoard) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(bgBoard, r.pins.x, r.pins.y, r.pins.w, r.pins.h); ctx.restore(); }
     else { ctx.fillStyle = '#00000022'; ctx.fillRect(r.pins.x, r.pins.y, r.pins.w, r.pins.h); }
     for (const p of S.pegs) {
@@ -1636,7 +1712,7 @@
       const def = PEG_TYPES[p.type] || PEG_TYPES.normal;
       const PR = (p.pr || CFG.pegRadius) * BU, R = PR * (p.alive ? 1 : 0.85);
       ctx.save();
-      if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 페그: 흐린 유령(다음 턴 부활)
+      if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 탄약: 흐린 유령(다음 턴 부활)
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive, 'peg_' + p.type);
       ctx.restore();
       const pegImg = (typeof PegArt !== 'undefined') && PegArt.ready('peg_' + p.type);
@@ -1666,7 +1742,7 @@
         }
       }
     }
-    // 볼(발사볼=흰색, 페그에서 변환된 볼=페그 색)
+    // 볼(발사볼=흰색, 탄약에서 변환된 볼=탄약 색)
     const palpha = S._acc ? Math.min(1, S._acc / PHYS_DT) : 0;      // 고정 걸음 사이의 남은 시간 비율 — 직전·현재 위치를 이어 그려 슬로모션에서도 매끄럽게
     for (const b of S.balls) {
       const bx = b.px == null ? b.x : b.px + (b.x - b.px) * palpha, by = b.py == null ? b.y : b.py + (b.y - b.py) * palpha;
@@ -1675,7 +1751,7 @@
       if (!b.harvest && b.combo >= 3) {                  // 콤보 카운터(발사볼 위)
         const big = b.combo >= 10;
         const k = COMBO_TEXT_SCALE, ty = by - b.r - 10 * k;
-        ctx.save(); ctx.font = 'bold ' + Math.max(10, Math.round((big ? 17 : 13) * k)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // 70%, 단 페그 위에서 읽히도록 최소 10px
+        ctx.save(); ctx.font = 'bold ' + Math.max(10, Math.round((big ? 17 : 13) * k)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';   // 70%, 단 탄약 위에서 읽히도록 최소 10px
         ctx.lineWidth = 3.5 * k; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.9)'; ctx.strokeText(b.combo + ' HIT', bx, ty);
         ctx.fillStyle = big ? '#ffd93b' : '#fff'; ctx.fillText(b.combo + ' HIT', bx, ty); ctx.restore();
       }
@@ -1693,12 +1769,12 @@
       if (lart) drawLauncherArt(L, r.pins.w, lart);                      // 받침 + 포신(예측선 위 — 포신이 선의 시작을 덮는다)
     }
 
-    // 골 포켓 — 상단은 레인별 캐릭터 이름 라벨, 하단은 포켓 셀
+    // 탄창 — 상단은 레인별 캐릭터 이름 라벨, 하단은 포켓 셀
     const g = r.goal, pw = g.w / 9;
     const lblH = Math.min(g.h * 0.4, 20), cellY = g.y + lblH, cellH = g.h - lblH;
-    for (let l = 0; l < CFG.lanes; l++) {                 // 레인 그룹 라벨(골칸↔캐릭터 매칭)
+    for (let l = 0; l < CFG.lanes; l++) {                 // 레인 그룹 라벨(탄창↔캐릭터 매칭)
       const c = S.chars.find(ch => ch.lane === l); if (!c) continue;
-      const span = (S.tutorial && l === 0) ? 6 : 3;       // 튜토리얼 전투: 루비의 충전 칸 6칸 위에 라벨
+      const span = (S.tutorial && l === 0) ? 6 : 3;       // 튜토리얼 전투: 루비의 탄창 6칸 위에 라벨
       const gx = g.x + (l * 3 + span / 2) * pw;
       ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, span * pw - 2, lblH - 1);
       ctx.fillStyle = laneHex(l); ctx.font = 'bold ' + Math.max(11, Math.round(lblH * 0.72)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
@@ -1707,14 +1783,16 @@
     for (let i = 0; i < 9; i++) {
       const pk = S.pockets[i]; const x = g.x + i * pw;
       const isC = pk.type === 'charge', isB = pk.type === 'buff';
-      const pimg = ART.pocket.on ? PegArt.ready(isC ? ART.pocket.charge[pk.lane % 3] : isB ? ART.pocket.buff : ART.pocket.blank) : null;   // 칸 그림(충전은 레인 색별) — 이 칸의 그림이 없으면 아래 도형
-      if (pimg) { drawCell(ctx, pimg, 0, 0, pimg.naturalWidth, pimg.naturalHeight, x + 1, cellY + 1, pw - 2, cellH - 3); continue; }
-      ctx.fillStyle = isC ? laneHex(pk.lane) + '55' : isB ? '#66ccff33' : '#ffffff08';
+      const pimg = ART.pocket.on ? PegArt.ready(isC ? ART.pocket.charge[pk.lane % 3] : isB ? ART.pocket.buff : ART.pocket.blank) : null;   // 칸 그림(장전은 레인 색별) — 이 칸의 그림이 없으면 아래 도형
+      const isX = !isC && !isB;                              // 꽝 칸 — 탄창(색 칸)과 한눈에 구분되도록 붉은 사선 + 굵은 ✕ 로 눈에 띄게 그린다
+      if (pimg) { drawCell(ctx, pimg, 0, 0, pimg.naturalWidth, pimg.naturalHeight, x + 1, cellY + 1, pw - 2, cellH - 3); if (isX) drawBlankMark(x + 1, cellY + 1, pw - 2, cellH - 3, true); continue; }
+      if (isX) { drawBlankMark(x + 1, cellY + 1, pw - 2, cellH - 3, false); continue; }
+      ctx.fillStyle = isC ? laneHex(pk.lane) + '66' : '#66ccff33';
       ctx.fillRect(x + 1, cellY + 1, pw - 2, cellH - 3);
-      ctx.strokeStyle = '#ffffff18'; ctx.strokeRect(x + 1, cellY + 1, pw - 2, cellH - 3);
-      ctx.fillStyle = isC ? laneHex(pk.lane) : isB ? '#6cf' : '#4a4570';
+      ctx.strokeStyle = isC ? laneHex(pk.lane) + 'aa' : '#ffffff18'; ctx.strokeRect(x + 1, cellY + 1, pw - 2, cellH - 3);
+      ctx.fillStyle = isC ? laneHex(pk.lane) : '#6cf';
       ctx.font = 'bold ' + Math.max(11, Math.round(Math.min(pw * 0.5, cellH * 0.5))) + 'px system-ui'; ctx.textAlign = 'center';
-      ctx.fillText(isC ? '◆' : isB ? '♥' : '×', x + pw / 2, cellY + cellH / 2 + Math.min(pw * 0.18, cellH * 0.18));
+      ctx.fillText(isC ? '◆' : '♥', x + pw / 2, cellY + cellH / 2 + Math.min(pw * 0.18, cellH * 0.18));
     }
     const fpk = BgArt.ready('frame_pocket');       // 포켓 줄 금속 테두리(얇게 — 칸을 가리지 않는다)
     if (fpk) drawPocketFrame(fpk, g.x, cellY, g.w, cellH);
@@ -1770,7 +1848,7 @@
       }
       ctx.restore();
     }
-    for (const fl of anim.flashes) {                      // 타격/페그 접촉 섬광: 링 → 발광 코어
+    for (const fl of anim.flashes) {                      // 타격/탄약 접촉 섬광: 링 → 발광 코어
       const p = 1 - fl.t, rr = (fl.big ? 46 : 20) * U * (0.55 + p), col = fl.color || '#ffe9a8';
       ctx.save(); ctx.globalCompositeOperation = 'lighter';
       const fg = ctx.createRadialGradient(fl.x, fl.y, 0, fl.x, fl.y, rr);
@@ -1989,12 +2067,12 @@
       // 장전↔전투 레이아웃 부드럽게 보간(~0.35s)
       const tgt = S.layoutTarget || 0;
       if (S.layoutT !== tgt) { const step = d / 0.35; S.layoutT = (S.layoutT < tgt) ? Math.min(tgt, S.layoutT + step) : Math.max(tgt, S.layoutT - step); }
-      // 시간 배율: tScale = 튜토리얼 슬로모션(볼·연출 모두 느려진다) · battleSpeed = 전투 속도 버튼(전투 phase 에서만 1배/2배)
-      const ds = d * tScale, bd = S.phase === 'battle' ? ds * battleSpeed : ds;
-      if (window.__tutPause || window.__helpPause) { /* 튜토리얼 설명 카드·도움말 팝업이 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
+      // 시간 배율: tScale = 튜토리얼 슬로모션(볼·연출 모두 느려진다) × 배속 버튼(1·1.5·2·3배 — 장전 볼·전투 사격·연출 모두. 튜토리얼 전투는 안내 속도 그대로)
+      const ds = d * tScale * (S.tutorial ? 1 : battleSpeed);
+      if (window.__tutPause || window.__helpPause || window.__exitPause) { /* 튜토리얼 설명 카드·도움말·나가기 확인 팝업이 떠 있는 동안 전투 진행을 멈춘다(연출·그리기는 계속) */ }
       else if (S.phase === 'load') stepBalls(ds);
-      else if (S.phase === 'battle') { stepBattle(bd); checkBossThreshold(); }
-      stepVisuals(bd);
+      else if (S.phase === 'battle') { stepBattle(ds); checkBossThreshold(); }
+      stepVisuals(ds);
       if (S.phase !== 'map' && S.pockets.length) draw();   // 맵(상점·정비 포함) 중엔 캔버스 갱신 불필요
     }
   }
@@ -2079,9 +2157,16 @@
   $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
   $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
   $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
-  function syncSpeedBtn() { const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed === 2); }
-  $('speed-btn').onclick = () => { battleSpeed = battleSpeed === 2 ? 1 : 2; try { localStorage.setItem('pongtress_speed', String(battleSpeed)); } catch (e) {} Sound.play('click'); syncSpeedBtn(); };   // 전투 속도 ×1 ↔ ×2 (기기에 저장)
+  function syncSpeedBtn() { const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed > 1); }
+  $('speed-btn').onclick = () => { battleSpeed = SPEEDS[(SPEEDS.indexOf(battleSpeed) + 1) % SPEEDS.length]; try { localStorage.setItem('pongtress_speed', String(battleSpeed)); } catch (e) {} Sound.play('click'); syncSpeedBtn(); };   // 한 번 누를 때마다 ×1 → ×1.5 → ×2 → ×3 → ×1 (기기에 저장)
   syncSpeedBtn();
+  // 나가기: 전투 머리말·분기 지도 머리말의 ‹ 버튼([data-exit] 문서 위임 — 지도 머리말은 다시 그려지므로) → 확인 창 → 로비로
+  document.addEventListener('click', (e) => { if (e.target.closest('[data-exit]')) openExit(); });
+  $('exit-modal').onclick = (e) => {
+    if (e.target.closest('[data-exit-yes]')) { closeExit(); abandonRun(); return; }
+    if (e.target.closest('[data-exit-no]') || e.target === $('exit-modal')) closeExit();
+  };
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('exit-modal').hidden) closeExit(); });
   // 맵·상점·정비·모듈 정보
   $('map-body').onclick = (e) => { const b = e.target.closest('[data-node]'); if (!b || b.disabled || !S) return; const [f, i] = b.dataset.node.split('-').map(Number); enterNode(f, i); };
   $('map-relics').onclick = () => { if (S) openRelicInfo(); };
@@ -2108,7 +2193,7 @@
   // 전투 영역 크기가 바뀌면(모듈 바·적 요약 줄이 생겨 헤더가 커지는 등) 캔버스도 즉시 다시 맞춘다 — 안 그러면 아래쪽(방벽 HP바·핀볼판 테두리)이 잘린다
   if (window.ResizeObserver) new ResizeObserver(() => { const el = $('stage-wrap'); if (!$('combat').hidden && (Math.abs(el.clientHeight - H) > 1 || Math.abs(el.clientWidth - W) > 1)) resize(); }).observe($('stage-wrap'));   // 캔버스는 관찰 대상이 아니라 되먹임 루프 없음
 
-  // 에셋 미리 받기 — 타이틀·로비가 뜬 뒤 한가할 때 전투에서 쓰는 이미지(적·FX·페그·배경)를 받아 둔다(첫 전투에서 도형 폴백이 보이지 않게)
+  // 에셋 미리 받기 — 타이틀·로비가 뜬 뒤 한가할 때 전투에서 쓰는 이미지(적·FX·탄약·배경)를 받아 둔다(첫 전투에서 도형 폴백이 보이지 않게)
   setTimeout(function () {
     FxArt.preload(['muzzle', 'shell', 'boom', 'hit_spark']);
     EnemyArt.preload(Object.keys(ENEMIES).concat(['boss_titan', 'boss_swarm', 'boss_carrier']));
@@ -2123,7 +2208,8 @@
   window.__PONGTRESS__ = {
     get S() { return S; }, get anim() { return anim; }, get idle() { return Meta.idleDebug ? Meta.idleDebug() : null; }, startRun, launchBall, enterBattle, CFG,
     showMap, enterNode, gainRelic, relicOffer, genMap, applyBoardEffects, advanceEnemies, showReward, showRelicPick, openShop, openRest, openRelicInfo, loseRun,
-    setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(1.3, CFG.pegStep)); },
+    setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(boardRef(), CFG.pegSpacing)); },
+    rawPattern(n) { const R = boardRef(); return { R, g: PEG_REG(R), pts: pegPatterns(R, CFG.pegSpacing * ((CFG.patSpacing || {})[n] || 1))[n]() }; },   // 디버그: 걸러내기 전 패턴 점(px)
     tick(dt) { if (!S || S.over) return; if (S.phase === 'load') stepBalls(dt); else if (S.phase === 'battle') { stepBattle(dt); checkBossThreshold(); } },
     // 화면 연출까지 한 걸음(rAF가 멈춘 숨은 탭에서 수동 진행용): layoutT 보간 포함
     step(dt) { if (!S || S.over) return; advance(dt); },     // 게임 루프와 같은 한 프레임(슬로모션·튜토리얼 정지·전투 속도 적용)
@@ -2135,7 +2221,7 @@
     get BU() { return BU; }, get aiming() { return aimActive; },
     setTimeScale(x) { tScale = Math.max(0.05, Math.min(1, +x || 1)); },
     setDemoAim(p) { demoAim = p ? { x: p.x, y: p.y } : null; },       // 시범 조준점(캔버스 px) — 조준 점선·포신만 보여 준다
-    setBattleSpeed(v) { battleSpeed = v === 2 ? 2 : 1; syncSpeedBtn(); },
+    setBattleSpeed(v) { battleSpeed = SPEEDS.indexOf(v) >= 0 ? v : 1; syncSpeedBtn(); }, get SPEEDS() { return SPEEDS; }, openExit, closeExit, abandonRun,
     get timeScale() { return tScale; }
   };
 

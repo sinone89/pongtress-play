@@ -3,15 +3,12 @@
  * 밸런스 수치는 여기 한곳. game.js 보다 먼저 로드된다.
  */
 const CFG = {
-  lanes: 3,                // 캐릭터 편성(방벽) 레인 수 — 골칸·포켓도 이 값 기준
+  lanes: 3,                // 캐릭터 편성(방벽) 레인 수 — 탄창·포켓도 이 값 기준
   fieldLanes: 6,           // 적 필드 열 수(캐릭터 레인과 분리). 공격은 레인 무관 맨 앞 타겟
-  pegCols: 9,              // 조밀 격자 패턴의 열 수
-  pegRows: 12,             // 조밀 격자 패턴의 행 수
-  pegStep: 0.05,           // 패턴 선을 따라 페그를 놓는 간격(fx/fy). 작을수록 촘촘
-  pegMinGap: 0.055,        // 페그 최소 간격(겹침 방지, 세로 비율 보정). 작을수록 촘촘
-  pegScale: 1.22,          // 페그 성김 배율 — 열·행·줄 수를 이 값으로 나누고 간격(pegStep·pegMinGap)을 곱한다. 페그·볼을 키운 만큼 키워 판의 빽빽함(볼 한 발이 맞히는 페그 수 = 충전량)을 예전과 맞춘다(8패턴 평균 ±5%)
-  normalPegHits: 1,        // (레거시) 페그는 이제 충돌 시 볼로 변환됨 — 내구도 미사용
-  harvestPerBall: 8,       // 볼 하나가 이번 궤적에서 충전 볼로 바꿀 수 있는 페그 최대 수(과충전 방지, 판은 유지)
+  patSpacing: { grid: 1.15, chevrons: 1, zigzag: 1, diamonds: 0.9, rings: 1, heart: 1, cross: 1.05 },   // 패턴별 간격 배율(간격 = pegSpacing × 배율) — 판마다 볼 한 발의 장전량(APS)이 18~33 안에 들게 맞춘 값(tools/aps.js)
+  pegSpacing: 32,          // 이웃한 탄약 중심 사이 간격(px · 기준 판 폭 311 기준). 패턴이 이 간격으로 반듯하게 선다 — 작을수록 촘촘(볼 한 발이 맞히는 탄약↑ = 장전량↑ = 쉬움). 탄약 반경 12~19 라 36 아래는 서로 닿는다
+  normalPegHits: 1,        // (레거시) 탄약는 이제 충돌 시 볼로 변환됨 — 내구도 미사용
+  harvestPerBall: 8,       // 볼 하나가 이번 궤적에서 장전 볼로 바꿀 수 있는 탄약 최대 수(과장전 방지, 판은 유지)
   battleShotMinDelay: 130, // ms, 전투 발사 최소 간격(탄환 많을 때 자동 단축 하한) — 크면 전투가 느려짐 (예전 90 — 너무 빨리 지나간다는 의견으로 2026-10 늦춤)
   battleWindow: 7500,      // ms, 전투 발사 목표 총 시간(탄환 수로 나눠 간격 자동 결정) — 크면 전투가 느려짐 (예전 4500)
   fieldRows: 5,            // 적 대기 필드 세로 칸 수(레인당)
@@ -19,20 +16,27 @@ const CFG = {
   launchesPerTurn: 2,      // 한 장전 턴에 쏘는 볼 수(기본). 패시브로 증가 예정
   maxBalls: 140,           // 볼 폭주 방지 상한(수확 볼이 동시에 많이 뜨므로 상향)
   gravity: 0,              // 무중력(퍼즐 보블): 볼은 직선+반사로 이동, 무조건 위로 올라감
-  restitution: 0.98,       // 페그 반사 시 에너지 거의 유지(가라앉지 않게)
+  restitution: 0.98,       // 탄약 반사 시 에너지 거의 유지(가라앉지 않게)
   wallRestitution: 1.0,    // 벽·바닥 완전 반사
-  ballRadius: 9,           // ⚠ 페그·볼 크기와 속도는 '기준 판 폭 311px(폰 375 화면)' 기준 값 — 실제 판 폭에 비례해 커진다(game.js BU). 폰에서 잘 보이게 예전(7/9)보다 키웠다(2026-10)
+  ballRadius: 9,           // ⚠ 탄약·볼 크기와 속도는 '기준 판 폭 311px(폰 375 화면)' 기준 값 — 실제 판 폭에 비례해 커진다(game.js BU). 폰에서 잘 보이게 예전(7/9)보다 키웠다(2026-10)
   pegRadius: 12,
   launchSpeed: 820,        // 발사 속도(고정). 조준은 각도만
   aimMinUp: 0.3,           // 조준 하한(수평 근처)을 막아 항상 위로 향하게 (vy < -aimMinUp*speed)
-  ballLifetime: 6,         // s, 이 시간 넘으면 제거하지 않고 상단으로 점점 강하게 유도(상단 포켓 도달 전엔 절대 소멸 안 함)
+  obstMargin: 6,           // 장애물(범퍼·기둥) 가장자리와 탄약 가장자리 사이 최소 여유(px · 기준 판 폭 311 기준) — 이 안에 든 탄약은 판에서 뺀다(작을수록 장애물 곁에 탄약이 더 남는다 · 예전 12 는 장애물 6개짜리 S5 판에서 탄약이 절반으로 깎였다)
+  floorHp0: 0.8,           // 층(전투 노드 깊이 0~4)에 따른 적 체력 배수 = floorHp0 + floorHp × f + floorHp2 × f² (층0=0.8 · 1=1.04 · 2=1.5 · 3=2.2 · 4=3.2) — 스테이지 배수에 곱한다(content.js floorHpMul)
+  floorHp: 0.12,           //   첫 전투는 워밍업(0.8)이고 뒤로 갈수록 가파르게(제곱항) — 런 안의 레벨업·모듈 성장이 뒤로 갈수록 가팔라서, 직선이면 첫 전투만 위험하고 끝은 시시했다
+  floorHp2: 0.12,          //   ⚠ 이 값을 올리면 승률뿐 아니라 런 길이가 같이 는다(전투 하나가 7~9턴, 한 런 30~35턴 ≈ 한 턴 18초) — 올릴 땐 tools/bot.js 의 turns 도 같이 볼 것
+  floorDmg0: 0.8,          // 층에 따른 적 공격 배수 = floorDmg0 + floorDmg × f (층0=0.8 … 4=1.2) — 첫 전투에서 새는 한두 마리에 방벽이 무너져 3분 만에 끝나지 않게
+  floorDmg: 0.1,
+  bossFloor: 2,            // 보스의 체력·공격 층 배수를 이 층 값으로 계산(보스 체력은 기본값이 이미 커서 맨 위 층 배수를 다 곱하면 한 런의 1/4 을 먹는다 — 2층 배수면 보스전 3~5턴)
+  ballLifetime: 3.5,       // s, 이 시간 넘으면 제거하지 않고 속도 방향을 상단으로 점점 빠르게 돌려 보낸다(상단 포켓 도달 전엔 절대 소멸 안 함) — 예전 6초: 대형 탄약 판에선 한 발이 10초 넘게 튕기는 일이 잦았다
   battleShotDelay: 380,    // ms, 전투 phase 공격 1발 간 간격(보이게 느리게) — 예전 240
   battleStartDelay: 700,   // ms, 전투 phase 시작 후 첫 공격까지 — 예전 500
   battleEndDelay: 1100,    // ms, 마지막 공격 후 적 전진까지 — 예전 800
   enemyContactFlash: 250
 };
 
-// ── 페그 종류(모양·기능) — 실제 핀볼처럼 다양하게 ──
+// ── 탄약 종류(모양·기능) — 실제 핀볼처럼 다양하게 ──
 // shape: 기본 렌더 모양 · size: 기본 크기 배수(반경) · weight: 판 생성 가중치 · oneShot: 맞으면 이번 턴 비활성(다음 턴 부활)
 // 기능: split(볼 분열 수) · boost(속도 킥 배수, 영구 범퍼) · gold(획득 골드) · atk(이번 턴 공격 버프)
 const PEG_TYPES = {
@@ -41,29 +45,29 @@ const PEG_TYPES = {
   mult5:  { name: '증식×5', color: '#ff5db1', shape: 'star',     size: 1.3,  weight: 5,  oneShot: true,  split: 4, label: '×5' },
   bumper: { name: '범퍼',   color: '#46e6d0', shape: 'bumper',   size: 1.5,  weight: 0,  oneShot: false, boost: 1.28 },  // weight0=랜덤 스폰 제외(범퍼는 고정 장애물로 이전, 패시브/보상 설치만)
   gold:   { name: '크레딧', color: '#ffd93b', shape: 'hex',      size: 1.1,  weight: 8,  oneShot: true,  gold: 15, label: '$' },
-  charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' },  // 충전 ×3 볼 생성(탄약·스킬게이지 대량 충전)
+  charge: { name: '증폭',   color: '#7ef29a', shape: 'triangle', size: 1.15, weight: 6,  oneShot: true,  charge: 3, label: '⚡' },  // 장전 ×3 볼 생성(탄환·스킬게이지 대량 장전)
   // ── 아래는 랜덤 스폰 제외(weight 0): 스킬·적 간섭으로만 생성 ──
-  bomb:   { name: '폭탄',   color: '#ff8a3a', shape: 'circle',   size: 1.25, weight: 0,  oneShot: true,  bomb: 0.16, label: '✹' },  // 맞으면 주변 페그 연쇄 폭발(스킬이 남김)
+  bomb:   { name: '폭탄',   color: '#ff8a3a', shape: 'circle',   size: 1.25, weight: 0,  oneShot: true,  bomb: 0.16, label: '✹' },  // 맞으면 주변 탄약 연쇄 폭발(스킬이 남김)
   scrap:  { name: '파편',   color: '#7a7f8c', shape: 'pentagon', size: 1.35, weight: 0,  oneShot: false, scrap: true },               // 반사만(변환·소멸 없음) — 헤비아머/타이탄이 설치
-  sludge: { name: '오염',   color: '#5ad0a0', shape: 'circle',   size: 1.2,  weight: 0,  oneShot: true,  sludge: true, label: '≈' }   // 발사볼을 삼킴(충전 없이 소멸) — 슬러지가 설치
+  sludge: { name: '오염',   color: '#5ad0a0', shape: 'circle',   size: 1.2,  weight: 0,  oneShot: true,  sludge: true, label: '≈' }   // 발사볼을 삼킴(장전 없이 소멸) — 슬러지가 설치
 };
-// 일반(반사) 페그는 모두 원형으로 통일(가독성·정렬감).
+// 일반(반사) 탄약는 모두 원형으로 통일(가독성·정렬감).
 const NORMAL_SHAPES = ['circle'];
 
-// 페그 하나 생성: 종류별 기본 크기 × 개별 지터(±) → 물리 반경(pr)·모양(shape) 확정
+// 탄약 하나 생성: 종류별 기본 크기 × 개별 지터(±) → 물리 반경(pr)·모양(shape) 확정
 function makePeg(fx, fy, type) {
   const def = PEG_TYPES[type] || PEG_TYPES.normal;
-  const jitter = 0.82 + Math.random() * 0.42;                 // 0.82~1.24 크기 편차
+  const jitter = 0.92 + Math.random() * 0.18;                 // 0.92~1.10 크기 편차(예전 0.82~1.24 — 큰 것끼리 닿아 줄이 흐트러졌다)
   const pr = CFG.pegRadius * (def.size || 1) * jitter;
   const shape = (type === 'normal') ? NORMAL_SHAPES[Math.floor(Math.random() * NORMAL_SHAPES.length)] : def.shape;
   return { fx, fy, type, alive: true, pr, shape, hits: 0 };
 }
 
-// 레벨업에 필요한 누적 경험치: 레벨 L→L+1 (충전·처치가 늘어난 만큼 완만하게)
+// 레벨업에 필요한 누적 경험치: 레벨 L→L+1 (장전·처치가 늘어난 만큼 완만하게)
 function expToNext(level) { return 16 + level * 11; }
 
 // ── 캐릭터 (12종. 새 계정의 시작 보유·편성은 아래 META_START, 보라·코코는 튜토리얼에서 합류) ──
-// atk 공격력(발당 피해) · hp 체력(방벽 HP에 합산) · gol 고정 골칸 수(레인 3칸 중 충전 칸)
+// atk 공격력(발당 피해) · hp 체력(방벽 HP에 합산) · gol 고정 탄창 수(레인 3칸 중 장전되는 칸)
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
 const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' }, legendary: { name: '레전더리', color: '#ffce54' } };
 // 클래스 3종: 화력을 단일/광역으로 나누고, 힐·제어·버프를 지원으로 묶음
@@ -87,7 +91,7 @@ const ROSTER = [
   { id: 'archer', cls: 'gunner', name: '미나', weapon: '캐논', rarity: 'rare', atk: 10, hp: 26, gol: 2,
     concept: '트윈테일의 활발한 소녀. 크림슨·블랙 전술 재킷. 크림슨 포인트 캐논',
     active: { name: '연속 사격', gauge: 15, kind: 'extraShots', shots: 4 },
-    passive: { name: '탄약 보급', kind: 'addBall', n: 1 } },
+    passive: { name: '볼 보급', kind: 'addBall', n: 1 } },
   { id: 'berserker', cls: 'gunner', name: '카린', weapon: '캐논', rarity: 'epic', atk: 14, hp: 34, gol: 1,
     concept: '긴 흑발 크림슨 롱코트의 쿨한 에이스. 디테일이 강조된 대형 캐논(크림슨·미세 골드)',
     active: { name: '강습 포격', gauge: 16, kind: 'bigHit', mult: 4 },
@@ -104,7 +108,7 @@ const ROSTER = [
   { id: 'mortar', cls: 'cannon', name: '하나', weapon: '캐논', rarity: 'rare', atk: 9, hp: 36, gol: 2,
     concept: '만두머리의 씩씩한 소녀. 오렌지·블랙 복장. 오렌지 포인트 캐논',
     active: { name: '곡사 포격', gauge: 15, kind: 'aoe', count: 3, shots: 1, mult: 1.6 },
-    passive: { name: '탄약 보급', kind: 'addBall', n: 1 } },
+    passive: { name: '볼 보급', kind: 'addBall', n: 1 } },
   { id: 'mage', cls: 'cannon', name: '티아', weapon: '캐논', rarity: 'epic', atk: 12, hp: 30, gol: 2,
     concept: '앰버 롱헤어의 당당한 에이스. 오렌지·크림 군복 드레스. 장식이 들어간 대형 캐논(오렌지·미세 골드)',
     active: { name: '포격', gauge: 15, kind: 'aoe', count: 4, shots: 1, mult: 1.6 },
@@ -129,7 +133,7 @@ const ROSTER = [
   { id: 'seraph', cls: 'support', name: '세라', weapon: '캐논', rarity: 'legendary', atk: 7, hp: 50, gol: 3,
     concept: '백·민트 롱헤어에 후광·날개의 천사 사령관. 골드 트림 거대 캐논',
     active: { name: '대규모 수리', gauge: 17, kind: 'heal', amount: 58 },
-    passive: { name: '탄약 투하', kind: 'addBall', n: 2 } }
+    passive: { name: '볼 투하', kind: 'addBall', n: 2 } }
 ];
 
 // ── 메타(로비, 런 밖) 설정 ──
@@ -156,10 +160,16 @@ const MISSIONS = [
 ];
 // ── 스테이지 (높을수록 난이도↑) ──
 const STAGE_MAX = 5;
+//  ⚠ 적 기본 체력(ENEMIES·BOSSES)은 'S1' 기준이다. 스테이지 배수는 그 위에 곱하고, 층이 깊어지면 CFG.floorHp0·floorHp·floorHp2 로 한 번 더 단단해진다(nodeCombat · 첫 전투 ×0.8 → 5번째 전투 ×3.2).
+//  보정 근거(2026-10 봇 시험 · tools/bot.js · balmx.js · aps.js): 스테이지마다 '그 스테이지에 맞는 파티'가 평균 조준으로 승률 75~85% 가 되는 값.
+//    S1 시작 3명(루비·보라·코코) Lv1★1 ≈100%(막무가내 조준 ≈88%) · S2 시작 3명 Lv8★1 ≈80%(레어 3명이면 100%) · S3 레어 3명 Lv12★2 ≈83% · S4 에픽 3명 Lv18★3 ≈83%(레어 3명 ≈50%)
+//    · S5 레전더리1+에픽2 Lv24★4 ≈83%. 판의 탄약 양(장전량)이 스테이지마다 달라(S1 32 → S5 24) 이 값은 판 배치(STAGE_BOARDS·STAGE_OBST·CFG.pegSpacing)와 한 묶음이다.
+//    체력 배수가 ±15% 만 어긋나도 승률이 90%→50% 로 갈릴 만큼 가파르다(런 안 레벨업 눈덩이) — 판·적·성장 중 하나를 바꾸면 봇으로 다시 잴 것.
+const STAGE_HP = [0, 1, 1.0, 1.3, 1.7, 2.25];   // 인덱스 = 스테이지
 function stageScale(s) {
   s = Math.max(1, Math.min(STAGE_MAX, s || 1));
   return {
-    hp: 1 + (s - 1) * 0.65,     // 적/보스 체력 배수: S1=1 … S5=3.6
+    hp: STAGE_HP[s],            // 적/보스 체력 배수: S1=1 … S5=2.25 (S1→S2 는 같다 — 상승분은 적 종류(워커 등장)·공격 배수·'그 스테이지에 맞는 파티'의 성장 폭이 맡는다)
     dmg: 1 + (s - 1) * 0.42,    // 적 공격 배수: S1=1 … S5=2.68 (방벽 압박)
     exp: 1 + (s - 1) * 0.40,    // 경험치 배수
     reward: 1 + (s - 1) * 0.60  // 메타 화폐 보상 배수: S1=1 … S5=3.4
@@ -187,7 +197,7 @@ const TUTORIAL = {
   rewardId: 'guard',                         // 튜토리얼 완료 선물 캐릭터(코코)
   reward: { gems: 200, gold: 300 },          // 완료 선물 재화(기존 선물 그대로)
   starter: ['grenadier', 'guard'],           // 건너뛰기로 한꺼번에 받는 동료 · 개발용 신규 계정 지급
-  scale: { hp: 0.7, dmg: 0.3, exp: 1, reward: 0 },   // 튜토리얼 전투의 적: 약하게(체력 ×0.7, 공격 ×0.3)
+  scale: { hp: 0.31, dmg: 0.3, exp: 1, reward: 0 },  // 튜토리얼 전투의 적: 약하게(체력 ×0.31 ≈ 경비봇 48 — 적 기본 체력을 ×2.3 으로 올리기 전 ×0.7 과 같은 값, 공격 ×0.3)
   wallHp: 120,                               // 튜토리얼 전투의 방벽 HP(루비 혼자라도 지지 않게)
   // 튜토리얼 전투: 2웨이브(경비봇 2 → 드론 1 + 경비봇 1). 웨이브 원소가 적 종류 id 면 그 종류로 등장한다.
   combat: { name: '튜토리얼', tutorial: true, waves: [['sentry', 'sentry'], ['drone', 'sentry']] }
@@ -202,12 +212,12 @@ const IDLE = {
 // 적 종류 — speed(턴당 전진 칸), armor(피격 시 고정 감소). 스테이지가 높을수록 강한 적 등장.
 // 필드 라벨 폭 때문에 이름은 4글자 이내(슬러지=오염된 나노 젤). 이미지: assets/enemy/<id>.png
 const ENEMIES = {
-  sentry: { name: '경비봇',   hp: 68,  dmg: 13, exp: 6,  color: '#6fb1e8', speed: 1, armor: 0 },   // 기본 보병형 로봇(보스 부하도 이 유닛)
-  drone:  { name: '해킹드론', hp: 43,  dmg: 10, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },   // 비행 드론 — 특수 페그를 해킹(일반화)
-  walker: { name: '워커',     hp: 138, dmg: 22, exp: 15, color: '#e0733a', speed: 1, armor: 0 },   // 중형 이족 전투기(고체력·고공격)
-  hound:  { name: '하운드',   hp: 51,  dmg: 13, exp: 9,  color: '#e8b04a', speed: 2, armor: 0 },   // 사족보행 로봇견 — 빠름(턴당 2칸)·물몸
-  heavy:  { name: '헤비아머', hp: 200, dmg: 24, exp: 22, color: '#7f8aa0', speed: 1, armor: 4 },   // 대형 기갑 — 장갑(피격 -4)
-  sludge: { name: '슬러지',   hp: 84,  dmg: 13, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }    // 오염된 나노 젤 — 오염 페그(볼 흡수)
+  sentry: { name: '경비봇',   hp: 156, dmg: 13, exp: 6,  color: '#6fb1e8', speed: 1, armor: 0 },   // 기본 보병형 로봇(보스 부하도 이 유닛)
+  drone:  { name: '해킹드론', hp: 99,  dmg: 10, exp: 5,  color: '#9b6cff', speed: 1, armor: 0 },   // 비행 드론 — 특수 탄약을 해킹(일반화)
+  walker: { name: '워커',     hp: 317, dmg: 22, exp: 15, color: '#e0733a', speed: 1, armor: 0 },   // 중형 이족 전투기(고체력·고공격)
+  hound:  { name: '하운드',   hp: 117, dmg: 13, exp: 9,  color: '#e8b04a', speed: 2, armor: 0 },   // 사족보행 로봇견 — 빠름(턴당 2칸)·물몸
+  heavy:  { name: '헤비아머', hp: 460, dmg: 24, exp: 22, color: '#7f8aa0', speed: 1, armor: 4 },   // 대형 기갑 — 장갑(피격 -4)
+  sludge: { name: '슬러지',   hp: 193, dmg: 13, exp: 8,  color: '#5ad0a0', speed: 1, armor: 0 }    // 오염된 나노 젤 — 오염 탄약(볼 흡수)
 };
 // 스테이지별 적 풀(가중치) — 상위 스테이지에 강한 적이 섞임
 const STAGE_POOL = {
@@ -226,24 +236,26 @@ function pickEnemyType(s) {
 
 // ── 보스 3종 (스테이지 티어별) ── 이미지: assets/enemy/boss_<kind>.png
 const BOSSES = {
-  titan:   { name: '타이탄', kind: 'titan', hp: 1320, dmg: 50, exp: 110, color: '#8a8f9a',
+  titan:   { name: '타이탄', kind: 'titan', hp: 3050, dmg: 50, exp: 110, color: '#8a8f9a',
              thresholds: [0.75, 0.5, 0.25], retreat: 2, stunTurns: 1, vulnerable: 0.5 },   // 돌격형: HP% 구간마다 과열 정지(후퇴+스턴), 코어 노출 중 피해+50%
-  swarm:   { name: '스웜 코어', kind: 'swarm', hp: 1080, dmg: 32, exp: 130, color: '#5ad0a0',
+  swarm:   { name: '스웜 코어', kind: 'swarm', hp: 2500, dmg: 32, exp: 130, color: '#5ad0a0',
              thresholds: [0.66, 0.33], splitCount: 2 },                                     // 분리형: 임계마다 슬러지 분리
-  carrier: { name: '드론 모함', kind: 'carrier', hp: 1600, dmg: 28, exp: 150, color: '#5f8fd0',
+  carrier: { name: '드론 모함', kind: 'carrier', hp: 3700, dmg: 28, exp: 150, color: '#5f8fd0',
              addType: 'sentry' }                                                            // 정지형: 매 턴 경비봇 사출
 };
 function stageBoss(s) { return s >= 5 ? 'carrier' : s >= 3 ? 'swarm' : 'titan'; }
 
-// ── 스테이지별 고정 페그판 ──
+// ── 스테이지별 고정 핀볼 판 ──
 // [전투0, 전투1, 전투2, 보스] 순. 매 판 랜덤이던 것을 스테이지·전투마다 고정 → 밸런스 재현성 확보.
-// 중앙 집중형 그림 패턴(heart/star/rings/diamonds)에는 좌우 레일이 자동 추가되어 양옆 레인도 장전 가능(pegLayout 참조).
+// 중앙 집중형 그림 패턴(heart/rings/diamonds)에는 좌우 레일이 자동 추가되어 양옆 레인도 장전 가능(pegPatterns 참조).
+//  ⚠ 판 하나의 장전량(APS)은 장애물 때문에 스테이지마다 다르다 — 얇은 선 패턴(별·하트)은 장애물이 선 위에 앉으면 끊겨 장전량이 3~10 까지 떨어졌다(별은 빼고, 하트는 장애물이 적은 S3 보스판에만).
+//    새 패턴·장애물을 바꾸면 tools/aps.js 로 (스테이지 × 패턴) 장전량을 다시 재서 18~33 안에 드는지 볼 것.
 const STAGE_BOARDS = {
   1: ['grid', 'chevrons', 'diamonds', 'cross'],
   2: ['chevrons', 'zigzag', 'rings', 'grid'],
   3: ['zigzag', 'diamonds', 'heart', 'cross'],
-  4: ['cross', 'chevrons', 'star', 'rings'],
-  5: ['grid', 'zigzag', 'star', 'heart']
+  4: ['cross', 'chevrons', 'rings', 'zigzag'],
+  5: ['grid', 'zigzag', 'cross', 'chevrons']
 };
 
 // ── 스테이지별 고정 장애물(실제 핀볼판 느낌) ──
@@ -253,9 +265,9 @@ const STAGE_BOARDS = {
 //   ① 원형(bumper/pillar)만 — 수평 '바'는 발사구 위에서 볼을 바닥과 무한 반사시켜 금지.
 //   ② 발사 부채꼴(하단) 비움: 모든 장애물 fy ≤ 0.58.
 //   ③ 중앙 발사 열(fx 0.42~0.58)은 어떤 높이에도 장애물 금지 → 수직 발사가 정면충돌로
-//      영구 반사(무한 튕김)되지 않게. 좌우 대칭 페어로 배치. (수직 발사는 중앙 페그를
-//      소모하며 통과 → 페그는 맞으면 사라지므로 영구 함정이 아님)
-//   ④ buildBoard가 장애물과 겹치는 페그를 자동 제거(겹침 방지).
+//      영구 반사(무한 튕김)되지 않게. 좌우 대칭 페어로 배치. (수직 발사는 중앙 탄약를
+//      소모하며 통과 → 탄약는 맞으면 사라지므로 영구 함정이 아님)
+//   ④ buildBoard가 장애물과 겹치는 탄약를 자동 제거(겹침 방지).
 const STAGE_OBST = {
   1: [{ t: 'bumper', fx: 0.30, fy: 0.44, r: 0.06 }, { t: 'bumper', fx: 0.70, fy: 0.44, r: 0.06 }],
   2: [{ t: 'bumper', fx: 0.24, fy: 0.30, r: 0.065 }, { t: 'bumper', fx: 0.76, fy: 0.30, r: 0.065 }, { t: 'bumper', fx: 0.34, fy: 0.52, r: 0.06 }, { t: 'bumper', fx: 0.66, fy: 0.52, r: 0.06 }],
@@ -288,13 +300,13 @@ const COMBATS = [
 ];
 
 // ── 레벨업 보상 후보(3택1) ──
-// 개편 원칙: 선택 시 '항상' 효과가 있어야 함(무효화 없음) + 판(페그/장애물)을 건드리지 않음(겹침 방지).
-//   → 골칸 개방/버프 칸(포켓 꽉 차면 무효)·증식판/범퍼 설치(페그 겹침)는 제거하고 순수 스탯 보상으로 교체.
+// 개편 원칙: 선택 시 '항상' 효과가 있어야 함(무효화 없음) + 판(탄약/장애물)을 건드리지 않음(겹침 방지).
+//   → 탄창 개방/버프 칸(포켓 꽉 차면 무효)·증식판/범퍼 설치(탄약 겹침)는 제거하고 순수 스탯 보상으로 교체.
 const REWARDS = [
   { id: 'heal',  name: '🔧 수리',      desc: '방벽 HP +30',                  apply: (S) => { S.wallHp = Math.min(S.wallHpMax, S.wallHp + 30); } },
   { id: 'atk',   name: '🔩 화력 조정', desc: '모든 동료 공격력 +1',          apply: (S) => { S.atkBonus += 1; } },
   { id: 'maxhp', name: '🧱 방벽 보강', desc: '방벽 최대 HP +40 (+즉시 회복)', apply: (S) => { S.wallHpMax += 40; S.wallHp += 40; } },
-  { id: 'ball',  name: '➕ 탄창 증설', desc: '이번 런 장전 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
+  { id: 'ball',  name: '➕ 볼 증설', desc: '이번 런 발사 볼 +1',           apply: (S) => { S.bonusBalls += 1; } },
   { id: 'power', name: '💥 화력 증폭', desc: '모든 동료 공격력 +2',          apply: (S) => { S.atkBonus += 2; } },
   { id: 'fort',  name: '🛡 요새화',    desc: '방벽 최대 HP +20 & 공격력 +1',  apply: (S) => { S.wallHpMax += 20; S.wallHp += 20; S.atkBonus += 1; } }
 ];
@@ -306,25 +318,25 @@ const RELIC_TAGS = {
   explosive: { name: '폭발', icon: '💥', color: '#ffb057', cls: 'cannon',  set: '모든 사격이 인접 적에게 20% 스플래시' },
   guard:     { name: '방호', icon: '🛡', color: '#5ce0a0', cls: 'support', set: '방벽이 무너질 때 1회 HP 50%로 버팀' },
   pinball:   { name: '핀볼', icon: '🟣', color: '#b58cff', cls: null,      set: '매 턴 첫 발사 볼의 콤보 보너스 ×2' },
-  harvest:   { name: '보급', icon: '📦', color: '#ffd93b', cls: null,      set: '모든 충전 착지 +1' }
+  harvest:   { name: '보급', icon: '📦', color: '#ffd93b', cls: null,      set: '볼이 탄창에 닿을 때마다 장전 +1' }
 };
 const RELIC_SET_N = 3;
 // 모듈: 같은 모듈을 다시 고르면 Lv2 = 개량(구 '진화' — 이름·효과 변경). lv1/lv2 = 효과 파라미터.
 const RELICS = {
   // 🎱 핀볼
-  elastic:    { tag: 'pinball',   icon: '🟢', name: '탄성 코어', lv1: { desc: '장애물 범퍼에 맞으면 20% 확률로 충전볼 +1', p: 0.2 },
-                lv2: { name: '분열탄', desc: '장애물 범퍼에 맞으면 50% 확률로 충전볼 +1', p: 0.5 } },
-  chain:      { tag: 'pinball',   icon: '⛓', name: '연쇄 반응', lv1: { desc: '한 볼로 10콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 10 },
-                lv2: { name: '연쇄 폭주', desc: '한 볼로 6콤보마다 판에 증폭 페그 생성(전투당 최대 6)', every: 6 } },
+  elastic:    { tag: 'pinball',   icon: '🟢', name: '탄성 코어', lv1: { desc: '장애물 범퍼에 맞으면 20% 확률로 장전 볼 +1', p: 0.2 },
+                lv2: { name: '분열탄', desc: '장애물 범퍼에 맞으면 50% 확률로 장전 볼 +1', p: 0.5 } },
+  chain:      { tag: 'pinball',   icon: '⛓', name: '연쇄 반응', lv1: { desc: '한 볼로 10콤보마다 판에 증폭 탄약 생성(전투당 최대 6)', every: 10 },
+                lv2: { name: '연쇄 폭주', desc: '한 볼로 6콤보마다 판에 증폭 탄약 생성(전투당 최대 6)', every: 6 } },
   multishot:  { tag: 'pinball',   icon: '🔫', name: '다중 발사', lv1: { desc: '매 턴 첫 발사 때 볼 2개 동시 발사', n: 2 },
                 lv2: { name: '삼연발', desc: '매 턴 첫 발사 때 볼 3개 동시 발사', n: 3 } },
   // 📦 보급
-  midas:      { tag: 'harvest',   icon: '🪙', name: '자원 회수기', lv1: { desc: '크레딧 페그가 충전볼 +1 추가', balls: 1, gmul: 1 },
-                lv2: { name: '대량 회수기', desc: '크레딧 페그: 크레딧 ×2 · 충전볼 +2', balls: 2, gmul: 2 } },
-  overcharge: { tag: 'harvest',   icon: '⚡', name: '과충전', lv1: { desc: '증폭 페그 충전 ×3 → ×4', charge: 4 },
-                lv2: { name: '초과충전', desc: '증폭 페그 충전 ×5', charge: 5 } },
-  lucky:      { tag: 'harvest',   icon: '🍀', name: '행운 포켓', lv1: { desc: '충전 칸 착지 시 15% 확률로 충전 ×3', p: 0.15 },
-                lv2: { name: '대박 포켓', desc: '충전 칸 착지 시 30% 확률로 충전 ×3', p: 0.3 } },
+  midas:      { tag: 'harvest',   icon: '🪙', name: '자원 회수기', lv1: { desc: '크레딧 탄약이 장전 볼 +1 추가', balls: 1, gmul: 1 },
+                lv2: { name: '대량 회수기', desc: '크레딧 탄약: 크레딧 ×2 · 장전 볼 +2', balls: 2, gmul: 2 } },
+  overcharge: { tag: 'harvest',   icon: '⚡', name: '초과 장전', lv1: { desc: '증폭 탄약 장전 ×3 → ×4', charge: 4 },
+                lv2: { name: '극한 장전', desc: '증폭 탄약 장전 ×5', charge: 5 } },
+  lucky:      { tag: 'harvest',   icon: '🍀', name: '행운 포켓', lv1: { desc: '탄창에 닿으면 15% 확률로 장전 ×3', p: 0.15 },
+                lv2: { name: '대박 포켓', desc: '탄창에 닿으면 30% 확률로 장전 ×3', p: 0.3 } },
   // 🎯 정밀
   crit:       { tag: 'precision', icon: '🎯', name: '치명탄', lv1: { desc: '치명타 15% (피해 ×2)', p: 0.15, mult: 2 },
                 lv2: { name: '급소 사격', desc: '치명타 25% (피해 ×2.5)', p: 0.25, mult: 2.5 } },
@@ -361,31 +373,34 @@ const MAP_CFG = {
   weights: { battle: 48, elite: 18, shop: 16, rest: 18 }
 };
 // 노드별 전투 구성(웨이브 = 마릿수). 층이 깊을수록 커짐. 정예 노드는 정예 적 1 포함 + 웨이브 증가.
+//  hpMul·dmgMul = 층(0~4)이 깊을수록 적이 단단하고 아파진다(CFG.floorHp·floorHp2·floorDmg). 런 안에서 레벨·모듈로 강해지는 속도를 따라가게 — 이게 없으면 첫 전투만 위험하고 뒤는 시시하다.
+const floorHpMul = (f) => CFG.floorHp0 + CFG.floorHp * f + CFG.floorHp2 * f * f;
+const floorDmgMul = (f) => CFG.floorDmg0 + CFG.floorDmg * f;
 function nodeCombat(type, floor) {
-  const base = 6 + floor * 2, mk = n => new Array(n).fill('x');
-  if (type === 'elite') return { name: '정예', elite: true, waves: [mk(base + 1), mk(base + 3), mk(base + 5)] };
-  return { name: '전투', waves: [mk(base), mk(base + 2), mk(base + 4)] };
+  const base = 6 + floor * 2, mk = n => new Array(n).fill('x'), hpMul = floorHpMul(floor), dmgMul = floorDmgMul(floor);
+  if (type === 'elite') return { name: '정예', elite: true, hpMul, dmgMul, waves: [mk(base + 1), mk(base + 3), mk(base + 5)] };
+  return { name: '전투', hpMul, dmgMul, waves: [mk(base), mk(base + 2), mk(base + 4)] };
 }
 const ELITE = { hpMul: 3.2, dmgMul: 1.8, expMul: 4, gold: 60 };   // 정예 적 배수·보상
 const SHOP_PRICE = { relic: 120, relicEvo: 150, heal: 60 };        // 상점(런 골드)
 const REST_HEAL = 0.4;                                             // 정비: 최대 HP 40% 회복
 
 // ═══════════════ 스킬 → 다음 판 변화 / 적 → 판 간섭 ═══════════════
-// 스킬을 쓰면 다음 장전 판에 흔적을 남김(빌드·연계 재미). kind: 판에 추가할 페그 or 포켓 효과.
+// 스킬을 쓰면 다음 장전 판에 흔적을 남김(빌드·연계 재미). kind: 판에 추가할 탄약 or 포켓 효과.
 const SKILL_BOARD = {
-  bigHit:     { peg: 'bomb',  n: 1, text: '폭탄 페그 설치' },
-  extraShots: { peg: 'mult2', n: 2, text: '증식 페그 +2' },
-  aoe:        { peg: 'bomb',  n: 2, text: '폭탄 페그 +2' },
+  bigHit:     { peg: 'bomb',  n: 1, text: '폭탄 탄약 설치' },
+  extraShots: { peg: 'mult2', n: 2, text: '증식 탄약 +2' },
+  aoe:        { peg: 'bomb',  n: 2, text: '폭탄 탄약 +2' },
   heal:       { buff: 1,              text: '회복 칸 +1' },
   stun:       { peg: 'bumper', n: 1, text: '범퍼 설치' }
 };
 // 적이 판에 간섭(장전 시작 시 적용, 해당 적이 필드에 있는 동안). 전투에서 먼저 잡을 대상이 생김.
 const ENEMY_BOARD = {
-  drone:  { steal: 1, text: '해킹드론이 특수 페그를 교란했어요!' },        // 특수 페그 → 일반 페그(해킹)
-  sludge: { peg: 'sludge', n: 1, text: '슬러지가 오염 페그를 뿌렸어요!' },   // 오염 페그(볼 흡수)
+  drone:  { steal: 1, text: '해킹드론이 특수 탄약을 교란했어요!' },        // 특수 탄약 → 일반 탄약(해킹)
+  sludge: { peg: 'sludge', n: 1, text: '슬러지가 오염 탄약을 뿌렸어요!' },   // 오염 탄약(볼 흡수)
   heavy:  { peg: 'scrap',  n: 1, text: '헤비아머가 파편을 흩뿌렸어요!' }    // 파편(반사만)
 };
-const ENEMY_BOARD_CAP = 4;   // 적 간섭으로 추가되는 페그 최대(판이 막히지 않게)
+const ENEMY_BOARD_CAP = 4;   // 적 간섭으로 추가되는 탄약 최대(판이 막히지 않게)
 // 보스 예고 패턴: N턴마다 강력한 행동 예고 → 그 턴에 기절시키면 저지.
 const BOSS_INTENT = {
   titan:   { every: 3, name: '돌격 모드', desc: '다음 전진 때 2칸 돌진 · 피해 ×1.5' },
@@ -400,11 +415,11 @@ const MODES = {
   daily:   { name: '일일 도전', desc: '오늘의 고정 판 · 같은 시드로 기록 도전', reward: { gems: 40 } },
   endless: { name: '무한 모드', desc: '보스를 잡을 때마다 더 강한 막이 이어짐 · 최고 기록 도전', loopScale: 0.35 }
 };
-// 콤보: N콤보마다 보너스 충전볼(충전량 = 콤보/COMBO_STEP, 최대 COMBO_MAX)
+// 콤보: N콤보마다 보너스 장전볼(장전량 = 콤보/COMBO_STEP, 최대 COMBO_MAX)
 const COMBO_STEP = 5, COMBO_MAX = 4;
 const COMBO_TEXT_SCALE = 0.7;                       // 장전 화면 텍스트 배율(70%) — 팝업 크기·외곽선·글로우와 볼 위 "N HIT" 카운터가 공유
-const LOAD_POPUP_PX = 44 * COMBO_TEXT_SCALE;        // 장전 화면 팝업 공통 글자 크기(≈31px): 콤보·JACKPOT·+G·충전·연쇄·포켓 충전 등 종류 불문 동일
-// 움직이는 잭팟 포켓: 상단 골칸 위를 좌우로 이동, 그 위로 착지하면 ×JACKPOT_MUL
+const LOAD_POPUP_PX = 44 * COMBO_TEXT_SCALE;        // 장전 화면 팝업 공통 글자 크기(≈31px): 콤보·JACKPOT·+G·장전·연쇄·포켓 장전 등 종류 불문 동일
+// 움직이는 잭팟 포켓: 상단 탄창 위를 좌우로 이동, 그 위로 착지하면 ×JACKPOT_MUL
 const JACKPOT_MUL = 3, JACKPOT_SPEED = 1.1;   // 속도 = 초당 포켓 칸 수
 
 // UI 아이콘(DOM): assets/ui/<name>.png 있으면 이모지 대체, 없으면 이모지 폴백(spr-box)
@@ -420,37 +435,38 @@ const eulReul = (n) => ('013678'.indexOf(String(n).replace(/\D/g, '').slice(-1))
 const helpBtn = (cls) => '<button class="help-btn ' + cls + '" data-help="open" aria-label="도움말">' + uiIcon('ic_info', '❔') + '</button>';
 
 // ── 전역 헬퍼(보상·패시브에서 사용) ──
-// 골칸 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 골칸을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영
+// 탄창 개방(보상): 캐릭터가 있고 아직 3칸 안 찬 레인의 탄창을 영구히 +1(다음 전투에도 유지) + 현재 판 즉시 반영
 function openOneBlank(S) {
   if (!S.pocketBonus) S.pocketBonus = [0, 0, 0];
   const lane = S.chars.map(c => c.lane).find(l => {
     const c = S.chars.find(ch => ch.lane === l);
     return c && (c.ref.gol + (S.pocketBonus[l] || 0)) < 3;
   });
-  if (lane === undefined) return false;                 // 모든 레인 골칸이 이미 꽉 참
+  if (lane === undefined) return false;                 // 모든 레인 탄창이 이미 꽉 참
   S.pocketBonus[lane] = (S.pocketBonus[lane] || 0) + 1;
   const pk = S.pockets.find(p => p.lane === lane && p.type === 'blank');
   if (pk) pk.type = 'charge';                           // 현재 판에도 즉시 반영
   return true;
 }
-// 임시 골칸 개방(패시브): 현재 판의 꽝칸 하나만 충전칸으로(영구 아님, 다음 전투엔 재계산)
+// 임시 탄창 개방(패시브): 현재 판의 꽝 칸 하나만 탄창으로(영구 아님, 다음 전투엔 재계산)
 function openBlankTemp(S) {
   const lanesWithChar = new Set(S.chars.map(c => c.lane));
   const cand = S.pockets.filter(p => p.type === 'blank' && lanesWithChar.has(p.lane));
   if (cand.length) cand[0].type = 'charge';
 }
-// 판에 페그 추가(보상·모듈·스킬·적 간섭 공용). 반환: 추가된 페그 배열.
-//  - 모든 페그(터진 페그 포함 — 다음 턴 부활하므로)와 최소 간격 확보
+// 판에 탄약 추가(보상·모듈·스킬·적 간섭 공용). 반환: 추가된 탄약 배열.
+//  - 모든 탄약(터진 탄약 포함 — 다음 턴 부활하므로)과 최소 간격 확보(px 로 잰다 — 가로·세로 같은 잣대)
 //  - 고정 장애물(범퍼/기둥)과 겹치지 않게 회피
 //  - opts.avoidLaunch: 중앙 발사열(fx 0.42~0.58) 회피(영구 반사체용 — 수직 발사 정면충돌 방지)
+const PEG_BOARD = { w: 311, h: 341 };   // 기준 판 크기(px) — game.js REF_PINS_W 와 같은 가로, 세로는 같은 화면 비율(9:16 프레임이라 늘 같다)
 function addPegToBoard(S, type, n, opts) {
   opts = opts || {};
-  const gap = (CFG.pegMinGap || 0.06) * (CFG.pegScale || 1), g2 = gap * gap, asp = 1.4, out = [];
+  const RW = PEG_BOARD.w, RH = PEG_BOARD.h, need = CFG.pegSpacing * 0.8, out = [];
   const obst = S.obstacles || [];
   const blocked = (fx, fy) => {
     for (const o of obst) {
       if (o.t === 'bar') { if (fx > o.fx - 0.05 && fx < o.fx + o.fw + 0.05 && fy > o.fy - 0.05 && fy < o.fy + o.fh + 0.05) return true; continue; }
-      const dx = fx - o.fx, dy = (fy - o.fy) * asp, rr = (o.r || 0.06) + 0.055;
+      const dx = (fx - o.fx) * RW, dy = (fy - o.fy) * RH, rr = (o.r || 0.06) * RW + CFG.ballRadius + CFG.pegRadius * 1.3;
       if (dx * dx + dy * dy < rr * rr) return true;
     }
     return opts.avoidLaunch && fx > 0.42 && fx < 0.58;
@@ -458,14 +474,14 @@ function addPegToBoard(S, type, n, opts) {
   for (let i = 0; i < n; i++) {
     let best = null, bestD = -1;
     for (let t = 0; t < 40; t++) {
-      const fx = 0.10 + Math.random() * 0.80, fy = 0.08 + Math.random() * 0.62;
+      const fx = 0.12 + Math.random() * 0.76, fy = 0.12 + Math.random() * 0.58;
       if (blocked(fx, fy)) continue;
-      let md = 9;
-      for (const p of S.pegs) { const dx = fx - p.fx, dy = (fy - p.fy) * asp; const d = dx * dx + dy * dy; if (d < md) md = d; }
+      let md = 1e9;
+      for (const p of S.pegs) { const d = Math.hypot((fx - p.fx) * RW, (fy - p.fy) * RH); if (d < md) md = d; }
       if (md > bestD) { bestD = md; best = { fx, fy }; }
-      if (md > g2 * 2.2) break;               // 충분히 떨어진 자리면 즉시 채택
+      if (md >= need * 1.4) break;               // 충분히 떨어진 자리면 즉시 채택
     }
-    if (!best || bestD < g2 * 0.6) continue;   // 자리가 없으면 추가 생략(겹침보다 생략이 낫다)
+    if (!best || bestD < need) continue;         // 자리가 없으면 추가 생략(겹침보다 생략이 낫다)
     const p = makePeg(best.fx, best.fy, type); S.pegs.push(p); out.push(p);
   }
   return out;
@@ -520,7 +536,7 @@ const FxArt = makeCanvasLoader('assets/fx/', 'png');
 // 적/보스 시트: assets/enemy/<id>.webp — 일반 1024×256(4프레임) · 보스 2048×1024(행0 이동 4 + 행1 상태 프레임)
 const EnemyArt = makeCanvasLoader('assets/enemy/', 'webp', null, true);
 const enemyUrl = (key) => 'assets/enemy/' + key + '.webp' + ASSET_Q;   // CSS 배경으로 쓰는 곳(적 요약 줄·스테이지 정보)도 같은 주소(캐시 공유·버스트)
-// 페그/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
+// 탄약/장애물: assets/peg/<id>.png (peg_normal/…, obst_bumper/…). 없으면 도형 폴백.
 const PegArt = makeCanvasLoader('assets/peg/', 'png');
 // 배경/영역 레이어: assets/bg/<name>.webp (bg_field/bg_wall/bg_board) · frame_pocket 만 png
 const BgArt = makeCanvasLoader('assets/bg/', 'webp', { frame_pocket: 'png' });

@@ -20,7 +20,7 @@ const ART = (function () {
 
   return {
     on: on,
-    // 골칸: 칸마다 그림 한 장(assets/peg/<이름>.png, 160×304). 충전 칸은 레인 색별 3장, 꽝·회복 칸, 잭팟 덮개(칸 위를 지나가는 금색 괄호 — 속은 투명)
+    // 탄창: 칸마다 그림 한 장(assets/peg/<이름>.png, 160×304). 탄창은 레인 색별 3장, 꽝·회복 칸, 잭팟 덮개(칸 위를 지나가는 금색 괄호 — 속은 투명)
     pocket: { on: on.pocket, charge: ['pocket_charge_0', 'pocket_charge_1', 'pocket_charge_2'], blank: 'pocket_blank', buff: 'pocket_buff', jackpot: 'pocket_jackpot' },
     // 발사대: 받침(256×256, 회전 중심=정중앙) + 포신(128×224, 회전 중심 (64,160)·총구 끝 (64,0), 위가 앞). 받침 그림 한 변 = 핀볼 판 폭 × size
     //   납품(2026-10-02 파일럿)에서 잰 값: 받침 512px = 256단위(원판 지름 240) · 포신 256×470px = 128×235단위, 허브(회전 중심) (64, 166.7) — tools\split-sheets.ps1 가 출력한다

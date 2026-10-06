@@ -12,8 +12,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>PONGTRESS</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="stylesheet" href="css/game.css?v=150">
-  <link rel="stylesheet" href="css/skin.css?v=150">
+  <link rel="stylesheet" href="css/game.css?v=151">
+  <link rel="stylesheet" href="css/skin.css?v=151">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
@@ -21,7 +21,7 @@
     <!-- 로그인 게이트(로컬 다중 프로필: 아이디/비번) -->
     <div id="login">
       <h1 class="lg-logo logo-wrap"><span class="logo-tx">PONGTRESS</span><img class="logo-im" alt="PONGTRESS" src="assets/logo.webp" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></h1>
-      <p class="lg-tag">튕겨서 충전하는 로그라이크 핀볼</p>
+      <p class="lg-tag">튕겨서 장전하는 로그라이크 핀볼</p>
       <div class="lg-box">
         <input id="lg-id" placeholder="아이디" autocomplete="off" autocapitalize="off" maxlength="16">
         <input id="lg-pw" type="password" placeholder="비밀번호" autocomplete="off" maxlength="24">
@@ -37,7 +37,7 @@
       <div id="title-hero" aria-hidden="true"></div>   <!-- 중앙 연출: 편성 캐릭터 CG가 서 있고 몇 초마다 바뀜(game.js initTitleHero) -->
       <div class="title-top">
         <h1 class="logo logo-wrap"><span class="logo-tx">PONGTRESS</span><img class="logo-im" alt="PONGTRESS" src="assets/logo.webp" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></h1>
-        <p class="tagline">튕겨서 충전하는 로그라이크 핀볼</p>
+        <p class="tagline">튕겨서 장전하는 로그라이크 핀볼</p>
       </div>
       <div class="title-btm">
         <button id="btn-start" class="btn primary">터치하여 시작</button>
@@ -58,6 +58,7 @@
       <main id="lobby-main">
         <div id="tab-home" class="lobby-panel">
           <canvas id="idle-canvas"></canvas>
+          <button id="codex-btn" class="home-fab" data-codex="open" aria-label="도감"><span class="uic"><span class="uic-fb">📖</span><img class="uic-im" alt="" src="assets/ui/ic_codex.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><span class="hf-tx">도감</span><i class="hf-dot"></i></button>
           <div id="idle-reward" class="idle-card"></div>
         </div>
         <div id="tab-sortie" class="lobby-panel" hidden>
@@ -106,10 +107,11 @@
     <!-- 전투 오버레이 -->
     <section id="combat" class="screen" hidden>
       <header id="combat-top">
+        <button id="btn-exit" class="exit-btn" data-exit="1" aria-label="로비로 나가기">‹</button>
         <span id="c-name" class="c-name">전투 1</span>
         <span id="c-phase" class="c-phase">장전</span>
         <span id="c-level" class="c-level">Lv.1</span>
-        <button id="speed-btn" class="speed-btn" aria-label="전투 속도">×1</button>
+        <button id="speed-btn" class="speed-btn" aria-label="배속">×1</button>
         <button class="mute-btn combat-mute"><span class="mute-icon">🔊</span></button>
         <button class="help-btn combat-help" data-help="open" aria-label="도움말"><span class="uic"><span class="uic-fb">❔</span><img class="uic-im" alt="" src="assets/ui/ic_info.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></button>
         <div id="exp-bar"><div id="exp-fill"></div></div>
@@ -136,8 +138,9 @@
       </div>
     </section>
 
-    <!-- 런 모달(상점·정비·모듈 정보) · 토스트 -->
+    <!-- 런 모달(상점·정비·모듈 정보) · 나가기 확인 · 토스트 -->
     <div id="run-modal" class="modal" hidden><div class="modal-box" id="run-modal-box"></div></div>
+    <div id="exit-modal" class="modal" hidden><div class="modal-box" id="exit-box"></div></div>
     <div id="toast" class="toast"></div>
 
     <!-- 레벨업 보상 -->
@@ -165,13 +168,14 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=150"></script>
-  <script src="js/spritemeta.js?v=150"></script>
-  <script src="js/artmeta.js?v=150"></script>
-  <script src="js/content.js?v=150"></script>
-  <script src="js/meta.js?v=150"></script>
-  <script src="js/game.js?v=150"></script>
-  <script src="js/tutorial.js?v=150"></script>
-  <script src="js/help.js?v=150"></script>
+  <script src="js/audio.js?v=151"></script>
+  <script src="js/spritemeta.js?v=151"></script>
+  <script src="js/artmeta.js?v=151"></script>
+  <script src="js/content.js?v=151"></script>
+  <script src="js/meta.js?v=151"></script>
+  <script src="js/game.js?v=151"></script>
+  <script src="js/tutorial.js?v=151"></script>
+  <script src="js/help.js?v=151"></script>
+  <script src="js/codex.js?v=151"></script>
 </body>
 </html>
