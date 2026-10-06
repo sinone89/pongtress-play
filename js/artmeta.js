@@ -1,9 +1,10 @@
 // 새 그림 슬롯 설정(build 145) — 그림을 assets/ 에 넣고 true 로 켜면 도형·옛 그림 대신 쓴다.
 // 켜 두어도 안전하다: 로드에 실패한 그림은 항목별로(칸 하나·발사대 한 부품 단위) 예전 도형으로 되돌아간다.
-//   ?art=all · ?art=pocket,launcher,title,lobby(콤마 목록) · ?art=off  — 주소 뒤에 붙이면 이번 접속에서만 켜고 끈다(저장 안 함, 새 그림 확인용).
+//   ?art=all · ?art=pocket,launcher,title,lobby(콤마 목록) · ?art=off  — 주소 뒤에 붙이면 이번 접속에서만 켜고 끈다(저장 안 함). 기본이 '켜짐'이므로 옛 모습과 비교할 때 ?art=off.
 //   그림 규격·좌표의 근거와 제작 지침: docs/ui-skin-plan.md · 구도 가이드: docs/art-guides/
 const ART = (function () {
-  const on = { pocket: false, launcher: false, title: false, lobby: false, skin: false };   // ← 그림이 납품되면 여기를 true 로 (skin = UI 스킨 9분할, css/skin.css)
+  // build 152(2026-10-06): 파일럿 그림 20종을 기본 켜짐으로 — 사용자 승인본(PONGTRESS_pilot_20_approved)인데 기본 꺼짐이라 라이브에서 안 보였다.
+  const on = { pocket: true, launcher: true, title: true, lobby: true, skin: true };   // 새 그림이 납품되면 해당 항목 그림을 교체(skin = UI 스킨 9분할, css/skin.css). 끄려면 false
   try {
     const m = /[?&]art=([\w,]*)/.exec(location.search);
     if (m) {
