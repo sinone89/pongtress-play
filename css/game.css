@@ -518,7 +518,8 @@ body {
 .cd-modal .cd-grade.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
 .cd-modal .cd-grade.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
 .cd-modal .cd-grade.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
-.cd-modal .cd-starsv { gap: 0.5cqw; color: #3a3358; font-size: 4.4cqw; }
+.cd-modal .cd-starsv { gap: 0.4cqw; color: #3a3358; font-size: 3.4cqw; }   /* 별 5개가 오른쪽 열(폭 ≈21cqw)에 다 들어가게 — 예전 4.4cqw 는 양 끝 별이 잘렸다 */
+.cd-modal .cd-starsv .st { flex: 0 0 auto; }
 .cd-modal .cd-starsv .st.on { color: var(--amber); }
 /* 성급 ★ = 아이콘 그림(ic_star — 시안 수정 별): 켜짐은 금빛으로 색을 돌리고, 꺼짐은 회색으로 가라앉힌다(그림이 없으면 위의 글자 ★ 색 규칙이 그대로 쓰인다) */
 .cd-modal .cd-starsv .st .uic, .stchar .sc-star .sc-st .uic { vertical-align: middle; }
@@ -980,8 +981,9 @@ body {
 .cx-grade { padding: .5cqw 2.6cqw; border-radius: 1.6cqw; font-size: 3cqw; font-weight: 900; color: #fff; background: color-mix(in srgb, var(--rc) 72%, #000); }
 .cx-sub2 { display: flex; flex-wrap: wrap; align-items: center; gap: 2.4cqw; margin-bottom: 1.6cqw; font-size: 3.2cqw; font-weight: 700; color: var(--muted); }
 .cx-sub2 .uic { width: 1.2em; height: 1.2em; vertical-align: -.2em; }
-.cx-stars span { color: #3a3350; }
-.cx-stars span.on { color: var(--amber); }
+.cx-stars .st { color: #3a3350; }
+.cx-stars .st.on { color: var(--amber); }
+.cx-stars .uic { width: 1.15em; height: 1.15em; }
 .cx-note { margin: 0 0 2cqw; font-size: 3.3cqw; line-height: 1.62; color: var(--ink); }
 .cx-note b, .cx-fine b, .cx-sk-d b { color: var(--amber); }
 .cx-fine { margin: 1.4cqw 0 1.6cqw; font-size: 2.7cqw; line-height: 1.5; color: var(--muted); }

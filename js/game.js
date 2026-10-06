@@ -1560,6 +1560,34 @@
     ctx.restore();
   }
 
+  // ── UI 스킨 조각을 캔버스에 그리는 도우미(ART.on.skin 일 때만) ──
+  // 레인 이름표(pocket_plate.png 512×109 — 가로 3분할): 양 끝 캡(소스 70px)은 높이에 맞춘 비율로만 줄여 모양을 지키고 가운데만 가로로 늘린다.
+  // 색(tint)을 입히려면 오프스크린에 한 번 그려 두고 재사용한다(레인 색 3종 × 크기 몇 가지 — 24개를 넘으면 비운다).
+  const _plateCache = {};
+  function plateCanvas(img, w, h, capSrc, tint) {
+    const key = tint + '|' + Math.round(w) + 'x' + Math.round(h); let c = _plateCache[key];
+    if (c) return c;
+    const ks = Object.keys(_plateCache); if (ks.length > 24) ks.forEach(function (k) { delete _plateCache[k]; });
+    const dpr = 2, iw = img.naturalWidth, ih = img.naturalHeight;
+    c = document.createElement('canvas'); c.width = Math.max(2, Math.round(w * dpr)); c.height = Math.max(2, Math.round(h * dpr));
+    const g = c.getContext('2d'); g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high';
+    const cw = Math.min(c.width / 2, capSrc * (c.height / ih));
+    g.drawImage(img, 0, 0, capSrc, ih, 0, 0, cw, c.height);
+    g.drawImage(img, capSrc, 0, iw - capSrc * 2, ih, cw, 0, c.width - cw * 2, c.height);
+    g.drawImage(img, iw - capSrc, 0, capSrc, ih, c.width - cw, 0, cw, c.height);
+    if (tint) { g.globalCompositeOperation = 'source-atop'; g.globalAlpha = 0.6; g.fillStyle = tint; g.fillRect(0, 0, c.width, c.height); }   // 회색 판 위에 레인 색 — 투명한 모서리는 그대로
+    return (_plateCache[key] = c);
+  }
+  // 가로로 긴 띠(band_battle·band_cutin — 좌우가 끝까지 이어진 그림): 위·아래 레일(소스 capSrc px)은 가로 배율 그대로의 두께로, 가운데만 세로로 늘려 w×h 에 맞춘다.
+  function drawBand3(img, x, y, w, h, capSrc) {
+    const iw = img.naturalWidth, ih = img.naturalHeight, cap = Math.min(h / 2, capSrc * (w / iw));
+    ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, 0, 0, iw, capSrc, x, y, w, cap);
+    ctx.drawImage(img, 0, capSrc, iw, ih - capSrc * 2, x, y + cap, w, h - cap * 2);
+    ctx.drawImage(img, 0, ih - capSrc, iw, capSrc, x, y + h - cap, w, cap);
+    ctx.restore();
+  }
+
   // 떠오르는 글자 속 이모지(🪙 🛡 …)를 아이콘 그림으로 바꿔 그린다 — 쓰인 이모지의 그림이 모두 준비됐을 때만(아니면 글자 그대로). 조각 목록은 글자마다 한 번만 만들어 둔다.
   const FLOAT_IC = { '🪙': 'cur_gold', '🧱': 'relic_steel', '💥': 'tag_explosive', '⛓': 'relic_chain', '🍀': 'relic_lucky', '🛢': 'relic_powder', '⏱': 'ic_timer', '🛡': 'tag_guard' };
   const FLOAT_SPLIT = /((?:🪙|🧱|💥|⛓|🍀|🛢|⏱|🛡)️?)/u;
@@ -1656,7 +1684,9 @@
       // hp bar(아래, 얇게)
       const bw = rad * 1.8, bx = p0.x - bw / 2, bh = Math.max(4, Math.round(cellH * 0.07)), by = p0.y + rad + 3;
       ctx.fillStyle = '#0009'; ctx.fillRect(bx, by, bw, bh);
-      ctx.fillStyle = e.elite ? '#ffd93b' : '#ff6b6b'; ctx.fillRect(bx, by, bw * Math.max(0, e.hp / e.maxHp), bh);
+      const ehw = bw * Math.max(0, e.hp / e.maxHp), ehImg = ART.on.skin ? SkinArt.ready(e.elite ? 'gauge_fill_amber' : 'gauge_fill_red') : null;   // 적 HP 채움: 게이지 그림(정예 호박·일반 빨강), 없으면 색 막대
+      if (ehImg) { if (ehw > 0.5) ctx.drawImage(ehImg, 0, 0, ehImg.naturalWidth, ehImg.naturalHeight, bx, by, ehw, bh); }
+      else { ctx.fillStyle = e.elite ? '#ffd93b' : '#ff6b6b'; ctx.fillRect(bx, by, ehw, bh); }
       if (e.isBoss && S.bossIntent && BOSS_INTENT[e.kind]) {   // 보스 예고(남은 턴) — 그 턴에 기절시키면 저지
         const BI = BOSS_INTENT[e.kind], left = S.bossIntent.left, urgent = left <= 1;
         const tic = UiArt.ready('ic_timer'), label = (tic ? '' : '⏳ ') + (urgent ? '다음 턴 ' : left + '턴 후 ') + BI.name;   // 시계 아이콘(없으면 이모지)
@@ -1692,13 +1722,23 @@
       }
     }
     // 방벽 HP 바(두껍게 + 큰 글자)
-    const hbH = Math.max(8, Math.round(wr.h * 0.16)), hbY = wr.y + wr.h - hbH - 3, hbW = wr.w - 16;
-    ctx.fillStyle = '#0007'; ctx.fillRect(wr.x + 8, hbY, hbW, hbH);
-    ctx.fillStyle = '#46e6d0'; ctx.fillRect(wr.x + 8, hbY, hbW * Math.max(0, S.wallHp / S.wallHpMax), hbH);
+    const hbH = Math.max(8, Math.round(wr.h * 0.16)), hbY = wr.y + wr.h - hbH - 3, hbW = wr.w - 16, hpFrac = Math.max(0, S.wallHp / S.wallHpMax);
+    const hpFrame = ART.on.skin ? SkinArt.ready('gauge_frame') : null, hpFill = hpFrame ? SkinArt.ready('gauge_fill_green') : null;   // 게이지 틀 + 초록 채움 그림(없으면 옛 막대)
+    if (hpFrame && hpFill) {
+      ctx.drawImage(plateCanvas(hpFrame, hbW, hbH, 60, null), wr.x + 8, hbY, hbW, hbH);                       // 틀(가로 3분할, 캡 60)
+      const cap = hbH * 60 / 77, ty = hbY + hbH * 0.27, th = hbH * 0.46, tx = wr.x + 8 + cap, tw = hbW - cap * 2;   // 안쪽 트랙(캡·위아래 레일 제외)
+      if (hpFrac > 0) { ctx.save(); ctx.imageSmoothingEnabled = true; ctx.drawImage(hpFill, 0, 0, hpFill.naturalWidth, hpFill.naturalHeight, tx, ty, tw * hpFrac, th); ctx.restore(); }
+    } else {
+      ctx.fillStyle = '#0007'; ctx.fillRect(wr.x + 8, hbY, hbW, hbH);
+      ctx.fillStyle = '#46e6d0'; ctx.fillRect(wr.x + 8, hbY, hbW * hpFrac, hbH);
+    }
     ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.max(11, Math.round(hbH * 0.82)) + 'px system-ui'; ctx.textAlign = 'left';
     const hic = UiArt.ready('stat_hp'), hisz = hbH * 1.1;                     // 방벽 HP 아이콘(없으면 이모지)
-    if (hic) ctx.drawImage(hic, wr.x + 12, hbY + (hbH - hisz) / 2, hisz, hisz);
-    ctx.fillText((hic ? '' : '🛡 ') + Math.ceil(S.wallHp) + ' / ' + S.wallHpMax, wr.x + 14 + (hic ? hisz + 2 : 0), hbY + hbH - Math.max(2, hbH * 0.2));
+    const hpIn = hpFrame && hpFill ? hbH * 60 / 77 * 0.8 - 4 : 0;             // 그림 틀이면 왼쪽 끝 장식(캡)에 안 겹치게 안쪽에서 시작
+    if (hic) ctx.drawImage(hic, wr.x + 12 + hpIn, hbY + (hbH - hisz) / 2, hisz, hisz);
+    const hpTxt = (hic ? '' : '🛡 ') + Math.ceil(S.wallHp) + ' / ' + S.wallHpMax, hpTx = wr.x + 14 + hpIn + (hic ? hisz + 2 : 0), hpTy = hbY + hbH - Math.max(2, hbH * 0.2);
+    if (hpFrame && hpFill) { ctx.save(); ctx.lineJoin = 'round'; ctx.lineWidth = Math.max(3, hbH * 0.22); ctx.strokeStyle = 'rgba(8,4,16,.88)'; ctx.strokeText(hpTxt, hpTx, hpTy); ctx.restore(); }   // 틀 위에서도 읽히게 어두운 테두리
+    ctx.fillText(hpTxt, hpTx, hpTy);
 
     // ── 핀볼 영역(전투로 갈수록 페이드아웃 → 전투 화면에선 안 보임) ──
     const pinAlpha = Math.max(0, 1 - (S.layoutT || 0) * 1.5);
@@ -1744,10 +1784,11 @@
     }
     // 볼(발사볼=흰색, 탄약에서 변환된 볼=탄약 색)
     const palpha = S._acc ? Math.min(1, S._acc / PHYS_DT) : 0;      // 고정 걸음 사이의 남은 시간 비율 — 직전·현재 위치를 이어 그려 슬로모션에서도 매끄럽게
+    const ballImg = ART.launcher.on ? PegArt.ready('ball') : null;   // 발사 볼 그림(광택 있는 금속 구) — 장전 볼(탄약 색)은 색 동그라미 그대로
     for (const b of S.balls) {
       const bx = b.px == null ? b.x : b.px + (b.x - b.px) * palpha, by = b.py == null ? b.y : b.py + (b.y - b.py) * palpha;
-      ctx.beginPath(); ctx.arc(bx, by, b.r, 0, 7);
-      ctx.fillStyle = b.color || '#eafcff'; ctx.fill();
+      if (ballImg && !b.harvest) { const bs = b.r * 2.3; ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(ballImg, bx - bs / 2, by - bs / 2, bs, bs); ctx.restore(); }
+      else { ctx.beginPath(); ctx.arc(bx, by, b.r, 0, 7); ctx.fillStyle = b.color || '#eafcff'; ctx.fill(); }
       if (!b.harvest && b.combo >= 3) {                  // 콤보 카운터(발사볼 위)
         const big = b.combo >= 10;
         const k = COMBO_TEXT_SCALE, ty = by - b.r - 10 * k;
@@ -1772,13 +1813,21 @@
     // 탄창 — 상단은 레인별 캐릭터 이름 라벨, 하단은 포켓 셀
     const g = r.goal, pw = g.w / 9;
     const lblH = Math.min(g.h * 0.4, 20), cellY = g.y + lblH, cellH = g.h - lblH;
+    const plateImg = ART.on.skin ? SkinArt.ready('pocket_plate') : null;   // 이름표 그림(레인 색을 입혀 쓴다) — 없으면 옛 색 띠
     for (let l = 0; l < CFG.lanes; l++) {                 // 레인 그룹 라벨(탄창↔캐릭터 매칭)
       const c = S.chars.find(ch => ch.lane === l); if (!c) continue;
       const span = (S.tutorial && l === 0) ? 6 : 3;       // 튜토리얼 전투: 루비의 탄창 6칸 위에 라벨
       const gx = g.x + (l * 3 + span / 2) * pw;
-      ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, span * pw - 2, lblH - 1);
-      ctx.fillStyle = laneHex(l); ctx.font = 'bold ' + Math.max(11, Math.round(lblH * 0.72)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-      ctx.fillText(c.ref.name, gx, g.y + lblH / 2 + 1); ctx.textBaseline = 'alphabetic';
+      ctx.font = 'bold ' + Math.max(11, Math.round(lblH * 0.72)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      if (plateImg) {
+        ctx.drawImage(plateCanvas(plateImg, span * pw - 2, lblH - 1, 70, laneHex(l)), g.x + l * 3 * pw + 1, g.y + 1, span * pw - 2, lblH - 1);
+        ctx.lineJoin = 'round'; ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(8,4,16,.85)'; ctx.strokeText(c.ref.name, gx, g.y + lblH / 2 + 1);   // 색 판 위에서도 읽히게 흰 글자 + 어두운 테두리
+        ctx.fillStyle = '#fff'; ctx.fillText(c.ref.name, gx, g.y + lblH / 2 + 1);
+      } else {
+        ctx.fillStyle = laneHex(l) + '22'; ctx.fillRect(g.x + l * 3 * pw + 1, g.y + 1, span * pw - 2, lblH - 1);
+        ctx.fillStyle = laneHex(l); ctx.fillText(c.ref.name, gx, g.y + lblH / 2 + 1);
+      }
+      ctx.textBaseline = 'alphabetic';
     }
     for (let i = 0; i < 9; i++) {
       const pk = S.pockets[i]; const x = g.x + i * pw;
@@ -1974,10 +2023,15 @@
     // 전투 시작 배너(가로 띠 + 글자)
     if (S.phase === 'battle' && S.battleStage === 'intro') {
       const cy = r.field.y + r.field.h * 0.5, bk = W / 405;                     // 화면 폭에 비례
+      const bandImg = ART.on.skin ? SkinArt.ready('band_battle') : null;         // 금속 띠 그림(호박색 선) — 없으면 옛 색 띠
       ctx.save();
-      ctx.fillStyle = '#ffcf5c22'; ctx.fillRect(0, cy - 30 * bk, W, 60 * bk);
-      ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30 * bk, W, 2 * bk); ctx.fillRect(0, cy + 28 * bk, W, 2 * bk);
+      if (bandImg) drawBand3(bandImg, 0, cy - 35 * bk, W, 70 * bk, 48);
+      else {
+        ctx.fillStyle = '#ffcf5c22'; ctx.fillRect(0, cy - 30 * bk, W, 60 * bk);
+        ctx.fillStyle = '#ffcf5c'; ctx.fillRect(0, cy - 30 * bk, W, 2 * bk); ctx.fillRect(0, cy + 28 * bk, W, 2 * bk);
+      }
       ctx.fillStyle = '#ffcf5c'; ctx.textAlign = 'center'; ctx.font = 'bold ' + Math.round(34 * bk) + 'px system-ui';
+      if (bandImg) { ctx.lineJoin = 'round'; ctx.lineWidth = 5 * bk; ctx.strokeStyle = 'rgba(8,4,16,.85)'; ctx.strokeText('전투!', W / 2, cy + 12 * bk); }
       ctx.fillText('전투!', W / 2, cy + 12 * bk);
       ctx.restore();
     }
@@ -1987,10 +2041,16 @@
       const c = anim.cut, tt = Math.min(1, c.t / CUT_DUR);
       const a = tt < 0.15 ? tt / 0.15 : tt > 0.82 ? Math.max(0, (1 - tt) / 0.18) : 1;   // 페이드 인/아웃
       const bandH = H * 0.30, bandY = H * 0.34;
+      const cutImg = ART.on.skin ? SkinArt.ready('band_cutin') : null;           // 흰 레일의 어두운 띠 그림 — 곱하기로 클래스 색을 입힌다(레일 = 클래스 색)
       ctx.save(); ctx.globalAlpha = a;
-      ctx.fillStyle = '#0b0812f0'; ctx.fillRect(0, bandY, W, bandH);
-      ctx.fillStyle = c.color; ctx.globalAlpha = a * 0.22; ctx.fillRect(0, bandY, W, bandH); ctx.globalAlpha = a;
-      ctx.fillStyle = c.color; ctx.fillRect(0, bandY, W, 4); ctx.fillRect(0, bandY + bandH - 4, W, 4);
+      if (cutImg) {
+        drawBand3(cutImg, 0, bandY, W, bandH, 56);
+        ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = c.color; ctx.fillRect(0, bandY, W, bandH); ctx.globalCompositeOperation = 'source-over';
+      } else {
+        ctx.fillStyle = '#0b0812f0'; ctx.fillRect(0, bandY, W, bandH);
+        ctx.fillStyle = c.color; ctx.globalAlpha = a * 0.22; ctx.fillRect(0, bandY, W, bandH); ctx.globalAlpha = a;
+        ctx.fillStyle = c.color; ctx.fillRect(0, bandY, W, 4); ctx.fillRect(0, bandY + bandH - 4, W, 4);
+      }
       const cg = (typeof CharArt !== 'undefined') ? CharArt.sprite(c.id, 'cgm') : null;   // CG 좌측 슬라이드 인(작게 그리므로 중간 크기 — 큰 원본을 10배 가까이 줄이면 뭉개짐)
       const slide = Math.min(1, tt / 0.32);
       if (cg) { const ih = bandH * 1.35, iw = ih * (832 / 1216), ix = -iw * 0.35 + slide * (iw * 0.35 + W * 0.04); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(cg, ix, bandY + bandH - ih, iw, ih); }
@@ -2201,7 +2261,8 @@
     UiArt.preload(['stat_hp', 'ic_timer'].concat(Object.keys(FLOAT_IC).map(function (k) { return FLOAT_IC[k]; })));
     PegArt.preload(Object.keys(PEG_TYPES).map(function (k) { return 'peg_' + k; }).concat(['obst_bumper', 'obst_pillar']));
     if (ART.pocket.on) PegArt.preload(ART.pocket.charge.concat([ART.pocket.blank, ART.pocket.buff, ART.pocket.jackpot]));   // 새 그림 슬롯(켜져 있을 때만 요청 — 꺼져 있으면 404 도 없다)
-    if (ART.launcher.on) PegArt.preload([ART.launcher.base, ART.launcher.barrel]);
+    if (ART.launcher.on) PegArt.preload([ART.launcher.base, ART.launcher.barrel, 'ball']);
+    if (ART.on.skin) SkinArt.preload(['pocket_plate', 'band_battle', 'band_cutin', 'gauge_frame', 'gauge_fill_green', 'gauge_fill_red', 'gauge_fill_amber']);   // 캔버스에 그리는 UI 스킨 조각(DOM 쪽은 CSS 가 불러온다)
   }, 600);
 
   // 디버그/스모크 훅

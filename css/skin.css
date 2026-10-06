@@ -49,3 +49,97 @@ html.skin .sns-h { border: solid transparent; border-width: 0 10cqw 0 10.4cqw; b
 /* 상단 재화 칩: chip_frame.png 316×84 · 캡 좌우 56 */
 html.skin #lobby-top .cur { border: solid transparent; border-width: 0 2.2cqw; border-image: url('../assets/ui/skin/chip_frame.png') 0 56 0 56 fill / 0 2.2cqw stretch;
   border-radius: 0; background: none; padding: 1.6cqw 0; }
+
+/* ═══════════ 2026-10-06 추가 납품(PONGTRESS_new_53_approved: U-4~U-12 + 핀볼) ═══════════
+   같은 방식(border-image 9분할)에 조각 15종을 더 입혔다. 캔버스에 그리는 것(이름표·전투 시작 띠·컷인 띠·볼)은 game.js 가 SkinArt/PegArt 로 읽는다. */
+
+/* ── 두 번째 공통 틀: 탭·토글·스킬 버튼·스테이지 버튼 ── */
+html.skin :is(.sns-tab, .hp-tab, .cd-tab, .cx-tab, .side-tgl, .skillbtn, .ss-btn) {
+  --bw: calc(var(--t) * var(--k) * var(--u)) calc(var(--r) * var(--k) * var(--u)) calc(var(--b) * var(--k) * var(--u)) calc(var(--l) * var(--k) * var(--u));
+  border: solid transparent; border-width: var(--bw);
+  border-image: var(--sk) var(--t) var(--r) var(--b) var(--l) fill / var(--bw) stretch;
+  border-radius: 0; background: none; box-shadow: none; }
+
+/* 탭 알약: tab_pill_off/on 344×120 · 슬라이스 40 52 40 52 · 켜짐은 시안 발광 테두리 */
+html.skin :is(.sns-tab, .hp-tab, .cd-tab, .cx-tab) { --sk: url('../assets/ui/skin/tab_pill_off.png'); --t: 40; --r: 52; --b: 40; --l: 52; --k: .5; padding: 0; }
+html.skin :is(.sns-tab, .hp-tab, .cd-tab, .cx-tab).on { --sk: url('../assets/ui/skin/tab_pill_on.png'); }
+html.skin :is(.hp-tab, .cx-tab) { --k: .42; }                    /* 아이콘 위·글자 아래 세로형 탭은 테두리를 조금 얇게(도움말 탭이 두 줄이라 본문 자리를 아낀다) */
+
+/* 하단 내비 활성 탭: nav_active.png(시안 빛기둥) 를 아이콘 뒤에 깐다 */
+html.skin #lobby-nav .tabbtn { position: relative; }
+html.skin #lobby-nav .tabbtn > * { position: relative; z-index: 1; }
+html.skin #lobby-nav .tabbtn.active::before { content: ''; position: absolute; left: 50%; bottom: 26%; width: 78%; height: 104%; transform: translateX(-50%); z-index: 0; pointer-events: none;   /* 빛기둥의 밝은 밑동이 아이콘 아래에 닿고 글자 줄은 비워 둔다(시안 글자가 시안 빛에 묻히지 않게) */
+  background: url('../assets/ui/skin/nav_active.png') center bottom / 100% 100% no-repeat; opacity: .9; }
+
+/* 원형 버튼: round_btn.png — 음소거·도움말·계정·나가기(‹)·닫기(✕) */
+html.skin :is(.lobby-mute, .acct-btn, .lobby-help, .combat-help, .map-help, .exit-btn, .hp-x) { background: url('../assets/ui/skin/round_btn.png') center / 100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; }
+html.skin :is(.lobby-mute, .acct-btn, .lobby-help, .combat-help, .map-help) .uic { width: .85em; height: .85em; }
+html.skin .exit-btn { font-size: 5cqw; padding: 0 0 .5cqw; }
+html.skin .hp-x { font-size: 3.4cqw; }
+/* 화살표 버튼: arrow_left/right.png — 캐릭터 상세·도감의 ‹ › (글자는 숨기고 그림이 화살표를 가진다) */
+html.skin :is(#char-modal .cd-nav, .cx-navs button) { background: url('../assets/ui/skin/arrow_left.png') center / 100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; color: transparent; font-size: 0; }
+html.skin :is(#char-modal button.cd-next, .cx-navs button[data-cx-nav="1"]) { background-image: url('../assets/ui/skin/arrow_right.png'); }   /* ⚠ .cd-next 는 능력치 비교 상자(div)도 쓰는 이름이라 button 으로 좁힌다 */
+html.skin #char-modal .cd-nav { width: 11cqw; height: 11cqw; }
+html.skin .cx-navs button { width: 10cqw; height: 10cqw; }
+
+/* 지도 노드: node_ring.png · node_ring_boss.png (상태는 filter — 방문 = 어둡게 · 현재 = 시안 발광 · 도달 가능 = 호박 맥동) */
+html.skin .map-node .mn-ic { background: url('../assets/ui/skin/node_ring.png') center / 100% 100% no-repeat; border: 0; border-radius: 0; box-shadow: none; }
+html.skin .map-node.t-boss .mn-ic { background: url('../assets/ui/skin/node_ring_boss.png') center / 100% 100% no-repeat; width: 18cqw; height: 18cqw; }
+html.skin .map-node .mn-ic .uic { width: .82em; height: .82em; }
+html.skin .map-node.visited .mn-ic { background: url('../assets/ui/skin/node_ring.png') center / 100% 100% no-repeat; filter: grayscale(.5) brightness(.78); opacity: .9; }
+html.skin .map-node.t-boss.visited .mn-ic { background-image: url('../assets/ui/skin/node_ring_boss.png'); }
+html.skin .map-node.cur .mn-ic { box-shadow: none; filter: drop-shadow(0 0 1.6cqw #46e6d0); }
+html.skin .map-node.reach .mn-ic { animation: nodePulseSkin 1.2s ease-in-out infinite; }
+@keyframes nodePulseSkin { 0%, 100% { filter: drop-shadow(0 0 .4cqw #ffcf5c88); transform: scale(1); } 50% { filter: drop-shadow(0 0 2.2cqw #ffcf5c); transform: scale(1.07); } }
+
+/* 결과 화면 제목: banner_win/lose.png 800×216 · 슬라이스 64 84 64 84 (작전 종료·나가기는 승리 배너의 시안빛을 쓴다) */
+html.skin .result-box h2 {
+  --sk: url('../assets/ui/skin/banner_win.png'); --t: 64; --r: 84; --b: 64; --l: 84; --k: .5;
+  --bw: calc(var(--t) * var(--k) * var(--u)) calc(var(--r) * var(--k) * var(--u)) calc(var(--b) * var(--k) * var(--u)) calc(var(--l) * var(--k) * var(--u));
+  border: solid transparent; border-width: var(--bw); border-image: var(--sk) var(--t) var(--r) var(--b) var(--l) fill / var(--bw) stretch;
+  padding: .6cqw 0; letter-spacing: .8cqw; }
+html.skin .result-box.lose h2 { --sk: url('../assets/ui/skin/banner_lose.png'); }
+
+/* 등급 배지(커먼·레어·에픽·레전더리) · NEW · 편성: 작은 알약이라 9분할 없이 그림 한 장을 칸에 맞춰 늘린다(원본 비율 2.7:1 에 가깝다) */
+/* ⚠ 원래 규칙(.stchar .sc-grade.g-n { background: … })이 클래스 3개라 등급 클래스까지 붙여 우선순위를 맞춘다(안 그러면 background 단축형이 size·repeat 를 되돌려 그림이 잘려 보인다) */
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade):is(.g-n, .g-r, .g-e, .g-l) { background-color: transparent; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; border-radius: 0; text-shadow: none; box-shadow: none; }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-n { background-image: url('../assets/ui/skin/badge_common.png'); }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-r { background-image: url('../assets/ui/skin/badge_rare.png'); }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-e { background-image: url('../assets/ui/skin/badge_epic.png'); }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-l { background-image: url('../assets/ui/skin/badge_legendary.png'); }
+html.skin .stchar .sc-grade { min-width: 11cqw; height: 4.8cqw; }   /* ※ 배치 슬롯의 작은 등급 글자(.ls-g, 글자 2.1cqw)는 그림을 입히면 뭉개져 옛 색 알약 그대로 둔다 */
+html.skin .stchar .sc-st { flex: 0 0 auto; }                         /* 별 5개가 줄어들어 한 개가 실처럼 가늘어지지 않게 */
+html.skin .cd-modal .cd-grade { padding: 1.3cqw 4.6cqw; }
+html.skin .g-tag { padding: .6cqw 2.6cqw; }
+html.skin :is(.onbadge, .gr-tag.new, .cx-new) { background: url('../assets/ui/skin/badge_new.png') center / 100% 100% no-repeat; border-radius: 0; box-shadow: none; color: #fff; padding: .5cqw 2.2cqw; }
+html.skin .stchar .onbadge { background-image: url('../assets/ui/skin/badge_party.png'); }
+html.skin .cx-grade { padding: .7cqw 3.2cqw; color: #fff; }
+html.skin .cx-grade.g-l { color: #2c1d02; }
+
+/* 별(성급): star_on/off.png — ic_star 아이콘을 색만 바꿔 쓰던 것 대신 */
+html.skin :is(.sc-st, .st) .uic { background: url('../assets/ui/skin/star_off.png') center / contain no-repeat; }
+html.skin :is(.sc-st.on, .st.on) .uic { background-image: url('../assets/ui/skin/star_on.png'); }
+html.skin :is(.sc-st, .st) .uic > * { visibility: hidden; }
+
+/* 게이지 틀: gauge_frame.png 512×77 · 가로 3분할(캡 60) — 막대 높이에 비례한 캡. 채움은 gauge_fill_*.png */
+html.skin :is(#exp-bar, .mi-bar) { height: var(--gh); border: solid transparent; border-width: 0 calc(var(--gh) * 60 / 77); border-image: url('../assets/ui/skin/gauge_frame.png') 0 60 0 60 fill / 0 calc(var(--gh) * 60 / 77) stretch;
+  border-radius: 0; background: none; padding: calc(var(--gh) * .27) 0; overflow: hidden; }
+html.skin #exp-bar { --gh: 4cqw; }
+html.skin .mi-bar { --gh: 3.4cqw; margin-top: 1.6cqw; }
+html.skin #exp-fill { background: url('../assets/ui/skin/gauge_fill_cyan.png') 0 0 / 100% 100% no-repeat; }
+html.skin .mi-bar div { background: url('../assets/ui/skin/gauge_fill_amber.png') 0 0 / 100% 100% no-repeat; }
+
+/* 토글(스킬 자동·전투 자동): toggle_off/on.png 320×126 · 슬라이스 42 52 42 70(왼쪽 표시등이 늘어나지 않게) */
+html.skin .side-tgl { --sk: url('../assets/ui/skin/toggle_off.png'); --t: 42; --r: 52; --b: 42; --l: 70; --k: .32; padding: .2cqw 0; }
+html.skin .side-tgl.on { --sk: url('../assets/ui/skin/toggle_on.png'); }
+html.skin #auto-skill-btn, html.skin #btn-auto { background: none; border-color: transparent; }   /* 켜짐 색 바탕(#id.on 규칙)이 틀 뒤에 비치지 않게 */
+/* 스킬 버튼: skill_btn_frame.png 240×259 · 슬라이스 60 56 60 56 — 게이지 채움은 틀 안쪽에서 차오른다 */
+html.skin .skillbtn { --sk: url('../assets/ui/skin/skill_btn_frame.png'); --t: 60; --r: 56; --b: 60; --l: 56; --k: .3; padding: 0; }
+html.skin .skillbtn.ready { filter: drop-shadow(0 0 2cqw #ffcf5ccc); }
+html.skin .skillbtn.armed { filter: brightness(1.35) drop-shadow(0 0 2.4cqw #ffcf5c); }
+html.skin .skillbtn.armed .sb-nm, html.skin .skillbtn.armed .sb-g, html.skin .skillbtn.armed .sb-sk { color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+html.skin .skillbtn.empty { opacity: .55; }
+/* 스테이지 버튼: stage_btn_off/on/locked.png 240×210 · 슬라이스 64 */
+html.skin .ss-btn { --sk: url('../assets/ui/skin/stage_btn_off.png'); --t: 64; --r: 64; --b: 64; --l: 64; --k: .42; padding: 0; min-height: 12cqw; }
+html.skin .ss-btn.sel { --sk: url('../assets/ui/skin/stage_btn_on.png'); }
+html.skin .ss-btn.locked { --sk: url('../assets/ui/skin/stage_btn_locked.png'); opacity: 1; }

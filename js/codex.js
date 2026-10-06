@@ -79,7 +79,9 @@ const Codex = (function () {
   // ═════════ 조각 HTML ═════════
   const num = (n) => Number(n).toLocaleString('ko-KR');
   const spr = (key) => '<i class="cx-spr" style="background-image:url(' + enemyUrl(key) + ');background-size:' + (isBoss(key) ? '400% 200%' : '400% 100%') + '"></i>';   // 적·보스 시트의 첫 프레임
-  const stars = (n) => { let s = ''; for (let i = 1; i <= GROWTH.starMax; i++) s += '<span class="' + (i <= n ? 'on' : '') + '">★</span>'; return s; };
+  // 성급 ★ — 글자 별(스킨이 꺼져 있으면 그대로, 켜져 있으면 css/skin.css 가 .st .uic 에 star_on/off 그림을 입힌다)
+  const stars = (n) => { let s = ''; for (let i = 1; i <= GROWTH.starMax; i++) s += '<span class="st' + (i <= n ? ' on' : '') + '"><span class="uic"><span class="uic-fb">★</span></span></span>'; return s; };
+  const GCLS = { common: 'g-n', rare: 'g-r', epic: 'g-e', legendary: 'g-l' };   // 등급 배지 그림(skin.css)이 읽는 클래스
   const SEC = (t) => '<div class="cx-sect">' + t + '</div>';
   const STAT = (lb, v) => '<div class="cx-st"><span>' + lb + '</span><b>' + v + '</b></div>';
 
@@ -154,11 +156,11 @@ const Codex = (function () {
     const id = key.slice(2), d = ROSTER.find((x) => x.id === id), R = RARITY[d.rarity] || RARITY.common, cl = CLASS[d.cls] || { icon: '', name: '', color: '#9a92c6' };
     const o = Meta.state.owned[id];
     const hero = '<div class="cx-hero char' + (o ? '' : ' locked') + '" style="--rc:' + R.color + '"><img src="' + CharArt.small(id) + '" alt="" draggable="false" onerror="this.style.display=\'none\'"></div>';
-    if (!o) return hero + '<div class="cx-title"><b>???</b><span class="cx-grade" style="--rc:' + R.color + '">' + R.name + '</span></div>'
+    if (!o) return hero + '<div class="cx-title"><b>???</b><span class="cx-grade ' + GCLS[d.rarity] + '" style="--rc:' + R.color + '">' + R.name + '</span></div>'
       + '<p class="cx-note">아직 만나지 못한 동료예요. 상점 <b>가챠</b>에서 얻을 수 있어요.</p>';
     const cur = Meta.leveledDef(id);
     return hero
-      + '<div class="cx-title"><b>' + d.name + '</b><span class="cx-grade" style="--rc:' + R.color + '">' + R.name + '</span></div>'
+      + '<div class="cx-title"><b>' + d.name + '</b><span class="cx-grade ' + GCLS[d.rarity] + '" style="--rc:' + R.color + '">' + R.name + '</span></div>'
       + '<div class="cx-sub2"><span style="color:' + cl.color + '">' + ui('cls_' + d.cls, cl.icon) + ' ' + cl.name + ' · ' + (d.weapon || '') + '</span><span class="cx-stars">' + stars(o.star) + '</span><span>Lv.' + o.level + '</span></div>'
       + '<p class="cx-note">' + d.concept + '</p>'
       + SEC('능력치 <small>Lv.' + o.level + ' · ★' + o.star + ' 기준</small>') + '<div class="cx-stats">' + STAT(ui('stat_atk', '💥') + ' 공격', cur.atk) + STAT(ui('stat_hp', '🛡') + ' 체력', cur.hp) + STAT(ui('stat_gol', '🎯') + ' 탄창', d.gol) + '</div>'

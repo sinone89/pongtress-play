@@ -542,6 +542,8 @@ const PegArt = makeCanvasLoader('assets/peg/', 'png');
 const BgArt = makeCanvasLoader('assets/bg/', 'webp', { frame_pocket: 'png' });
 // UI 아이콘(캔버스에 그릴 때): assets/ui/<name>.png (DOM 에서는 uiIcon/ui 사용)
 const UiArt = makeCanvasLoader('assets/ui/', 'png');
+// UI 스킨 조각(캔버스에 그리는 것): assets/ui/skin/<이름>.png — 레인 이름표(pocket_plate)·전투 시작 띠(band_battle)·스킬 컷인 띠(band_cutin). DOM 쪽 스킨은 css/skin.css 가 맡는다.
+const SkinArt = makeCanvasLoader('assets/ui/skin/', 'png');
 
 // 캔버스 해상도 배율(전투·홈 캔버스 공용): 기기 화소 비율을 그대로 따른다 — 이전엔 2 로 막아서 DPR 3 폰에서 캔버스가 CSS 로 1.5배 늘어나 전부 흐렸다.
 // 2 이하는 그대로, 2 초과는 최대 3 까지 올리되 백킹 스토어가 너무 커지면(≈3.2M 화소) 줄이되 2 아래로는 내리지 않는다.
