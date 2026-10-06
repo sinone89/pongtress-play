@@ -69,7 +69,9 @@ function expToNext(level) { return 16 + level * 11; }
 // ── 캐릭터 (12종. 새 계정의 시작 보유·편성은 아래 META_START, 보라·코코는 튜토리얼에서 합류) ──
 // atk 공격력(발당 피해) · hp 체력(방벽 HP에 합산) · gol 고정 탄창 수(레인 3칸 중 장전되는 칸)
 // active 액티브 스킬(게이지 N) · passive 패시브(보드 효과, 이번 패스 일부만 구현)
-const RARITY = { common: { name: '커먼', color: '#9aa2c0' }, rare: { name: '레어', color: '#5cc8ff' }, epic: { name: '에픽', color: '#c98bff' }, legendary: { name: '레전더리', color: '#ffce54' } };
+const RARITY = { common: { name: '커먼', color: '#9aa2c0', cls: 'g-n' }, rare: { name: '레어', color: '#5cc8ff', cls: 'g-r' }, epic: { name: '에픽', color: '#c98bff', cls: 'g-e' }, legendary: { name: '레전더리', color: '#ffce54', cls: 'g-l' } };
+// 등급 딱지(<span class="g-tag g-n">커먼</span>) — 등급을 보여 주는 곳은 모두 이걸 쓴다(어디서나 같은 그림·같은 모양, 스킨은 css/skin.css '등급 딱지', 꺼져 있으면 색 알약). extra = 추가 클래스.
+function rarBadge(rar, extra) { const R = RARITY[rar] || RARITY.common; return '<span class="g-tag ' + R.cls + (extra ? ' ' + extra : '') + '">' + R.name + '</span>'; }
 // 클래스 3종: 화력을 단일/광역으로 나누고, 힐·제어·버프를 지원으로 묶음
 const CLASS = {
   gunner:  { name: '사수', icon: '🎯', color: '#ff6b6b', desc: '단일 표적 고화력' },

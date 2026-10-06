@@ -1646,8 +1646,7 @@
     // 위험 지대 경계선(점선 빨강)
     ctx.strokeStyle = '#ff6b6b77'; ctx.lineWidth = 2; ctx.setLineDash([7, 5]);
     ctx.beginPath(); ctx.moveTo(fr.x, fr.y + fr.h - cellH); ctx.lineTo(fr.x + fr.w, fr.y + fr.h - cellH); ctx.stroke(); ctx.setLineDash([]);
-    // 적
-    const showLabels = cellH > 42;
+    // 적 (이름·HP 숫자 글자는 그리지 않는다 — build 154)
     for (const g of anim.ghosts) {                 // 방벽에 닿은 적: 방벽 쪽으로 걸어 들어가며 사라진다(방벽 띠가 위에 덮임)
       const gf = EnemyAnim.frame(g, nowS, true); if (!gf) continue;
       const gp = enemyPos(g), gs = Math.min(cellW, cellH) * 0.42 * 2.3;
@@ -1672,15 +1671,12 @@
         drawCell(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, px - s / 2, py - s / 2, s, s);
         if (hit > 0.2) drawCellTint(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, px - s / 2, py - s / 2, s, s, '#ffffff', Math.min(0.85, hit * 1.1));   // 피격 번쩍임(실루엣만)
         else if (e.stun > 0 && !(e.isBoss && e.kind === 'titan')) drawCellTint(ctx, ef.img, ef.sx, ef.sy, ef.sw, ef.sh, px - s / 2, py - s / 2, s, s, '#c9c2ff', 0.42);   // 기절 색조(타이탄은 과열 프레임으로 표현)
-        if (showLabels) { ctx.font = 'bold ' + Math.round(rad * 0.58) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 3; ctx.lineJoin = 'round'; ctx.strokeStyle = 'rgba(8,4,16,.85)'; ctx.strokeText(Math.max(0, Math.ceil(e.hp)), px, py + rad * 0.55); ctx.fillStyle = '#fff'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + rad * 0.55); ctx.textBaseline = 'alphabetic'; }
-      } else {                                        // 폴백: 색 원 + HP 숫자
+        // (build 154) 전투 화면이 난잡하다는 의견으로 적 머리 위 이름과 몸 아래 HP 숫자 글자는 그리지 않는다 — 남은 체력은 아래 막대와 머리말 '적 요약 줄'(남은 총 HP)로, 이름은 도움말·도감으로 본다
+      } else {                                        // 폴백: 색 원(그림이 없을 때)
         ctx.beginPath(); ctx.arc(px, py, rad, 0, 7);
         ctx.fillStyle = hit > 0.2 ? '#ffffff' : e.stun > 0 ? '#c9c2ff' : e.color; ctx.fill();
         ctx.lineWidth = e.isBoss ? 3 : 2; ctx.strokeStyle = '#ffffff55'; ctx.stroke();
-        if (showLabels) { ctx.fillStyle = '#1a1020'; ctx.font = 'bold ' + Math.round(rad * 0.82) + 'px system-ui'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(Math.max(0, Math.ceil(e.hp)), px, py + 1); ctx.textBaseline = 'alphabetic'; }
       }
-      // 이름(위, 공간 있을 때만)
-      if (showLabels && py - rad - 5 > fr.y + cellH * 0.18) { ctx.fillStyle = '#fff'; ctx.font = 'bold ' + Math.round(cellH * 0.15) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(e.name, px, py - rad - 6); }
       // hp bar(아래, 얇게)
       const bw = rad * 1.8, bx = p0.x - bw / 2, bh = Math.max(4, Math.round(cellH * 0.07)), by = p0.y + rad + 3;
       ctx.fillStyle = '#0009'; ctx.fillRect(bx, by, bw, bh);
@@ -1694,7 +1690,7 @@
         ctx.save(); ctx.font = 'bold ' + fs + 'px system-ui'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
         const tw = ctx.measureText(label).width + 16 + (iw ? iw + 4 : 0), th = Math.max(20, cellH * 0.24);
         const tx = Math.max(fr.x + tw / 2 + 4, Math.min(fr.x + fr.w - tw / 2 - 4, px));
-        let ty = py - rad - (showLabels ? 26 : 12); if (ty - th / 2 < fr.y + 2) ty = py + rad + th / 2 + 8;   // 필드 위로 잘리면 보스 아래로
+        let ty = py - rad - 12; if (ty - th / 2 < fr.y + 2) ty = py + rad + th / 2 + 8;   // 필드 위로 잘리면 보스 아래로
         ctx.fillStyle = urgent ? 'rgba(120,20,30,.92)' : 'rgba(20,14,40,.88)'; ctx.beginPath(); ctx.roundRect(tx - tw / 2, ty - th / 2, tw, th, th / 2); ctx.fill();
         ctx.strokeStyle = urgent ? '#ff6b6b' : '#ffcf5c'; ctx.lineWidth = 1.5; ctx.stroke();
         if (tic) ctx.drawImage(tic, tx - tw / 2 + 8, ty - iw / 2, iw, iw);
@@ -2151,7 +2147,9 @@
       const sk = c.ref.active, ready = c.gauge >= sk.gauge;
       b.className = 'skillbtn' + (ready ? ' ready' : '') + (c.armed ? ' armed' : '');
       b.style.setProperty('--lc', laneHex(lane));                                           // 게이지 막대 = 레인 색
-      b.innerHTML = '<i class="sb-fill" style="height:' + Math.round(100 * Math.min(1, c.gauge / sk.gauge)) + '%"></i><span class="sb-nm">' + c.ref.name + '</span><span class="sb-sk">' + sk.name + '</span><span class="sb-g">' + Math.min(c.gauge, sk.gauge) + '/' + sk.gauge + '</span>';
+      b.setAttribute('aria-pressed', c.armed ? 'true' : 'false');
+      // 손으로 켠 스킬(armed)은 막대를 가득 채우고 글자도 '발동 대기' — 어두워지거나 게이지 숫자로 돌아가 '꺼진 것처럼' 보이지 않게(색·링·반짝임은 CSS)
+      b.innerHTML = '<i class="sb-fill" style="height:' + (c.armed ? 100 : Math.round(100 * Math.min(1, c.gauge / sk.gauge))) + '%"></i><span class="sb-nm">' + c.ref.name + '</span><span class="sb-sk">' + sk.name + '</span><span class="sb-g">' + (c.armed ? '발동 대기' : Math.min(c.gauge, sk.gauge) + '/' + sk.gauge) + '</span>';
       b.onclick = () => { if (c.gauge >= sk.gauge) { c.armed = !c.armed; renderSkills(); } };
       col.append(b);
     }

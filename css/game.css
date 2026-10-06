@@ -271,16 +271,34 @@ body {
 .cd-grow-row { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
 .cd-actions { display: flex; gap: 8px; margin-top: 12px; }
 .cd-actions .sns-btn { flex: 1; }
-/* 가챠 결과: 한 줄 4장(10연 = 4+4+2), 카드마다 등급 색 테두리·안쪽 광택, 차례로 튀어나오는 연출 */
-.gacha-res { --cols: 4; display: flex; flex-wrap: wrap; justify-content: center; gap: 2cqw; margin: 3.4cqw auto; max-height: 66vh; overflow-y: auto; }   /* 마지막 줄은 가운데 정렬 */
-.gr-item { flex: 0 0 calc((100% - 2cqw * (var(--cols) - 1)) / var(--cols)); min-width: 0; position: relative; border: 1.5px solid; border-radius: 2.6cqw; padding: 1.8cqw 0.8cqw 1.6cqw; display: flex; flex-direction: column; gap: 0.4cqw; align-items: center;
-  background: linear-gradient(180deg, #ffffff12, #ffffff05); box-shadow: inset 0 0 3cqw color-mix(in srgb, var(--rc, #fff) 28%, transparent);
+/* 가챠 결과(build 154): 캐릭터 그림이 카드 가득 — 반신 크롭 인물 카드(9:16). 한 줄 4장(10연 = 4+4+2, 1~3장은 크게), 등급색 테두리·아래 띠, 차례로 튀어나오는 연출.
+   그림은 CG 를 확대해 얼굴·상체가 카드 폭을 채우게 자른다(--fx 보이는 폭 비율 · --fcx 얼굴 중심 x · --ft 위로 올릴 양 — meta.js GR_FOCUS). */
+#gacha-modal.gr-wide { padding: 2.4cqw; }                            /* 바깥 여백을 줄여 카드를 키운다(보상·상점 팝업과 같은 방식) — 결과 창에만(확률 팝업은 그대로) */
+#gacha-modal.gr-wide .modal-box { max-width: 96cqw; padding: 3.4cqw 3cqw; }
+.gacha-res { --cols: 4; --gap: 1.8cqw; display: flex; flex-wrap: wrap; justify-content: center; gap: var(--gap); margin: 3cqw auto 3.4cqw; max-height: 70vh; overflow-y: auto; }   /* 마지막 줄은 가운데 정렬 */
+.gr-item { --rc: #9aa2c0; flex: 0 0 calc((100% - var(--gap) * (var(--cols) - 1)) / var(--cols)); min-width: 0; position: relative; aspect-ratio: 9 / 16; overflow: hidden;
+  border: .6cqw solid var(--rc); border-radius: 2.6cqw;
+  background: radial-gradient(120% 78% at 50% 30%, color-mix(in srgb, var(--rc) 38%, #1c1634), #0d0a1b 80%);
+  box-shadow: 0 0 2.4cqw color-mix(in srgb, var(--rc) 40%, transparent), inset 0 0 2cqw color-mix(in srgb, var(--rc) 22%, transparent);
   animation: grPop .4s cubic-bezier(.2, 1.4, .4, 1) both; animation-delay: var(--d, 0s); }
-.gr-cg { width: 100%; height: 17cqw; object-fit: contain; margin-bottom: 0.6cqw; }
-.gr-item b { font-size: 3.4cqw; }
-.gr-item span { font-size: 2.7cqw; color: var(--muted); }
-.gr-tag { font-size: 2.6cqw !important; font-weight: 800; color: var(--cyan) !important; }
-.gr-tag.new { color: #3a2a05 !important; background: var(--amber); border-radius: 1cqw; padding: 0.1cqw 1.3cqw; }
+.gacha-res.few .gr-item { flex: 0 0 var(--cw); }
+.gr-art { position: absolute; inset: 0; overflow: hidden; }
+.gr-cg { position: absolute; top: 0; left: calc(50% - var(--fcx, .47) * 100% / var(--fx, .5)); width: calc(100% / var(--fx, .5)); max-width: none; height: auto;
+  transform: translateY(calc(var(--ft, 0) * -100%)); -webkit-user-drag: none; user-select: none; pointer-events: none; filter: drop-shadow(0 .8cqw 1.2cqw #000a); }
+.gr-new, .gr-dup { position: absolute; top: .8cqw; right: .8cqw; z-index: 2; font-size: 2.3cqw; font-style: normal; font-weight: 900; color: #fff; }
+.gr-new { color: #3a2a05; background: var(--amber); border-radius: 1cqw; padding: .3cqw 1.4cqw; }                 /* 스킨을 끈 모습(스킨이 켜져 있으면 NEW 딱지 그림) */
+.gr-dup { display: inline-flex; align-items: center; gap: .5cqw; background: #0b0818d0; border: 1px solid #ffffff30; border-radius: 999px; padding: .3cqw 1.4cqw; text-shadow: 0 1px 2px #000; }
+.gr-dup .uic { width: 1.15em; height: 1.15em; }
+.gr-info { position: absolute; left: 0; right: 0; bottom: 0; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: .7cqw; padding: 7cqw .8cqw 1.5cqw;
+  background: linear-gradient(0deg, color-mix(in srgb, var(--rc) 82%, #000) 0, color-mix(in srgb, var(--rc) 58%, #000) 42%, transparent 100%); }   /* 아래쪽 등급색 띠(니케 카드의 이름 띠처럼) */
+.gr-info b { font-size: 3.7cqw; line-height: 1.1; color: #fff; white-space: nowrap; text-shadow: 0 0 .5cqw #000, 0 .2cqw .5cqw #000; }
+.gr-info .g-tag { margin: 0; font-size: 2.2cqw; }
+.gacha-res.few .gr-info b { font-size: 5.2cqw; }
+.gacha-res.few .gr-info .g-tag { font-size: 3cqw; }
+.gacha-res.few .gr-new, .gacha-res.few .gr-dup { font-size: 3.2cqw; top: 1.4cqw; right: 1.4cqw; }
+.gr-item.g-e::after, .gr-item.g-l::after { content: ''; position: absolute; inset: -10% -40%; z-index: 3; pointer-events: none; transform: translateX(-130%); animation: grGlint 1.2s ease .55s 1 both;
+  background: linear-gradient(110deg, transparent 42%, #ffffff55 50%, transparent 58%); }                         /* 에픽·레전더리: 카드 위로 빛줄기가 한 번 지나간다 */
+@keyframes grGlint { to { transform: translateX(130%); } }
 @keyframes grPop { from { opacity: .25; transform: translateY(2.4cqw) scale(.82); } to { opacity: 1; transform: none; } }   /* 시작도 보이는 상태(.25) — 애니메이션이 멈춰도 내용이 사라지지 않게 */
 
 /* 하단 내비 = 스틸앤샷式 아이콘+라벨 */
@@ -341,10 +359,17 @@ body {
 .skillbtn.ready .sb-fill { background: linear-gradient(180deg, #ffcf5c88, #ff9d3aaa); border-top-color: #ffe9a8; animation: sbPulse 1.3s ease-in-out infinite; }
 .skillbtn.ready .sb-g { color: var(--amber); }
 @keyframes sbPulse { 0%, 100% { opacity: .75; } 50% { opacity: 1; } }
-.skillbtn.armed { background: var(--amber); color: #3a2a05; }
-.skillbtn.armed .sb-fill { display: none; }
-.skillbtn.armed .sb-nm { color: #3a2a05; text-shadow: none; }
-.skillbtn.armed .sb-g, .skillbtn.armed .sb-sk { color: #3a2a05; text-shadow: none; }
+/* 발동 대기(손으로 켠 스킬, build 154): 'ready'(반투명 호박 막대가 깜박) 보다 확실히 켜진 모습 — 막대가 꽉 차 밝은 금색 · 흰 링이 빠르게 맥동 · 빛줄기가 훑고 지나감 · 글자는 '발동 대기'.
+   (예전엔 막대를 숨겨서 UI 스킨에선 까만 버튼이 되는 바람에 스킬이 꺼진 것처럼 보였다) */
+.skillbtn.armed { background: var(--amber); color: #3a2200; border-color: #fff4c4; animation: sbArmed .8s ease-in-out infinite; }
+.skillbtn.armed .sb-fill { display: block; height: 100% !important; background: linear-gradient(180deg, #fff6c0, #ffc93d 52%, #ff9a22); border-top-color: #fff; animation: none; opacity: 1; }
+.skillbtn.armed .sb-nm { color: #3a2200; text-shadow: 0 1px 0 #fff9; }
+.skillbtn.armed .sb-g, .skillbtn.armed .sb-sk { color: #3a2200; text-shadow: 0 1px 0 #fff9; }
+.skillbtn.armed .sb-g { font-size: 2.6cqw; white-space: nowrap; }
+.skillbtn.armed::after { content: ''; position: absolute; top: -25%; bottom: -25%; left: -60%; width: 36%; z-index: 2; pointer-events: none;
+  background: linear-gradient(100deg, transparent, #ffffffcc, transparent); transform: skewX(-18deg); animation: sbShine 1.5s linear infinite; }
+@keyframes sbArmed { 0%, 100% { box-shadow: 0 0 0 .4cqw #fff4c4aa, 0 0 3cqw #ffcf5ccc, inset 0 0 2cqw #fff6; } 50% { box-shadow: 0 0 0 .8cqw #ffffff, 0 0 5.4cqw #ffe27a, inset 0 0 3.4cqw #fffb; } }
+@keyframes sbShine { from { left: -60%; } to { left: 140%; } }
 .skillbtn.empty { border-style: dashed; color: var(--muted); opacity: .6; font-size: 2.8cqw; }
 
 #combat-dock { padding: 8px 12px max(8px, env(safe-area-inset-bottom)); display: flex; gap: 10px; align-items: center; }
@@ -445,10 +470,16 @@ body {
 .cc-rar { font-size: 2.8cqw; }
 .cc-badge { font-size: 2.6cqw; padding: 0.3cqw 1.4cqw; border-radius: 1.6cqw; }
 /* 홈(방치형) 오버레이 카드 */
-.idle-card { padding: 3cqw 3.4cqw; border-radius: 3.6cqw; left: 3cqw; right: 3cqw; bottom: 3cqw; }
-.idle-card .il-time { font-size: 3cqw; }
-.idle-card .il-amt { font-size: 4cqw; }
-.idle-card .il-row { gap: 2.4cqw; margin-top: 2cqw; }
+/* build 154: 칸이 내용에 비해 컸고 제목 글자(16px 고정)·아이콘(18px)이 너무 작았다 → 왼쪽 [제목·시간 / 재화 2개], 오른쪽 [받기] 한 덩어리로 조이고 글자·아이콘을 키운다 */
+.idle-card { padding: 2cqw 3cqw; border-radius: 3.6cqw; left: 3cqw; right: 3cqw; bottom: 3cqw;
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; column-gap: 2.6cqw; row-gap: .6cqw; }
+.idle-card .il-top { grid-column: 1; grid-row: 1; justify-content: flex-start; align-items: center; gap: 2cqw; font-size: 3.6cqw; }
+.idle-card .il-top b { font-size: 3.6cqw; white-space: nowrap; }
+.idle-card .il-time { font-size: 3cqw; white-space: nowrap; }
+.idle-card .il-row { display: contents; }
+.idle-card .il-amt { grid-column: 1; grid-row: 2; display: flex; align-items: center; gap: 4.4cqw; font-size: 4.6cqw; white-space: nowrap; }
+.idle-card .il-c { display: inline-flex; align-items: center; gap: 1.2cqw; }
+.idle-card .il-row .sns-btn { grid-column: 2; grid-row: 1 / 3; align-self: center; font-size: 4cqw; padding: 2.2cqw 4.4cqw; }
 /* 상점/가챠/미션 */
 .gacha-info { font-size: 3.2cqw; margin-bottom: 2.4cqw; }
 .gacha-btns { gap: 2cqw; }
@@ -517,7 +548,7 @@ body {
 .cd-modal .cd-grade.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
 .cd-modal .cd-grade.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
 .cd-modal .cd-grade.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
-.cd-modal .cd-grade.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
+.cd-modal .cd-grade.g-l { background: linear-gradient(180deg,#e6a935,#bd7a18); text-shadow: 0 1px 2px #000a; }   /* 글자색은 다른 등급과 같은 흰색(레전더리만 어두운 글자라 어색하다는 의견, build 154) */
 .cd-modal .cd-starsv { gap: 0.4cqw; color: #3a3358; font-size: 3.4cqw; }   /* 별 5개가 오른쪽 열(폭 ≈21cqw)에 다 들어가게 — 예전 4.4cqw 는 양 끝 별이 잘렸다 */
 .cd-modal .cd-starsv .st { flex: 0 0 auto; }
 .cd-modal .cd-starsv .st.on { color: var(--amber); }
@@ -574,7 +605,7 @@ body {
 .stchar .sc-grade.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
 .stchar .sc-grade.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
 .stchar .sc-grade.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
-.stchar .sc-grade.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
+.stchar .sc-grade.g-l { background: linear-gradient(180deg,#e6a935,#bd7a18); text-shadow: 0 1px 2px #000a; }
 .stchar .sc-star { flex: 1; display: flex; justify-content: flex-end; gap: 0.2cqw; overflow: hidden; }
 .stchar .sc-star .sc-st { font-size: 2.2cqw; color: #3a3350; line-height: 1; }
 .stchar .sc-star .sc-st.on { color: var(--amber); }
@@ -611,7 +642,7 @@ body {
 .lane-slot .ls-g.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
 .lane-slot .ls-g.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
 .lane-slot .ls-g.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
-.lane-slot .ls-g.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
+.lane-slot .ls-g.g-l { background: linear-gradient(180deg,#e6a935,#bd7a18); text-shadow: 0 1px 2px #000a; }
 .lane-slot .ls-x { position: absolute; top: 0.8cqw; right: 0.8cqw; z-index: 3; width: 5.6cqw; height: 5.6cqw; border: 0; border-radius: 1.6cqw;
   background: #ff5db1cc; color: #fff; font-size: 3cqw; font-weight: 800; cursor: pointer; line-height: 1; padding: 0; }
 .lane-slot .ls-rlbl { position: absolute; top: 0.8cqw; left: 0.8cqw; z-index: 3; font-size: 2.2cqw; font-weight: 800; color: var(--muted);
@@ -647,7 +678,7 @@ body {
 .g-tag.g-n { background: linear-gradient(180deg,#5b6b7a,#3f4c58); }
 .g-tag.g-r { background: linear-gradient(180deg,#3b7cc4,#2a5b93); }
 .g-tag.g-e { background: linear-gradient(180deg,#a24fd0,#7a34a5); }
-.g-tag.g-l { background: linear-gradient(180deg,#f0b84c,#d08a22); color: #2c1d02; }
+.g-tag.g-l { background: linear-gradient(180deg,#e6a935,#bd7a18); text-shadow: 0 1px 2px #000a; }
 /* 가챠 확률 팝업 */
 .gi-rates { display: flex; flex-direction: column; gap: 1.4cqw; margin: 3cqw 0; }
 .gi-row { display: flex; align-items: center; justify-content: space-between; background: #ffffff0d; border: 1px solid #ffffff1c; border-radius: 2.4cqw; padding: 2cqw 3cqw; }
@@ -985,6 +1016,30 @@ body {
 .cx-stars .st.on { color: var(--amber); }
 .cx-stars .uic { width: 1.15em; height: 1.15em; }
 .cx-note { margin: 0 0 2cqw; font-size: 3.3cqw; line-height: 1.62; color: var(--ink); }
+
+/* ═══ 출격 탭 한 화면 맞춤(build 154) ═══
+   9:16 프레임에서 스크롤 없이 모든 UI 가 보이게 한다. 세로 flex 로 로비 본문 높이를 채우고(남는 높이는 구역 사이 간격으로 나눠 갖는다),
+   높이가 모자라면(글자 크기 설정이 큰 기기 등) '편성 부대' 칸이 먼저 줄어든다. 머리글·탭·버튼·카드는 조금씩 작게(스킨 쪽 크기는 skin.css 맨 아래). */
+#tab-sortie:not([hidden]) { display: flex; flex-direction: column; justify-content: space-between; height: 100%; gap: 1.2cqw; }
+#tab-sortie > * { flex: 0 0 auto; margin-top: 0; margin-bottom: 0; }          /* flex 안에서는 마진이 겹치지 않으므로 간격은 gap·space-between 이 맡는다 */
+#tab-sortie > #sortie-party { flex: 0 1 27cqw; min-height: 18cqw; margin: 0; }
+#tab-sortie #sortie-party .lane-slot { min-height: 0; }
+#tab-sortie .sns-h { font-size: 3.7cqw; padding: 1.5cqw 3cqw; }
+#mode-select .mode-tabs { margin: 0; }
+#mode-select .mode-info { margin: 1cqw .5cqw 0; }
+html:not(.skin) #mode-select .sns-tab { padding: 2cqw 0; }
+#tab-sortie #stage-select { margin: 0; }
+html:not(.skin) #stage-select .ss-btn { padding: 2.2cqw 0; }
+#tab-sortie #stage-info { margin: 0 .5cqw; padding: 1.8cqw 3cqw 1.6cqw; }
+#tab-sortie .stg-ic { width: 9.2cqw; height: 9.2cqw; }
+#tab-sortie .stg-tile.boss { flex-basis: 19cqw; }
+#tab-sortie .stg-tile.boss .stg-ic { width: 12.6cqw; height: 12.6cqw; }
+#tab-sortie .stg-mul { margin-top: 1.2cqw; gap: 1.4cqw; }
+#tab-sortie .stg-mul > span { font-size: 2.9cqw; padding: .4cqw 2.2cqw; }
+#tab-sortie .cta-bar { padding: 2cqw 4cqw 1.6cqw; }
+#tab-sortie #sortie-warn { font-size: 3.2cqw; }
+#tab-sortie .home-cta-btn { font-size: 4.4cqw; }
+html:not(.skin) #tab-sortie .home-cta-btn { padding: 2.6cqw 7cqw; }
 .cx-note b, .cx-fine b, .cx-sk-d b { color: var(--amber); }
 .cx-fine { margin: 1.4cqw 0 1.6cqw; font-size: 2.7cqw; line-height: 1.5; color: var(--muted); }
 .cx-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.6cqw; }

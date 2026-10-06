@@ -278,7 +278,7 @@ const Meta = (function () {
   }
 
   // ═══════════ 로비 UI ═══════════
-  function rarTag(rar) { const R = RARITY[rar] || RARITY.common; return '<span class="rar" style="color:' + R.color + '">' + R.name + '</span>'; }
+  function rarTag(rar) { return rarBadge(rar); }                  // 등급 딱지(어디서나 같은 모양 — content.js rarBadge)
   function fmtCost(obj) { return Object.entries(obj).filter(([k]) => k !== '_id').map(([k, v]) => uiCur(k) + v).join(' '); }
 
   // 상단 칩용 축약(만 단위): 9,999 이하는 그대로, 그 위는 1.2만 · 123만 · 1.2억 — 숫자가 커져도 칩이 화면 밖으로 밀리지 않게(정확한 값은 title)
@@ -405,7 +405,7 @@ const Meta = (function () {
     const el = $('idle-reward'); if (!el) return;
     const p = idlePending(), hh = Math.floor(p.mins / 60), mm = Math.floor(p.mins % 60), has = (p.gold + p.mats) > 0;
     el.innerHTML = '<div class="il-top"><b>' + ui('ic_idle', '⏳') + ' 방치 보상</b><span class="il-time">' + (p.capped ? '가득 참 · ' : '') + hh + '시간 ' + mm + '분</span></div>'
-      + '<div class="il-row"><span class="il-amt">' + uiCur('gold') + ' ' + p.gold + '  ' + uiCur('mats') + ' ' + p.mats + '</span>'
+      + '<div class="il-row"><span class="il-amt"><span class="il-c">' + uiCur('gold') + ' ' + p.gold + '</span><span class="il-c">' + uiCur('mats') + ' ' + p.mats + '</span></span>'
       + '<button class="sns-btn sm" data-idle="claim"' + (has ? '' : ' disabled') + '>받기</button></div>';
   }
 
@@ -702,7 +702,7 @@ const Meta = (function () {
     el.innerHTML = h;
   }
   function openGachaInfo() {
-    const box = $('gacha-modal-box');
+    const box = $('gacha-modal-box'); $('gacha-modal').classList.remove('gr-wide');
     box.innerHTML = '<h2>' + ui('ic_gacha', '🎰') + ' 가챠 확률</h2>'
       + '<div class="gi-rates">' + GACHA.rates.slice().reverse().map(r => { const R = RARITY[r.rarity] || {}, g = RAR_G[r.rarity] || 'g-n'; return '<div class="gi-row"><span class="g-tag ' + g + '">' + R.name + '</span><b>' + r.w + '%</b></div>'; }).join('') + '</div>'
       + '<div class="gi-guide"><div class="gi-g"><b>' + uiCur('shards') + ' 조각</b> — 이미 가진 동료가 또 나오면 조각 ' + GACHA.dupShards + '개(승급 재료)</div></div>'
@@ -851,11 +851,21 @@ const Meta = (function () {
   }
 
   // ── 가챠 결과 모달 ──
+  // build 154: 캐릭터 그림이 작다는 의견 → 카드 가득 반신 크롭 인물 카드(니케 캐릭터 카드 방식). 위 오른쪽 = NEW 또는 조각 수, 아래 = 등급 딱지 + 이름(등급색 띠).
+  // 그림은 CG(cgm/cg)를 확대해 얼굴·상체가 카드 폭을 채우게 자른다 — fx = 카드에 보이는 그림 폭 비율, fcx = 얼굴 중심 x(그림 폭 비율), ft = 위로 올릴 양(그림 높이 비율). 캐릭터별 보정은 GR_FOCUS.
+  const GR_FOCUS = { _: { fx: 0.52, fcx: 0.47, ft: -0.04 } };
   function showGachaResult(res) {
-    const box = $('gacha-modal-box');
-    const cols = Math.min(4, res.length);
-    box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res" style="--cols:' + cols + ';max-width:' + (cols * 19) + 'cqw">'
-      + res.map((r, i) => { const R = RARITY[r.rarity]; return '<div class="gr-item" style="border-color:' + R.color + ';--rc:' + R.color + ';--d:' + (i * 0.06).toFixed(2) + 's"><img class="gr-cg" src="' + CharArt.path(r.id, 'thumb') + '" alt="" onerror="this.remove()"><b style="color:' + R.color + '">' + r.name + '</b><span>' + R.name + '</span><span class="gr-tag' + (r.isNew ? ' new' : '') + '">' + (r.isNew ? 'NEW' : uiCur('shards') + '+' + GACHA.dupShards) + '</span></div>'; }).join('')
+    const box = $('gacha-modal-box'), n = res.length; $('gacha-modal').classList.add('gr-wide');   // 결과 창만 넓게(확률 팝업은 원래 폭)
+    const few = n <= 3, cols = few ? n : 4, cw = n === 1 ? 38 : n === 2 ? 32 : 26;                // 1~3장은 크게(고정 폭), 4장 이상은 한 줄 4장(10연 = 4+4+2)
+    box.innerHTML = '<h2>뽑기 결과</h2><div class="gacha-res' + (few ? ' few' : '') + '" style="--cols:' + cols + ';--cw:' + cw + 'cqw">'
+      + res.map((r, i) => {
+        const R = RARITY[r.rarity] || RARITY.common, f = Object.assign({}, GR_FOCUS._, GR_FOCUS[r.id]);
+        return '<div class="gr-item ' + R.cls + '" style="--rc:' + R.color + ';--d:' + (i * 0.06).toFixed(2) + 's;--fx:' + f.fx + ';--fcx:' + f.fcx + ';--ft:' + f.ft + '">'
+          + '<div class="gr-art"><img class="gr-cg" src="' + CharArt.path(r.id, few ? 'cg' : 'cgm') + '" alt="" draggable="false" onerror="this.parentNode.classList.add(\'noimg\');this.remove()"></div>'
+          + (r.isNew ? '<span class="gr-new">NEW</span>' : '<span class="gr-dup">' + uiCur('shards') + '+' + GACHA.dupShards + '</span>')
+          + '<div class="gr-info">' + rarBadge(r.rarity) + '<b>' + r.name + '</b></div>'
+          + '</div>';
+      }).join('')
       + '</div><button class="btn primary" data-close="1">확인</button>';
     $('gacha-modal').hidden = false;
   }
@@ -963,5 +973,6 @@ const Meta = (function () {
 
   return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, runEarn, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug, skillText,   // skillText = 도감도 쓴다
     tutOn, tutPullDue, tutorialPull, tutRewardPlan, tutGrantRewards, grantChar,           // 튜토리얼 보상·가챠(js/tutorial.js 가 사용)
+    showGachaResult,                                                                       // 개발용: 뽑기 결과 창을 가짜 결과로 띄워 모양 점검(tools/shots.js)
     get state() { return M; } };
 })();

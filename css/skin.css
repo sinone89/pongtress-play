@@ -29,6 +29,7 @@ html.skin :is(.sns-card, .idle-card, .gbanner), html.skin #stage-info { --sk: ur
 html.skin .sns-card:has(> .sns-row) { --sk: url('../assets/ui/skin/row_frame.png'); --t: 58; --r: 90; --b: 54; --l: 90; padding: .4cqw 1cqw; }
 html.skin .gbanner { padding: 2.4cqw 1.6cqw 1.4cqw; }                   /* 가챠 배너: 위 테두리(3cqw) + 제목 자리 — ⓘ 버튼이 아래 버튼과 겹치지 않게 */
 html.skin .gbanner .gb-info { top: 3.4cqw; right: 3.8cqw; }
+html.skin .idle-card { --k: .22; padding: .8cqw 1.4cqw; }               /* 방치 보상 카드(build 154): 내용에 비해 칸이 컸다 → 틀을 얇게 */
 
 /* ── 모달: modal_frame.png 415×382 · 슬라이스 108 125 100 125 ── */
 html.skin .modal-box { --sk: url('../assets/ui/skin/modal_frame.png'); --t: 108; --r: 125; --b: 100; --l: 125; --k: .30; padding: 2.2cqw 2.6cqw; }
@@ -100,21 +101,50 @@ html.skin .result-box h2 {
   padding: .6cqw 0; letter-spacing: .8cqw; }
 html.skin .result-box.lose h2 { --sk: url('../assets/ui/skin/banner_lose.png'); }
 
-/* 등급 배지(커먼·레어·에픽·레전더리) · NEW · 편성: 작은 알약이라 9분할 없이 그림 한 장을 칸에 맞춰 늘린다(원본 비율 2.7:1 에 가깝다) */
-/* ⚠ 원래 규칙(.stchar .sc-grade.g-n { background: … })이 클래스 3개라 등급 클래스까지 붙여 우선순위를 맞춘다(안 그러면 background 단축형이 size·repeat 를 되돌려 그림이 잘려 보인다) */
-html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade):is(.g-n, .g-r, .g-e, .g-l) { background-color: transparent; background-repeat: no-repeat; background-position: center; background-size: 100% 100%; border-radius: 0; text-shadow: none; box-shadow: none; }
-html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-n { background-image: url('../assets/ui/skin/badge_common.png'); }
-html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-r { background-image: url('../assets/ui/skin/badge_rare.png'); }
-html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-e { background-image: url('../assets/ui/skin/badge_epic.png'); }
-html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade).g-l { background-image: url('../assets/ui/skin/badge_legendary.png'); }
-html.skin .stchar .sc-grade { min-width: 11cqw; height: 4.8cqw; }   /* ※ 배치 슬롯의 작은 등급 글자(.ls-g, 글자 2.1cqw)는 그림을 입히면 뭉개져 옛 색 알약 그대로 둔다 */
+/* ── 등급 딱지(커먼·레어·에픽·레전더리) · NEW · 편성 — 어디서나 같은 모양(build 154) ──
+   ▸ 가로 3분할(border-image): 양 끝 장식(캡)은 그대로 두고 가운데만 글자 길이만큼 늘어난다 → 글자가 딱지 밖으로 나가지 않는다.
+   ▸ 높이 2.2em · 캡 1.4em 처럼 모두 글자 크기(em)에 비례 → 곳마다 font-size 만 정하면 되고, 기기의 글자 크기 설정이 커져도 딱지가 함께 커진다.
+   ▸ 글자는 등급과 상관없이 흰색 + 어두운 테두리(레전더리도 같다 — 혼자 어두운 글자라 어색하다는 의견).
+   ⚠ 원래 규칙(.stchar .sc-grade.g-n { background: … })이 클래스 3개라 등급 클래스까지 붙여 우선순위를 맞춘다. 원본 그림 240×88 → 캡 56px. */
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade, .ls-g):is(.g-n, .g-r, .g-e, .g-l) {
+  --bi: url('../assets/ui/skin/badge_common.png');
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box; flex: 0 0 auto;
+  height: 2.2em; min-width: 0; padding: 0 .1em;
+  border: solid transparent; border-width: 0 1.4em; border-image: var(--bi) 0 56 0 56 fill / 0 1.4em stretch;
+  border-radius: 0; background: none; box-shadow: none;
+  color: #fff; font-weight: 900; line-height: 1; letter-spacing: 0; white-space: nowrap; text-align: center;
+  text-shadow: 0 0 .09em #000, 0 0 .09em #000, 0 .06em .1em #000;
+}
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade, .ls-g).g-r { --bi: url('../assets/ui/skin/badge_rare.png'); }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade, .ls-g).g-e { --bi: url('../assets/ui/skin/badge_epic.png'); }
+html.skin :is(.sc-grade, .cd-grade, .g-tag, .cx-grade, .ls-g).g-l { --bi: url('../assets/ui/skin/badge_legendary.png'); }
+/* NEW · 편성(.onbadge) · 도감 NEW: 160×70 → 높이 2em · 캡 .86em(30px) */
+html.skin :is(.onbadge, .cx-new, .gr-new) {
+  --bi: url('../assets/ui/skin/badge_new.png');
+  display: inline-flex; align-items: center; justify-content: center; box-sizing: border-box;
+  height: 2em; min-width: 0; padding: 0 .1em;
+  border: solid transparent; border-width: 0 .86em; border-image: var(--bi) 0 30 0 30 fill / 0 .86em stretch;
+  border-radius: 0; background: none; box-shadow: none;
+  color: #fff; font-style: normal; font-weight: 900; line-height: 1; letter-spacing: 0; white-space: nowrap;
+  text-shadow: 0 0 .09em #000, 0 0 .09em #000, 0 .06em .1em #000;
+}
+html.skin .stchar .onbadge { --bi: url('../assets/ui/skin/badge_party.png'); }
+/* 곳마다 글자 크기(딱지 크기)와 자리 */
+html.skin .stchar .sc-grade { font-size: 2.1cqw; }
+html.skin .stchar .sc-top { flex-wrap: wrap; row-gap: .5cqw; }        /* 레전더리는 딱지가 넓어 별 5개가 한 줄에 안 들어가면 다음 줄로 내려간다 */
+html.skin .stchar .sc-star { flex: 1 0 auto; }
+html.skin .stchar .sc-star .sc-st { font-size: 1.9cqw; }
 html.skin .stchar .sc-st { flex: 0 0 auto; }                         /* 별 5개가 줄어들어 한 개가 실처럼 가늘어지지 않게 */
-html.skin .cd-modal .cd-grade { padding: 1.3cqw 4.6cqw; }
-html.skin .g-tag { padding: .6cqw 2.6cqw; }
-html.skin :is(.onbadge, .gr-tag.new, .cx-new) { background: url('../assets/ui/skin/badge_new.png') center / 100% 100% no-repeat; border-radius: 0; box-shadow: none; color: #fff; padding: .5cqw 2.2cqw; }
-html.skin .stchar .onbadge { background-image: url('../assets/ui/skin/badge_party.png'); }
-html.skin .cx-grade { padding: .7cqw 3.2cqw; color: #fff; }
-html.skin .cx-grade.g-l { color: #2c1d02; }
+html.skin .stchar .onbadge { font-size: 2.2cqw; }
+html.skin .lane-slot .ls-g { font-size: 2cqw; }
+html.skin .cd-modal .cd-grade { font-size: 3.2cqw; }
+html.skin .g-tag { font-size: 2.6cqw; }
+html.skin .gi-row .g-tag { min-width: 7em; }                          /* 가챠 확률 목록: 네 딱지 폭을 맞춘다 */
+html.skin .cx-grade { font-size: 3cqw; }
+html.skin .cx-new { font-size: 2.2cqw; }
+html.skin .gr-info .g-tag { font-size: 2.2cqw; }                      /* 뽑기 결과 카드 아래 띠의 등급 딱지(1~3장일 때는 크게) */
+html.skin .gacha-res.few .gr-info .g-tag { font-size: 3cqw; }
+html.skin #gacha-modal.gr-wide .modal-box { padding: 2.2cqw 2.6cqw; }
 
 /* 별(성급): star_on/off.png — ic_star 아이콘을 색만 바꿔 쓰던 것 대신 */
 html.skin :is(.sc-st, .st) .uic { background: url('../assets/ui/skin/star_off.png') center / contain no-repeat; }
@@ -136,10 +166,21 @@ html.skin #auto-skill-btn, html.skin #btn-auto { background: none; border-color:
 /* 스킬 버튼: skill_btn_frame.png 240×259 · 슬라이스 60 56 60 56 — 게이지 채움은 틀 안쪽에서 차오른다 */
 html.skin .skillbtn { --sk: url('../assets/ui/skin/skill_btn_frame.png'); --t: 60; --r: 56; --b: 60; --l: 56; --k: .3; padding: 0; }
 html.skin .skillbtn.ready { filter: drop-shadow(0 0 2cqw #ffcf5ccc); }
-html.skin .skillbtn.armed { filter: brightness(1.35) drop-shadow(0 0 2.4cqw #ffcf5c); }
-html.skin .skillbtn.armed .sb-nm, html.skin .skillbtn.armed .sb-g, html.skin .skillbtn.armed .sb-sk { color: #fff; text-shadow: 0 0 3px #000, 0 1px 2px #000; }
+/* 발동 대기(build 154): 막대는 game.css 의 .armed 규칙대로 꽉 찬 금색(틀 안쪽에 갇힘) · 빛은 틀 그림 모양을 따라가는 drop-shadow 로 맥동(네모 box-shadow 는 쓰지 않는다) · 글자는 어두운 갈색(밝은 금색 위) */
+html.skin .skillbtn.armed { box-shadow: none; animation: sbArmedSkin .8s ease-in-out infinite; }
+@keyframes sbArmedSkin { 0%, 100% { filter: brightness(1.08) drop-shadow(0 0 1.6cqw #ffe27a); } 50% { filter: brightness(1.28) drop-shadow(0 0 3.6cqw #fff3a8); } }
 html.skin .skillbtn.empty { opacity: .55; }
 /* 스테이지 버튼: stage_btn_off/on/locked.png 240×210 · 슬라이스 64 */
 html.skin .ss-btn { --sk: url('../assets/ui/skin/stage_btn_off.png'); --t: 64; --r: 64; --b: 64; --l: 64; --k: .42; padding: 0; min-height: 12cqw; }
 html.skin .ss-btn.sel { --sk: url('../assets/ui/skin/stage_btn_on.png'); }
 html.skin .ss-btn.locked { --sk: url('../assets/ui/skin/stage_btn_locked.png'); opacity: 1; }
+
+/* ── 출격 탭 한 화면 맞춤(build 154): 스킨 조각을 한 단계 작게 — 구조는 game.css 맨 아래 '출격 탭 한 화면 맞춤'.
+   머리글은 높이가 줄어든 만큼 양 끝 장식(캡)도 줄인다(캡 ≈ 높이 × 1.03) ── */
+html.skin #tab-sortie .sns-h { font-size: 3.7cqw; padding: 1.4cqw 0; border-width: 0 7.8cqw 0 8.1cqw;
+  border-image: url('../assets/ui/skin/header_banner.png') 0 88 0 92 fill / 0 7.8cqw 0 8.1cqw stretch; }
+html.skin #mode-select .sns-tab { --k: .4; }
+html.skin #stage-select .ss-btn { --k: .32; min-height: 10.2cqw; font-size: 4.4cqw; }
+html.skin #stage-select .ss-btn.locked { font-size: 3.4cqw; }
+html.skin #stage-info { --k: .25; padding: .6cqw 1.2cqw; }
+html.skin #tab-sortie .home-cta-btn { --k: .32; }

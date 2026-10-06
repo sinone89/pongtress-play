@@ -206,7 +206,7 @@ const Help = (function () {
       const c = CLASS[k];
       cl += ROW(big('cls_' + k, c.icon), '<span style="color:' + c.color + '">' + c.name + '</span> <span class="hp-sub">' + c.desc + '</span>', clsNote[k]);
     });
-    const rar = Object.keys(RARITY).map((k) => '<span class="hp-chip" style="--c:' + RARITY[k].color + '">' + RARITY[k].name + '</span>').join('');
+    const rar = Object.keys(RARITY).map((k) => rarBadge(k)).join('');   // 등급 딱지(다른 화면과 같은 모양)
     const pc = GROWTH.promoteCost(1);
     return H('클래스')
       + cl

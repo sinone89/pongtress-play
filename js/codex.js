@@ -116,7 +116,7 @@ const Codex = (function () {
     let rows = '';
     RARS.forEach((r) => {
       const R = RARITY[r];
-      rows += '<div class="cx-rar" style="--c:' + R.color + '">' + R.name + '</div><div class="cx-grid">';
+      rows += '<div class="cx-rar" style="--c:' + R.color + '">' + rarBadge(r) + '</div><div class="cx-grid">';   // 등급 딱지(다른 화면과 같은 모양)
       CLSS.forEach((k) => { const c = ROSTER.find((x) => x.rarity === r && x.cls === k); rows += c ? card('c:' + c.id) : '<span></span>'; });
       rows += '</div>';
     });
