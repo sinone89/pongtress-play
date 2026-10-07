@@ -375,7 +375,7 @@ const Meta = (function () {
     askBtns = o.buttons || []; m._dismiss = o.dismiss !== false;
     $('ask-box').innerHTML = '<h2>' + o.title + '</h2>' + (o.html || '')
       + '<div class="ex-row' + (o.stack ? ' stack' : '') + '">' + askBtns.map((b, i) => '<button class="btn' + (b.primary ? ' primary' : '') + '" data-ask="' + i + '">' + b.label + '</button>').join('') + '</div>';
-    m.hidden = false; if (typeof Sound !== 'undefined') Sound.play('click');
+    m.hidden = false; if (typeof Sound !== 'undefined') Sound.play('ui_popup_open');
   }
   let _mtT = 0;                                                                    // 로비용 토스트(전투 쪽 토스트와 같은 #toast)
   function mToast(html, color) { const el = $('toast'); if (!el) return; el.innerHTML = html; el.style.setProperty('--c', color || '#ffcf5c'); el.className = 'toast show'; clearTimeout(_mtT); _mtT = setTimeout(() => { el.className = 'toast'; }, 1900); }
@@ -411,7 +411,7 @@ const Meta = (function () {
     ask({
       title: '출석 보상',
       html: attendGrid(info) + '<p class="ex-body at-note">' + (info.can ? '<b>' + info.day + '일째</b> 보상이에요. 접속한 날마다 1칸씩 받고, 7일째까지 받으면 처음부터 다시 시작해요.' : '오늘 보상은 이미 받았어요. 내일 또 만나요!') + '</p>',
-      buttons: info.can ? [{ label: '나중에', }, { label: '🎁 받기', primary: true, onClick: () => { const r = claimAttend(); if (r) { if (typeof Sound !== 'undefined') Sound.play('charge'); mToast(ui('ic_reward', '🎁') + ' 출석 ' + r.day + '일째 · ' + fmtCost(r.reward)); } renderLobby(); } }] : [{ label: '확인', primary: true }]
+      buttons: info.can ? [{ label: '나중에', }, { label: '🎁 받기', primary: true, onClick: () => { const r = claimAttend(); if (r) { if (typeof Sound !== 'undefined') Sound.play(r.day === ATTEND.length ? 'ui_claim_big' : 'ui_claim'); mToast(ui('ic_reward', '🎁') + ' 출석 ' + r.day + '일째 · ' + fmtCost(r.reward)); } renderLobby(); } }] : [{ label: '확인', primary: true }]
     });
   }
 
@@ -956,6 +956,7 @@ const Meta = (function () {
     else if (activeTab === 'formation') renderFormation();
     else if (activeTab === 'shop') renderShop();
     else if (activeTab === 'mission') renderMissions();
+    if (typeof Sound !== 'undefined' && !$('lobby').hidden) Sound.scene(activeTab === 'home' ? 'home' : 'menu');   // 배경음: 홈 탭 = bgm_home · 나머지 탭 = bgm_menu (곡이 없으면 아무 일도 없다 · 로비 위에 뜨는 팝업은 탭 곡을 그대로)
   }
   function renderLobby() { renderBar(); renderTab(); }
 
@@ -1082,7 +1083,7 @@ const Meta = (function () {
     // 상단 재화 칩: 누르면 쓰는 곳 · 얻는 곳 설명
     const topBar = $('lobby-top'); if (topBar) topBar.onclick = (e) => { const c = e.target.closest('.cur[data-cur]'); if (c) openCurInfo(c.dataset.cur); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
-    $('mode-select').onclick = (e) => { const b = e.target.closest('[data-mode]'); if (b && MODES[b.dataset.mode]) { M.runMode = b.dataset.mode; save(); renderSortie(); if (typeof Sound !== 'undefined') Sound.play('click'); } };
+    $('mode-select').onclick = (e) => { const b = e.target.closest('[data-mode]'); if (b && MODES[b.dataset.mode]) { M.runMode = b.dataset.mode; save(); renderSortie(); if (typeof Sound !== 'undefined') Sound.play('ui_click'); } };
     // 편성 탭: 드래그하여 레인 배치(스틸앤샷式) — 임계 넘으면 고스트, 드롭한 레인에 할당 / 탭=상세
     $('lane-slots').onclick = (e) => {
       const x = e.target.closest('[data-un]'); if (x) { clearPartySlot(+x.dataset.un); renderFormation(); return; }
@@ -1120,14 +1121,14 @@ const Meta = (function () {
       const g = fmtGhost(); g.style.display = 'none'; fmtClearHi();
       if (!d.moved || (d.touch && d.armed && !d.dragged)) { if (!d.slid) openChar(d.id); return; }  // 탭 = 상세(쓸었다면 스크롤이었으니 열지 않는다 · 조금 길게 눌렀다 떼도 끌지 않았다면 탭으로 본다)
       const s = fmtSlotAt(e.clientX, e.clientY);              // 드래그 = 드롭한 레인에 배치
-      if (s >= 0 && M.owned[d.id]) { assignPartySlot(s, d.id); renderFormation(); if (typeof Sound !== 'undefined') Sound.play('click'); }
+      if (s >= 0 && M.owned[d.id]) { assignPartySlot(s, d.id); renderFormation(); if (typeof Sound !== 'undefined') Sound.play('ui_drag_drop'); }
     });
     window.addEventListener('pointercancel', (e) => { if (fDrag && e.pointerId === fDrag.pid) { clearTimeout(fDrag.lp); fmtStopBlock(); fDrag = null; fmtGhost().style.display = 'none'; fmtClearHi(); } });
     // 상점 탭(서브탭: 가챠/문서/패키지)
     $('shop-body').onclick = (e) => {
       const st = e.target.closest('[data-stab]'); if (st) { shopTab = st.dataset.stab; renderShop(); return; }
       if (e.target.closest('[data-shopcheat]')) {                                   // 치트: 자원 +9999 → 상단 재화 바와 상점 갱신, 버튼은 잠깐 '지급 완료'
-        shopCheatUntil = Date.now() + 1400; doCheat('cur'); if (typeof Sound !== 'undefined') Sound.play('charge');
+        shopCheatUntil = Date.now() + 1400; doCheat('cur'); if (typeof Sound !== 'undefined') Sound.play('ui_claim');
         setTimeout(() => { if (activeTab === 'shop') renderShop(); }, 1450);
         return;
       }
@@ -1136,10 +1137,10 @@ const Meta = (function () {
       if (gc && !gc.disabled) {
         const which = gc.dataset.gacha;
         const res = which === 'tutorial' ? tutorialPull() : which === 'free' ? gacha(1, true) : gacha(which === '10' ? 10 : 1, false);
-        if (res) { if (typeof Sound !== 'undefined') Sound.play('gacha'); showGachaResult(res); renderLobby(); }
+        if (res) { if (typeof Sound !== 'undefined') Sound.play(which === '10' ? 'gacha_ten' : 'gacha_pull'); showGachaResult(res); renderLobby(); }
         else if (which === '1' || which === '10') {                                  // 보석이 모자라 못 뽑음 → 말없이 무시하지 않고 버튼에 부족한 만큼 알린다
           const need = (which === '10' ? GACHA.cost10 : GACHA.cost1) - M.currencies.gems;
-          if (need > 0) { gc.classList.add('warn'); gc.innerHTML = uiCur('gems') + need + ' 부족'; if (typeof Sound !== 'undefined') Sound.play('click'); setTimeout(() => { if (activeTab === 'shop') renderShop(); }, 1300); }
+          if (need > 0) { gc.classList.add('warn'); gc.innerHTML = uiCur('gems') + need + ' 부족'; if (typeof Sound !== 'undefined') Sound.play('ui_deny'); setTimeout(() => { if (activeTab === 'shop') renderShop(); }, 1300); }
         }
         return;
       }
@@ -1153,11 +1154,11 @@ const Meta = (function () {
       else if (b.dataset.dm) { if (claimDaily(b.dataset.dm)) got = DAILY_MISSIONS.find(x => x.id === b.dataset.dm).reward; }
       else if (b.dataset.dmbonus) { if (claimDailyBonus()) got = DAILY_BONUS; }
       else if (b.dataset.attend) { rn = claimAttend(); if (rn) got = rn.reward; }
-      if (got) { if (typeof Sound !== 'undefined') Sound.play('charge'); mToast(ui('ic_reward', '🎁') + ' ' + (rn ? '출석 ' + rn.day + '일째 · ' : '받았어요 · ') + fmtCost(got)); }
+      if (got) { if (typeof Sound !== 'undefined') Sound.play(((rn && rn.day === ATTEND.length) || b.dataset.dmbonus) ? 'ui_claim_big' : 'ui_claim'); mToast(ui('ic_reward', '🎁') + ' ' + (rn ? '출석 ' + rn.day + '일째 · ' : '받았어요 · ') + fmtCost(got)); }   // 큰 수령음: 출석 마지막 날 · 일일 미션 전부 완료 보너스(docs/audio-asset-list.md ui_claim_big)
       renderMissions(); renderBar();
     };
     // 방치 보상 받기
-    const ir = $('idle-reward'); if (ir) ir.onclick = (e) => { const b = e.target.closest('[data-idle]'); if (b && !b.disabled) { const p = claimIdle(); if (p && typeof Sound !== 'undefined') Sound.play('charge'); renderIdleCard(); renderBar(); } };
+    const ir = $('idle-reward'); if (ir) ir.onclick = (e) => { const b = e.target.closest('[data-idle]'); if (b && !b.disabled) { const p = claimIdle(); if (p && typeof Sound !== 'undefined') Sound.play('ui_claim'); renderIdleCard(); renderBar(); } };
     // 캐릭터 모달
     $('char-modal').onclick = (e) => {
       if (e.target.dataset.close || e.target === $('char-modal')) { $('char-modal').hidden = true; return; }
@@ -1166,14 +1167,14 @@ const Meta = (function () {
       if (gt) { cdTab = gt.dataset.cdtab; openChar(cdId); }
       else if (nv && !nv.disabled) { cycleChar(+nv.dataset.cnav); }
       // 상태를 바꾸는 동작(레벨업·승급·편성)은 팝업 뒤의 로비 탭도 바로 다시 그린다(renderLobby) — 안 그러면 팝업을 닫아도 배치칸·Lv 가 탭을 옮겨야 갱신됨
-      else if (lv && !lv.disabled) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('level'); }
-      else if (pr && !pr.disabled) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('level'); }
+      else if (lv && !lv.disabled) { levelUp(lv.dataset.lvup); openChar(lv.dataset.lvup); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('ui_levelup_char'); }
+      else if (pr && !pr.disabled) { promote(pr.dataset.promote); openChar(pr.dataset.promote); renderLobby(); if (typeof Sound !== 'undefined') Sound.play('ui_promote'); }
       else if (pt) {
         const ok = toggleParty(pt.dataset.party); openChar(pt.dataset.party); renderLobby();
         if (!ok) {                                                  // 배치칸 3개가 다 찬 상태에서 편성 → 말없이 무시하지 말고 버튼에 잠깐 알린다
           const b = document.querySelector('#char-modal .cd-place');
           if (b) { b.textContent = '레인이 가득 찼어요'; b.classList.add('warn'); setTimeout(() => { if (b.isConnected && !$('char-modal').hidden) openChar(cdId); }, 1300); }
-        } else if (typeof Sound !== 'undefined') Sound.play('click');
+        } else if (typeof Sound !== 'undefined') Sound.play('ui_click');
       }
     };
     $('gacha-modal').onclick = (e) => { if (e.target.dataset.close || e.target === $('gacha-modal')) $('gacha-modal').hidden = true; };

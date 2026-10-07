@@ -211,7 +211,7 @@ const Codex = (function () {
       const n = e.target.closest('[data-cx-nav]'); if (n) { nav(+n.dataset.cxNav); click(); }
     });
   }
-  function click() { try { if (typeof Sound !== 'undefined') Sound.play('click'); } catch (e) {} }
+  function click() { try { if (typeof Sound !== 'undefined') Sound.play('ui_click'); } catch (e) {} }
   function openEntry(key) {                                          // 카드 → 정보 화면. 처음 보는 항목이면 NEW 를 끈다
     sel = key; view = 'detail';
     const c = data(); if (c && found(key) && !c.seen[key]) { c.seen[key] = 1; save(); }

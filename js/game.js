@@ -115,6 +115,7 @@
     const stage = tut ? 1 : (opts.stage || Meta.stage()), scale = tut ? Object.assign({}, TUTORIAL.scale) : stageScale(stage);   // 스테이지 난이도 배수
     const wallMax = tut ? TUTORIAL.wallHp : party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
     S = newRunState(mode, tut, stage, scale, opts.seed, party, wallMax);
+    Sound.setSpeed(tut ? 1 : battleSpeed);                                // 튜토리얼 전투는 배속 ×1 고정(advance 의 S.tutorial ? 1 : battleSpeed) — 소리의 간격 제한도 저장된 배속을 따르지 않게
     if (resume) applySnapshot(resume); else if (!tut) Meta.clearRun();    // 새 런이 시작되면 예전에 저장돼 있던 런은 버린다(이어하기로 시작한 경우만 유지)
     tScale = 1; demoAim = null; aimShown = null; aimActive = false;      // 튜토리얼 슬로모션·시범 조준은 새 런에 들고 가지 않는다
     if ($('exit-modal')) closeExit();                                    // 나가기 확인 창이 열린 채 새 런이 시작되지 않게
@@ -137,6 +138,7 @@
     if (S && S.tutorial) S.over = true;
     window.__tutPause = false; aimActive = false; tScale = 1; demoAim = null;
     $('combat').classList.remove('tut-battle');
+    Sound.setSpeed(battleSpeed);                                          // 튜토리얼이 끝났으니 소리의 배속을 저장된 값으로 되돌린다
     show('lobby'); Meta.renderLobby();
   }
 
@@ -145,6 +147,9 @@
   // 탄약 종류 가중치 추첨
   const PEG_KEYS = Object.keys(PEG_TYPES);
   const PEG_WEIGHT_TOTAL = PEG_KEYS.reduce((s, k) => s + PEG_TYPES[k].weight, 0);
+  // 소리 id(js/audio.js DEFS — 파일이 없으면 예전 합성음으로 폴백): 맞은 탄약 종류별 · 사격하는 동료 클래스별. 폭탄·오염은 터짐/흡수 소리(peg_bomb·peg_sludge)가 따로 난다
+  const PEG_SND = { normal: 'peg_hit', mult2: 'peg_mult2', mult5: 'peg_mult5', gold: 'peg_gold', charge: 'peg_charge', scrap: 'peg_scrap', bumper: 'obst_bumper', bomb: 'peg_hit', sludge: 'peg_hit' };
+  const SHOT_SND = { gunner: 'shot_gunner', cannon: 'shot_cannon', support: 'shot_support' };
   function pickPegType() {
     let r = Math.random() * PEG_WEIGHT_TOTAL;
     for (const k of PEG_KEYS) { r -= PEG_TYPES[k].weight; if (r <= 0) return k; }
@@ -165,6 +170,7 @@
     S.party.forEach((id, lane) => { if (id) S.chars.push({ ref: Meta.leveledDef(id), lane, ammo: 0, gauge: 0, armed: false, anim: CharAnim.create(id) }); });
     S.passiveBalls = 0;
     S.balls = []; S.shotQueue = []; anim.floats = []; anim.flashes = []; anim.shots = []; anim.skillCuts = []; anim.cut = null; anim.fx = []; anim.shake = 0; anim.ghosts = []; anim.lau = { ang: -Math.PI / 2, tgt: -Math.PI / 2, recoil: 0, flash: 0 };
+    Sound.unduck('cutin');                                              // 위에서 컷인(anim.cut)을 비웠으니 그 덕킹도 푼다
     buildBoard();
     // 패시브(보드 효과) 적용 — 탄약 추가 위치도 고정되도록 시드 난수로(버프판 재현성)
     { const _r = Math.random; Math.random = makeRng(boardSeed() + 31);
@@ -184,6 +190,7 @@
     $('c-name').textContent = S.tutorial ? '튜토리얼 전투' : runLabel() + (combat.name === '전투' ? '' : (combat.boss ? '\n' : ' · ') + combat.name);   // 보스는 이름이 길어 두 번째 줄로(헤더 폭이 좁아 어중간한 곳에서 접히지 않게)   // 일반 전투는 '전투' 를 빼 머리말이 좁아도 한 줄에 들어간다(오른쪽 단계 알약이 장전/전투를 알려 준다)
     enterLoad();
     syncHud();
+    Sound.scene(combat.boss ? 'boss' : 'battle', { stage: S.stage, endless: S.mode === 'endless', boss: S.bossDef && S.bossDef.kind });   // 배경음: 전투/보스(스테이지·무한·보스 종류로 곡을 고른다)
   }
   function runLabel() { return (S.mode === 'endless' ? '무한 ' + (S.loop + 1) + '막' : S.mode === 'daily' ? '일일' : 'S' + S.stage) + ' · ' + (S.combatIndex + 1) + '층'; }
 
@@ -418,7 +425,7 @@
     S.launchedThisTurn = (S.launchedThisTurn || 0) + 1;
     S.launchesLeft--;
     anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;   // 발사대 포신: 쏜 방향으로 맞추고 반동·섬광(자동 발사도 같은 방향)
-    Sound.play('launch');
+    Sound.play('ball_launch');
   }
   // 튜토리얼 시범 볼: 발사 횟수·턴 기록을 건드리지 않고 발사대에서 한 발(demo 표시) — 맞은 탄약·들어간 칸의 효과는 실제와 같다
   function spawnDemoBall(dir, opt) {
@@ -426,7 +433,7 @@
     const L = launcher(), b = { x: L.x, y: L.y, vx: dir.dx * CFG.launchSpeed * BU, vy: dir.dy * CFG.launchSpeed * BU, r: CFG.ballRadius * BU, age: 0, combo: 0, nextBonus: COMBO_STEP, demo: true, demoOnce: !!(opt && opt.once) };
     S.balls.push(b);
     const base = Math.atan2(dir.dy, dir.dx); anim.lau.ang = anim.lau.tgt = base; anim.lau.recoil = 1; anim.lau.flash = 1;
-    Sound.play('launch');
+    Sound.play('ball_launch');
     return b;
   }
 
@@ -455,7 +462,7 @@
         b.vx -= (1 + CFG.restitution) * vdot * nx;
         b.vy -= (1 + CFG.restitution) * vdot * ny;
         if (dry) dryPegHit(b, i, p, w);
-        else { const def = PEG_TYPES[p.type] || PEG_TYPES.normal; anim.flashes.push({ x: px, y: py, t: 1, color: def.color }); Sound.play('peg'); applyPegHit(b, p, def, px, py); }
+        else { const def = PEG_TYPES[p.type] || PEG_TYPES.normal; anim.flashes.push({ x: px, y: py, t: 1, color: def.color }); Sound.play(PEG_SND[p.type] || 'peg_hit', { n: b.combo }); applyPegHit(b, p, def, px, py); }   // n = 이 볼의 지금까지 콤보(일반 탄약 소리가 콤보가 쌓일수록 반음씩 올라간다)
         if (b.eaten) return 'eaten';                                                                          // 오염 탄약에 흡수됨
       }
       if (S.obstacles && S.obstacles.length) {                                                                // 고정 장애물(범퍼/기둥/바)
@@ -546,7 +553,7 @@
         if (dx * dx + dy * dy < b.r * b.r) {
           if (Math.abs(dx) > Math.abs(dy)) { b.vx = (dx < 0 ? -1 : 1) * Math.abs(b.vx) * CFG.wallRestitution; b.x = cx + (dx < 0 ? -1 : 1) * (b.r + 0.5); }
           else { b.vy = (dy < 0 ? -1 : 1) * Math.abs(b.vy) * CFG.wallRestitution; b.y = cy + (dy < 0 ? -1 : 1) * (b.r + 0.5); }
-          if (!dry) Sound.play('peg');
+          if (!dry) Sound.play('obst_pillar');
           return 'bar';
         }
       } else {
@@ -557,7 +564,7 @@
           const dot = b.vx * nx + b.vy * ny; b.vx -= 2 * dot * nx; b.vy -= 2 * dot * ny;
           const boost = (o.t === 'bumper') ? 1.25 : CFG.restitution;
           b.vx *= boost; b.vy *= boost;
-          if (!dry) { if (o.t === 'bumper') { o.flash = 1; anim.flashes.push({ x: ox, y: oy, t: 1, color: '#46e6d0' }); } Sound.play('peg'); }
+          if (!dry) { if (o.t === 'bumper') { o.flash = 1; anim.flashes.push({ x: ox, y: oy, t: 1, color: '#46e6d0' }); } Sound.play(o.t === 'bumper' ? 'obst_bumper' : 'obst_pillar'); }
           return o.t;
         }
       }
@@ -617,7 +624,7 @@
     if (b.harvest) return;                 // 수확 볼은 탄약를 변환하지 않음(연쇄 방지)
     if (def.sludge) {                      // 오염: 발사볼을 삼킴(장전 없음) — 슬러지 간섭
       p.alive = false; b.eaten = true;
-      anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1, ld: true }); Sound.play('wall');
+      anim.floats.push({ x: px, y: py - 10, text: '흡수!', color: def.color, t: 1, ld: true }); Sound.play('peg_sludge');
       return;
     }
     if (def.boost) {                       // 범퍼: 속도 킥(영구·안 사라짐) — 영구 반사체는 콤보 미집계(무한 파밍 방지)
@@ -653,7 +660,7 @@
   function explodeBomb(b, bp, px, py, depth) {
     const r = layout().pins, R = (PEG_TYPES.bomb.bomb || 0.16) * r.w;
     bp.alive = false;
-    anim.fx.push({ type: 'boom', x: px, y: py, t: 1, color: '#ff8a3a', sm: depth > 0 }); anim.shake = Math.max(anim.shake, 5); Sound.play('kill');
+    anim.fx.push({ type: 'boom', x: px, y: py, t: 1, color: '#ff8a3a', sm: depth > 0 }); anim.shake = Math.max(anim.shake, 5); Sound.play('peg_bomb');
     let popped = 0;
     for (const p of S.pegs) {
       if (!p.alive || p === bp) continue;
@@ -676,7 +683,7 @@
       if (b.first && S.setsOn.pinball) ch *= 2;
       spawnBalls(x, y, 1, '#ffd93b', ch, demoOpt(b));
       anim.floats.push({ x: x, y: y - 18, text: step + ' HIT! +' + ch, color: '#ffd93b', t: 1.2, big: true, ld: true });
-      Sound.play('charge');
+      Sound.play('combo_hit');
     }
     const every = rv('chain', 'every');         // 연쇄 반응: N콤보마다 증폭 탄약 생성
     if (every && (S.chainAdded || 0) < 6 && Math.floor(b.combo / every) > Math.floor((b.combo - k) / every)) {
@@ -700,12 +707,12 @@
       const lp = rv('lucky', 'p'); if (lp && Math.random() < lp) { amt *= 3; anim.floats.push({ x: px, y: g.y - 22, text: '🍀 ×3', color: '#7ef29a', t: 1, ld: true }); }
       if (jack) amt *= JACKPOT_MUL;
       if (c) { c.ammo += amt; c.gauge += amt; CharAnim.reload(c.anim); renderSkills(); }   // 탄이 채워질 때마다 재장전 동작
-      Sound.play('charge');
+      Sound.play(jack ? 'pocket_jackpot' : 'pocket_charge');
       anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: laneHex(pk.lane), t: 1, ld: true });
     } else if (pk && pk.type === 'buff') {
       const amt = (b.charge || 1) * 6 * (jack ? JACKPOT_MUL : 1);
       S.wallHp = Math.min(S.wallHpMax, S.wallHp + amt);
-      Sound.play('charge');
+      Sound.play('pocket_buff');
       anim.floats.push({ x: px, y: g.y + 10, text: '+' + amt, color: '#6cf', t: 1, ld: true });
     } else if (jack) {                            // 꽝 칸이라도 잭팟이면 골드
       S.gold = (S.gold || 0) + 10; anim.floats.push({ x: px, y: g.y + 10, text: '+10🪙', color: '#ffd93b', t: 1, ld: true });
@@ -719,7 +726,7 @@
     $('c-phase').textContent = '전투';
     const side = $('battle-side'); if (side) side.style.display = 'none';   // 전투 중 사이드바 숨김
     anim.floats = anim.floats.filter(f => !f.note);                         // 장전 화면용 안내 문구는 전투에 들고 가지 않는다
-    anim.skillCuts = []; anim.cut = null;
+    anim.skillCuts = []; anim.cut = null; Sound.unduck('cutin');
     // 튜토리얼 전투: 장전이 운 나쁘게 빗나가도 전투가 허공에 쏘지 않도록 최소 탄환을 채워 준다
     if (S.tutorial) { const c0 = S.chars[0]; if (c0 && c0.ammo < 6) { const add = 6 - c0.ammo; c0.ammo += add; c0.gauge += add; } }
     // 액티브 스킬 발동(자동 또는 armed) 결정 → 샷 큐 구성
@@ -766,7 +773,7 @@
       S.wallHp = Math.min(S.wallHpMax, S.wallHp + amt);
       const wr = layout().wall; anim.fx.push({ type: 'heal', x: wr.x + wr.w / 2, y: wr.y + wr.h * 0.6, w: wr.w, t: 1, color: '#6cf' });
       anim.floats.push({ x: W / 2, y: layout().wall.y + 12, text: '+' + amt, color: '#6cf', t: 1.2, big: true });
-      Sound.play('charge');
+      Sound.play('wall_heal');
     }
     else if (sk.kind === 'aoe') {   // 광역: 앞 N명 동시 타격(연쇄 폭발 모듈: 타격 수·피해 증가)
       const cnt = (sk.count || 4) + (rv('blast', 'count') || 0), m = (sk.mult || 1.3) * (rv('blast', 'mult') || 1) * mul;
@@ -774,7 +781,7 @@
     }
     else if (sk.kind === 'stun') {
       frontmostN((sk.count || 3) + (mul > 1 ? 1 : 0)).forEach(e => { e.stun = (e.stun || 0) + (sk.turns || 1); const p = enemyPos(e); anim.fx.push({ type: 'shock', x: p.x, y: p.y, t: 1 }); anim.floats.push({ x: p.x, y: p.y - 16, text: '기절', color: '#8cf', t: 1.1 }); });
-      anim.shake = Math.max(anim.shake, 5); Sound.play('wall');
+      anim.shake = Math.max(anim.shake, 5); Sound.play('skill_stun');
     }
   }
 
@@ -787,7 +794,7 @@
   function stepBattle(dt) {
     if (S.battleStage === 'done') return;   // 전투 종료(보상 대기/전진 처리 중)엔 정지 → 보상 선택지 재추첨 방지
     // 컷인 진행(루프·헤드리스 sim 공통). 컷인은 해당 캐릭터의 공격 차례에 발동(아래 'skill' 큐 항목)
-    if (anim.cut) { anim.cut.t += dt; if (anim.cut.t >= CUT_DUR) anim.cut = null; }
+    if (anim.cut) { anim.cut.t += dt; if (anim.cut.t >= CUT_DUR) { anim.cut = null; Sound.unduck('cutin'); } }   // 컷인이 실제로 끝난 순간 배경음 덕킹을 푼다(배속이 빨라도 연출과 같이 끝난다)
     S.battleTimer += dt * 1000;
     // 도입: 필드가 커진 걸 잠깐 보여준 뒤 공격 시작
     if (S.battleStage === 'intro') {
@@ -807,7 +814,7 @@
       if (!head.cutStarted) {                                  // 1) 컷인 시작
         head.cutStarted = true;
         anim.cut = { id: head.c.ref.id, name: head.c.ref.name, skill: head.label, color: head.color, t: 0 };
-        Sound.play('level'); S.battleTimer = 0; return;
+        Sound.play('skill_cutin'); Sound.duck('cutin', -8, { for: 3000 }); S.battleTimer = 0; return;   // 컷인 동안 배경음을 낮춘다 — 푸는 건 위의 컷인 종료 지점(anim.cut = null)이 한다. for 는 어떤 경로로도 안 풀렸을 때를 위한 안전장치(배속 ×1 의 컷인 0.95초보다 충분히 길게)
       }
       S.shotQueue.shift();                                     // 2) 컷인 종료 → 스킬 발동
       const n0 = S.shotQueue.length;
@@ -858,7 +865,7 @@
       anim.shots.push({ sx: from.x, sy: from.y, ex: beam.x, ey: beam.y, t: 0, color: col, big: shot.big || shot.fx === 'bigHit', flash: true, thick: shot.fx === 'bigHit' ? 3 : 1, mang: mz ? mz.ang : null, msz: spot ? spot.size : 0 });
       if (shot.fx === 'aoe') anim.fx.push({ type: 'ring', x: cx, y: cy, t: 1, r: layout().field.w / CFG.fieldLanes * 1.6, color: '#ffb057' });   // 광역 충격링
     }
-    Sound.play('shot');
+    Sound.play(shot.fx === 'bigHit' ? 'skill_big' : shot.fx === 'aoe' ? 'skill_aoe' : SHOT_SND[c && c.ref.cls] || 'shot_gunner');   // 스킬 사격은 스킬 소리, 평타·연사는 쏘는 동료의 클래스 소리
   }
   function frontmostN(n) {
     return S.enemies.slice().sort((a, b) => (a.row - b.row) || (a.lane - b.lane)).slice(0, n);
@@ -911,7 +918,7 @@
     const idx = S.enemies.indexOf(e); if (idx < 0) return; S.enemies.splice(idx, 1);
     S.runKills = (S.runKills || 0) + 1;
     if (typeof Codex !== 'undefined' && Codex.kill(e) && !S.tutorial) S.codexNew.push(e.name.replace(/^정예 /, ''));   // 도감 기록(처음 만난 종류면 결과 화면에 알린다)
-    Sound.play('kill');
+    Sound.play(e.isBoss ? 'boss_defeat' : e.elite ? 'elite_down' : (e.type === 'heavy' || e.type === 'walker') ? 'enemy_die_big' : 'enemy_die');
     { const kp = enemyPos(e); anim.fx.push({ type: 'boom', x: kp.x, y: kp.y, t: 1, color: e.color || '#ffcf5c', sm: !e.isBoss && !e.elite }); if (e.isBoss || e.elite) anim.shake = Math.max(anim.shake, 12); }   // 처치 폭발
     gainExp(e.exp);
     if (e.elite) { S.gold = (S.gold || 0) + ELITE.gold; const p = enemyPos(e); anim.floats.push({ x: p.x, y: p.y - 24, text: '정예 격파! +' + ELITE.gold + '🪙', color: '#ffd93b', t: 1.3, big: true }); }
@@ -929,7 +936,7 @@
 
   function gainExp(x) {
     S.exp += x;
-    while (S.exp >= S.expNext) { S.exp -= S.expNext; S.level++; S.expNext = expToNext(S.level); S.rewardQueue.push(S.level); S.pendingRewards = S.rewardQueue.length; Sound.play('level'); }
+    while (S.exp >= S.expNext) { S.exp -= S.expNext; S.level++; S.expNext = expToNext(S.level); S.rewardQueue.push(S.level); S.pendingRewards = S.rewardQueue.length; Sound.play('levelup_run'); }
     syncHud();
   }
 
@@ -976,7 +983,7 @@
       if (e.row < 0) {
         const dmg = Math.round(e.dmg * (isCharge ? 1.5 : 1) * (1 - red));
         S.wallHp -= dmg;
-        Sound.play('wall');
+        Sound.play('wall_hit');
         anim.floats.push({ x: W * (0.2 + Math.random() * 0.6), y: layout().wall.y + 20, text: '-' + dmg, color: '#ff6b6b', t: 1.2, big: true });
         anim.fx.push({ type: 'wallhit', t: 1 }); anim.fx.push({ type: 'flash', t: 1, color: '#ff2a2a', a: 0.28 }); anim.shake = Math.max(anim.shake, e.isBoss ? 18 : 12);   // 방벽 피격
         if (e.isBoss) { e.row = boss_retreatRow(); }   // 보스는 큰 피해 후 뒤로
@@ -1079,7 +1086,7 @@
       } else if (b.kind === 'swarm') {   // 분리형: 슬러지 분리
         EnemyAnim.pose(e, 'split');
         splitSwarm(e, b.splitCount);
-        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '분리!', color: '#5ad0a0', t: 1.2 }); Sound.play('kill');
+        anim.floats.push({ x: enemyPos(e).x, y: enemyPos(e).y - 20, text: '분리!', color: '#5ad0a0', t: 1.2 }); Sound.play('boss_split');
       }
     }
   }
@@ -1170,7 +1177,7 @@
       const pct = (lv >= 2 ? d.lv2.pct : d.lv1.pct) - (before ? d.lv1.pct : 0), add = Math.round(S.wallBase * pct);
       S.wallHpMax += add; S.wallHp += add;
     }
-    toast((lv >= 2 ? '★ 개량! ' : '모듈 장착 · ') + ui('relic_' + id, d.icon) + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play('level');
+    toast((lv >= 2 ? '★ 개량! ' : '모듈 장착 · ') + ui('relic_' + id, d.icon) + ' ' + relicName(id, lv), RELIC_TAGS[d.tag].color); Sound.play(lv >= 2 ? 'relic_evolve' : 'relic_get');
     // 세트: 같은 태그 모듈 RELIC_SET_N개
     const cnt = {}; for (const k in S.relics) cnt[RELICS[k].tag] = (cnt[RELICS[k].tag] || 0) + 1;
     for (const t in cnt) if (cnt[t] >= RELIC_SET_N && !S.setsOn[t]) {
@@ -1255,7 +1262,9 @@
     const nx = $('result-next');                                  // 패배(방벽 붕괴·무한 모드 종료)일 때만 '다음에 해볼 일' — 정산이 끝난 뒤의 재화·편성 상태로 지금 도움이 되는 것을 고른다
     if (nx) { nx.innerHTML = (!o.win && !o.abandon) ? Meta.nextActionsHTML(runInfo(false)) : ''; nx.classList.toggle('on', !!nx.innerHTML); }
     $('result').hidden = false; $('result-box').scrollTop = 0;
-    Sound.play(o.win ? 'win' : o.abandon ? 'click' : 'lose');
+    if (o.win) Sound.stinger('jg_win'); else if (o.abandon) Sound.play('ui_back'); else Sound.stinger(o.endless ? 'jg_endless_end' : 'jg_lose');   // 징글은 결과 곡(scene)보다 먼저 — result 장면이 징글 길이를 보고 그 뒤에 시작한다
+    Sound.unduck('cutin');                                              // 컷인 도중에 런이 끝나도(나가기) 컷인 덕킹이 결과·로비 곡에 남지 않게
+    Sound.scene('result');
   }
 
   // ============ 나가기(뒤로가기) — 전투 화면·분기 지도의 ‹ 버튼 ============
@@ -1275,7 +1284,7 @@
       + '<p class="ex-body">지금 나가면 이번 런이 <b>여기서 끝나요</b>. 모은 보상은 패배했을 때처럼 받아요.</p>'
       + (chips ? '<div class="ex-earn"><span class="ex-lb">지금 받는 보상</span>' + chips + '</div>' : '<p class="muted">지금 나가면 받을 보상이 없어요.</p>')
       + '<div class="ex-row"><button class="btn primary" data-exit-no="1">계속하기</button><button class="btn" data-exit-yes="1">나가기</button></div>';
-    $('exit-modal').hidden = false; window.__exitPause = true; Sound.play('click');
+    $('exit-modal').hidden = false; window.__exitPause = true; Sound.play('ui_popup_open');
   }
   function closeExit() { $('exit-modal').hidden = true; window.__exitPause = false; }
 
@@ -1342,11 +1351,12 @@
       + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>' + helpBtn('map-help');
     renderRelicBar();
     $('map').hidden = false;
+    Sound.scene('map', { stage: S.stage });                    // 배경음: 지도·상점·정비(곡이 없으면 로비 곡을 이어서)
     saveCheckpoint();                                          // 전투와 전투 사이(여기)가 이어하기 저장 지점
   }
   function enterNode(f, i) {
     const n = S.map.floors[f][i]; n.visited = true; S.mapPos = { f, i }; S.combatIndex = f; S.nodeIdx = i; S.pendingNode = null;
-    Sound.play('click');
+    Sound.play('node_' + n.type);                             // node_battle · node_elite · node_shop · node_rest · node_boss
     if (n.type === 'battle' || n.type === 'elite') { $('map').hidden = true; startCombat(nodeCombat(n.type, f), f, i); }
     else if (n.type === 'boss') { $('map').hidden = true; startCombat(Object.assign({ name: '보스 · ' + BOSSES[stageBoss(S.stage)].name, boss: true }, bossMul()), f, i); }
     else if (n.type === 'shop') { S.pendingNode = 'shop'; showMap(); openShop(); }
@@ -1371,7 +1381,7 @@
     const sh = S.shop; if (!sh) return;
     if (what === 'heal') { if (sh.healed || S.gold < SHOP_PRICE.heal) return; S.gold -= SHOP_PRICE.heal; sh.healed = true; S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * 0.3)); toast(ui('rw_heal', '🔧') + ' 방벽 수리 +30%', '#6cf'); }
     else { const evo = rl(what) === 1, price = evo ? SHOP_PRICE.relicEvo : SHOP_PRICE.relic; if (sh.sold[what] || S.gold < price) return; S.gold -= price; sh.sold[what] = true; gainRelic(what); }
-    Sound.play('charge'); openShop();
+    Sound.play('shop_buy'); openShop();
   }
   // 정비: 수리 또는 개량(보유 모듈 1개를 Lv2로) 중 택1
   function openRest() {
@@ -1385,7 +1395,7 @@
     saveCheckpoint();
   }
   function restPick(v) {
-    if (v === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * REST_HEAL)); toast(ui('rw_heal', '🔧') + ' 정비 · 방벽 회복', '#6cf'); Sound.play('charge'); }
+    if (v === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * REST_HEAL)); toast(ui('rw_heal', '🔧') + ' 정비 · 방벽 회복', '#6cf'); Sound.play('rest_heal'); }
     else if (v.indexOf('evo:') === 0) gainRelic(v.slice(4));
     S.pendingNode = null; $('run-modal').hidden = true; showMap();
   }
@@ -2230,9 +2240,10 @@
   initTitleHero();
   initTitleArt();
   Sound.syncIcons();
+  Sound.scene('title');                   // 배경음: 타이틀(곡 파일이 없으면 아무 일도 없다 · 브라우저 자동재생 정책상 첫 입력 전에는 시작을 미룬다)
   document.querySelectorAll('.mute-btn').forEach(b => b.onclick = () => Sound.toggle());
   const enterLobby = () => {
-    Sound.resume(); Sound.play('click');
+    Sound.resume(); Sound.play('app_start');
     if (typeof Tutorial !== 'undefined' && Tutorial.battleDue()) { startRun({ mode: 'tutorial' }); return; }   // 새 계정의 첫 진입 = 튜토리얼 전투부터(로비는 그 뒤)
     show('lobby'); Meta.renderLobby(); Meta.lobbyEnter();      // lobbyEnter: 저장된 런이 있으면 이어하기 확인 · 오늘 출석 보상이 남았으면 출석 창
   };
@@ -2245,8 +2256,8 @@
   };
   $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
   $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
-  function syncSpeedBtn() { const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed > 1); }
-  $('speed-btn').onclick = () => { battleSpeed = SPEEDS[(SPEEDS.indexOf(battleSpeed) + 1) % SPEEDS.length]; try { localStorage.setItem('pongtress_speed', String(battleSpeed)); } catch (e) {} Sound.play('click'); syncSpeedBtn(); };   // 한 번 누를 때마다 ×1 → ×1.5 → ×2 → ×3 → ×1 (기기에 저장)
+  function syncSpeedBtn() { Sound.setSpeed(S && S.tutorial && !S.over ? 1 : battleSpeed); const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed > 1); }   // setSpeed: 배속이 높을수록 같은 소리의 최소 간격을 늘려 소리가 몰리지 않게(js/audio.js)
+  $('speed-btn').onclick = () => { battleSpeed = SPEEDS[(SPEEDS.indexOf(battleSpeed) + 1) % SPEEDS.length]; try { localStorage.setItem('pongtress_speed', String(battleSpeed)); } catch (e) {} Sound.play('ui_speed'); syncSpeedBtn(); };   // 한 번 누를 때마다 ×1 → ×1.5 → ×2 → ×3 → ×1 (기기에 저장)
   syncSpeedBtn();
   // 나가기: 전투 머리말·분기 지도 머리말의 ‹ 버튼([data-exit] 문서 위임 — 지도 머리말은 다시 그려지므로) → 확인 창 → 로비로
   document.addEventListener('click', (e) => { if (e.target.closest('[data-exit]')) openExit(); });

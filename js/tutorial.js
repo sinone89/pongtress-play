@@ -521,7 +521,7 @@ const Tutorial = (function () {
   function onRowClick(e) {
     const b = e.target.closest('[data-a]'); if (!b || !shown || b.disabled) return;
     const a = b.dataset.a, d = shown.def;
-    try { if (typeof Sound !== 'undefined') Sound.play('click'); } catch (_) {}
+    try { if (typeof Sound !== 'undefined') Sound.play('ui_tut_next'); } catch (_) {}
     if (a === 'next') cardNext();
     else if (a === 'ask') { if (Date.now() < skipReadyAt) return; openSkip(); }
     else if (a === 'yes') replay(0);
@@ -564,6 +564,7 @@ const Tutorial = (function () {
     shown = null; window.__tutPause = false; handSig = ''; if (handAnim) { try { handAnim.cancel(); } catch (_) {} handAnim = null; }
     try { const g = game(); if (g && lastSlow !== 1) { g.setTimeScale(1); } g && g.setDemoAim(null); } catch (_) {}
     lastSlow = 1; try { setMarks([]); } catch (_) {}
+    try { if (typeof Sound !== 'undefined') Sound.unduck('tutorial'); } catch (_) {}   // 카드가 사라지면 배경음을 되돌린다(0.25초마다 불려도 이미 풀렸으면 아무 일 없다)
     if (!moment && raf && !needsRaf()) { if (raf > 0) cancelAnimationFrame(raf); raf = 0; }
   }
 
@@ -672,6 +673,7 @@ const Tutorial = (function () {
     if (!shown.ran) { shown.ran = true; if (d.run) { try { d.run(); } catch (e) { console.error('[tutorial]', e); } } }   // 박자 시작 동작(시범 볼 쏘기 등)은 한 번만
     renderDialog();
     $('tut').classList.add('show');
+    try { if (typeof Sound !== 'undefined') Sound.duck('tutorial', -6); } catch (_) {}   // 카드가 떠 있는 동안 배경음 -6 dB(같은 값을 또 불러도 아무 일 없다)
     place();
     window.__tutPause = !!(d.pause && combatOn());
     startRaf();

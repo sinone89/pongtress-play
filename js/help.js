@@ -336,7 +336,7 @@ const Help = (function () {
     renderTabs(); renderBody(); renderFoot();
     $('help-modal').hidden = false;
     window.__helpPause = vis('combat');                              // 런 중이면 게임을 멈춘다(game.js 루프)
-    try { if (typeof Sound !== 'undefined') Sound.play('click'); } catch (e) {}
+    try { if (typeof Sound !== 'undefined') Sound.play('ui_help_open'); } catch (e) {}
   }
   function close() {
     const m = $('help-modal'); if (m) m.hidden = true;
