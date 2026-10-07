@@ -14,8 +14,8 @@
   <link rel="manifest" href="manifest.json">
   <link rel="icon" type="image/png" href="assets/icon-192.png">
   <link rel="apple-touch-icon" href="assets/icon-192.png">
-  <link rel="stylesheet" href="css/game.css?v=156">
-  <link rel="stylesheet" href="css/skin.css?v=156">
+  <link rel="stylesheet" href="css/game.css?v=157">
+  <link rel="stylesheet" href="css/skin.css?v=157">
   <link rel="preload" as="image" href="assets/logo.webp" type="image/webp">
 </head>
 <body>
@@ -64,10 +64,10 @@
     <!-- 로비 -->
     <section id="lobby" class="screen" hidden>
       <header id="lobby-top">
-        <span class="cur"><span class="uic"><span class="uic-fb">🪙</span><img class="uic-im" alt="" src="assets/ui/cur_gold.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gold">0</b></span>
-        <span class="cur"><span class="uic"><span class="uic-fb">🔩</span><img class="uic-im" alt="" src="assets/ui/cur_mats.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-mats">0</b></span>
-        <span class="cur"><span class="uic"><span class="uic-fb">💎</span><img class="uic-im" alt="" src="assets/ui/cur_gems.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gems">0</b></span>
-        <span class="cur"><span class="uic"><span class="uic-fb">📄</span><img class="uic-im" alt="" src="assets/ui/cur_docs.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-docs">0</b></span>
+        <span class="cur" data-cur="gold" role="button" aria-label="크레딧 설명"><span class="uic"><span class="uic-fb">🪙</span><img class="uic-im" alt="" src="assets/ui/cur_gold.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gold">0</b></span>
+        <span class="cur" data-cur="mats" role="button" aria-label="재료 설명"><span class="uic"><span class="uic-fb">🔩</span><img class="uic-im" alt="" src="assets/ui/cur_mats.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-mats">0</b></span>
+        <span class="cur" data-cur="gems" role="button" aria-label="보석 설명"><span class="uic"><span class="uic-fb">💎</span><img class="uic-im" alt="" src="assets/ui/cur_gems.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-gems">0</b></span>
+        <span class="cur" data-cur="docs" role="button" aria-label="문서 설명"><span class="uic"><span class="uic-fb">📄</span><img class="uic-im" alt="" src="assets/ui/cur_docs.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span><b id="cur-docs">0</b></span>
         <button class="mute-btn lobby-mute"><span class="mute-icon">🔊</span></button>
         <button class="help-btn lobby-help" data-help="open" aria-label="도움말"><span class="uic"><span class="uic-fb">❔</span><img class="uic-im" alt="" src="assets/ui/ic_info.png" onload="this.parentNode.classList.add('ok')" onerror="this.remove()"></span></button>
         <button class="acct-btn" id="acct-btn"></button>
@@ -177,6 +177,7 @@
         <div id="result-stats" class="rs-stats"></div>
         <div id="result-earn" class="rs-earn"></div>
         <div id="result-notes" class="rs-notes"></div>
+        <div id="result-next" class="rs-next"></div>
         <button id="btn-result" class="btn primary">로비로</button>
       </div>
     </div>
@@ -185,14 +186,14 @@
   </div>
   <div id="build-tag"></div>
 
-  <script src="js/audio.js?v=156"></script>
-  <script src="js/spritemeta.js?v=156"></script>
-  <script src="js/artmeta.js?v=156"></script>
-  <script src="js/content.js?v=156"></script>
-  <script src="js/meta.js?v=156"></script>
-  <script src="js/game.js?v=156"></script>
-  <script src="js/tutorial.js?v=156"></script>
-  <script src="js/help.js?v=156"></script>
-  <script src="js/codex.js?v=156"></script>
+  <script src="js/audio.js?v=157"></script>
+  <script src="js/spritemeta.js?v=157"></script>
+  <script src="js/artmeta.js?v=157"></script>
+  <script src="js/content.js?v=157"></script>
+  <script src="js/meta.js?v=157"></script>
+  <script src="js/game.js?v=157"></script>
+  <script src="js/tutorial.js?v=157"></script>
+  <script src="js/help.js?v=157"></script>
+  <script src="js/codex.js?v=157"></script>
 </body>
 </html>

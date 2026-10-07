@@ -7,6 +7,7 @@ const Meta = (function () {
   const ACCTS_KEY = 'pongtress_accts', CUR_KEY = 'pongtress_cur';
   const $ = (id) => document.getElementById(id);
   let M = null, activeTab = 'home', onSortie = null, cdTab = 'lvup', cdId = null, shopTab = 'gacha';
+  let onResumeRun = null, onAbandonSaved = null, askedEmpty = '';   // 이어하기·저장된 런 포기(game.js 가 init 에서 넘김) · 빈 레인 확인에서 '그대로 출격'을 고른 편성(같은 편성이면 다시 묻지 않는다)
 
   // ── 로컬 계정(다중 프로필): 아이디/비번 → 계정별 세이브 (스틸앤샷式) ──
   let curAcct = null; try { curAcct = localStorage.getItem(CUR_KEY) || null; } catch (e) {}
@@ -27,10 +28,13 @@ const Meta = (function () {
     try { localStorage.setItem(CUR_KEY, id); } catch (e) {}
     location.reload();                                                             // 리로드로 해당 계정 세이브 재초기화
   }
-  function logout() {
-    if (!confirm('로그아웃할까요? 진행상황은 「' + curAcct + '」 계정에 저장돼 있어요.')) return;
-    try { localStorage.removeItem(CUR_KEY); } catch (e) {}
-    location.reload();
+  const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));   // 아이디는 사용자가 입력한 글자라 HTML 로 넣기 전에 이스케이프(자기 기기 안의 일이지만 위생상)
+  function logout() {                                                                // 앱 안의 확인 창(예전엔 브라우저 기본 confirm — 모양이 게임과 달랐다)
+    ask({
+      title: '로그아웃할까요?',
+      html: '<p class="ex-body">진행 상황은 「<b>' + escHtml(curAcct) + '</b>」 계정에 저장돼 있어요. 진행 중인 런도 그대로 남아요.</p>',
+      buttons: [{ label: '취소', primary: true }, { label: '로그아웃', onClick: () => { try { localStorage.removeItem(CUR_KEY); } catch (e) {} location.reload(); } }]
+    });
   }
   // 계정 메뉴(상단 계정 버튼): 튜토리얼 다시 보기 / 로그아웃
   function openAcctMenu() {
@@ -47,7 +51,7 @@ const Meta = (function () {
         else if (b.dataset.acct === 'logout') logout();
       };
     }
-    const nm = String(curAcct).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));   // 아이디는 사용자가 입력한 글자라 HTML 로 넣기 전에 이스케이프(자기 기기 안의 일이지만 위생상)
+    const nm = escHtml(curAcct);
     $('acct-box').innerHTML = '<h2>' + uiIcon('ic_account', '👤', 'width:1.2em;height:1.2em;vertical-align:-0.2em') + ' ' + nm + '</h2>'
       + '<div class="cd-btns"><button class="btn" data-acct="tut">' + ui('ic_info', '❔') + ' 튜토리얼 다시 보기</button><button class="btn" data-acct="logout">로그아웃</button></div>'
       + '<button class="btn primary" data-close="1">닫기</button>';
@@ -78,6 +82,8 @@ const Meta = (function () {
     if (!MODES[M.runMode]) M.runMode = 'normal';
     M.dailyRec = M.dailyRec || { date: '', best: 0, rewarded: false };
     M.endlessBest = M.endlessBest || { loop: 0, floors: 0, score: 0 };
+    if (!M.dm || typeof M.dm !== 'object') M.dm = dmBlank('');                          // 일일 미션(오늘 진행도·받은 표시) — 날짜가 바뀌면 dmState() 가 새로 시작시킨다
+    M.attend = Object.assign({ count: 0, last: '', shown: '' }, M.attend);              // 출석: count = 이번 7일 주기에서 받은 칸 수 · last = 마지막으로 받은 날짜 · shown = 출석 창을 자동으로 띄운 날짜
     // 튜토리얼 진행(js/tutorial.js, v2): 새 계정 = 첫 전투부터 자동 시작 / 튜토리얼 도입 전부터 있던 계정 = 완료로 보고 한 번 '볼까요?' 제안
     //   v2 필드 — battle: 튜토리얼 전투를 끝냈나 · pulled: 튜토리얼 가챠를 했나 · rewarded: 완료 선물을 받았나 · review: 다시 보기 중인 챕터(0=아님, -1=전체)
     if (!M.tut || typeof M.tut !== 'object') M.tut = fresh ? { v: 2, at: 'c1-hello', done: false, offered: true, seen: {}, battle: false, pulled: false, rewarded: false, review: 0 }
@@ -170,7 +176,7 @@ const Meta = (function () {
     if (o.level >= levelCap(id)) return false;
     const cost = GROWTH.levelUpCost(o.level);
     if (M.currencies.gold < cost) return false;
-    M.currencies.gold -= cost; o.level++; save(); return true;
+    M.currencies.gold -= cost; o.level++; dmAdd('lvups', 1); save(); return true;
   }
   function promote(id) {
     const o = M.owned[id]; if (!o) return false;
@@ -220,6 +226,59 @@ const Meta = (function () {
     if (missionProgress(m) < m.goal) return false;
     gain(m.reward); M.claimed[id] = true; save(); return true;
   }
+  // ── 일일 미션 · 출석 ──
+  const dmBlank = (date) => ({ date: date || '', p: { runs: 0, wins: 0, kills: 0, lvups: 0 }, claimed: {}, bonus: false });
+  function dmState() {                                                           // 오늘의 일일 미션 상태 — 날짜가 바뀌었으면(자정 이후·앱을 켜 둔 채로도) 새로 시작
+    const k = todayKey(), d = M.dm;
+    if (!d || typeof d !== 'object' || d.date !== k || !d.p || !d.claimed) M.dm = dmBlank(k);
+    return M.dm;
+  }
+  function dmAdd(stat, n) { if (!M || !(n > 0)) return; const d = dmState(); d.p[stat] = (d.p[stat] || 0) + n; }
+  const dmProg = (m) => Math.min(m.goal, dmState().p[m.stat] || 0);
+  const dmAllClaimed = () => DAILY_MISSIONS.every(m => dmState().claimed[m.id]);
+  function claimDaily(id) {
+    const m = DAILY_MISSIONS.find(x => x.id === id), d = dmState();
+    if (!m || d.claimed[id] || dmProg(m) < m.goal) return false;
+    gain(m.reward); d.claimed[id] = true; save(); return true;
+  }
+  function claimDailyBonus() {
+    const d = dmState(); if (d.bonus || !dmAllClaimed()) return false;
+    gain(DAILY_BONUS); d.bonus = true; save(); return true;
+  }
+  function attendInfo() {                                                        // day = 오늘 받을 칸(1~7) · done = 이번 주기에서 이미 받은 칸 수 · can = 오늘 아직 안 받았나
+    const a = M.attend, claimedToday = a.last === todayKey();
+    const done = (a.count >= ATTEND.length && !claimedToday) ? 0 : a.count;      // 7일째까지 다 받은 뒤 새 날이 오면 1일째부터 새 주기
+    return { day: Math.min(ATTEND.length, done + 1), done, can: !claimedToday, claimedToday };
+  }
+  function claimAttend() {
+    const info = attendInfo(); if (!info.can) return null;
+    const reward = ATTEND[info.day - 1]; gain(reward);
+    M.attend.count = info.day; M.attend.last = todayKey(); save();
+    return { day: info.day, reward };
+  }
+  // 미션 탭에 받을 게 있나(출석 · 일일 미션 · 일일 보너스 · 도전 과제) — 아래 탭 버튼의 빨간 점
+  function missionDot() {
+    if (!M) return false;
+    if (attendInfo().can) return true;
+    if (DAILY_MISSIONS.some(m => !dmState().claimed[m.id] && dmProg(m) >= m.goal)) return true;
+    if (!dmState().bonus && dmAllClaimed()) return true;
+    return MISSIONS.some(m => !M.claimed[m.id] && missionProgress(m) >= m.goal);
+  }
+
+  // ── 진행 중인 런 저장(js/game.js 가 체크포인트를 넘겨 준다) ── 계정별 1개. 런이 끝나면(onRunEnd) 지운다 → 이어하기 뒤 정산이 두 번 되는 일이 없다
+  const runKey = () => curAcct ? ('pongtress_run_' + curAcct) : null;
+  function saveRun(snap) { const k = runKey(); if (!k) return false; try { localStorage.setItem(k, JSON.stringify({ v: 1, t: Date.now(), s: snap })); return true; } catch (e) { return false; } }
+  function loadRun() {
+    const k = runKey(); if (!k) return null;
+    try {
+      const o = JSON.parse(localStorage.getItem(k)); const s = o && o.s;
+      const ok = o && o.v === 1 && s && s.map && Array.isArray(s.map.floors) && s.map.floors.length && s.mapPos && Array.isArray(s.party)
+        && s.party.every(id => !id || ROSTER.some(c => c.id === id)) && MODES[s.mode] && isFinite(s.stage) && isFinite(s.wallHp) && isFinite(s.wallHpMax) && s.relics && typeof s.relics === 'object';
+      if (ok) return o;
+    } catch (e) {}
+    clearRun(); return null;                                                     // 읽을 수 없거나 모양이 어긋난 저장은 버린다(새 버전과 맞지 않을 때도 안전)
+  }
+  function clearRun() { const k = runKey(); if (k) try { localStorage.removeItem(k); } catch (e) {} }
 
   // ── 편성 ──
   function inParty(id) { return M.party.indexOf(id) >= 0; }
@@ -257,6 +316,7 @@ const Meta = (function () {
     gain(earn);
     M.stats.kills += (r.kills || 0);
     M.stats.floors += (r.floors || 0);
+    dmAdd('kills', r.kills || 0); if ((r.floors || 0) >= 1) dmAdd('runs', 1); if (r.won) dmAdd('wins', 1);   // 일일 미션 진행(전투를 하나도 못 이긴 런은 '마친 런'으로 세지 않는다 — 켰다 끄기 반복 방지)
     let unlocked = 0, relicsUnlocked = [], record = false, dailyReward = 0;
     if (r.won) M.stats.runsWon += 1;
     if (r.won && mode === 'normal') {
@@ -274,6 +334,7 @@ const Meta = (function () {
       if (r.won && !M.dailyRec.rewarded) { M.dailyRec.rewarded = true; dailyReward = MODES.daily.reward.gems; M.currencies.gems += dailyReward; }
     }
     if (mode === 'endless' && (r.score || 0) > M.endlessBest.score) { M.endlessBest = { loop: r.loop || 0, floors: r.floors || 0, score: r.score || 0 }; record = true; }
+    clearRun();                                                                 // 정산이 끝난 런은 이어하기 저장에서 지운다(이중 정산 방지)
     save();
     return Object.assign(earn, { unlocked, relicsUnlocked, record, dailyReward });
   }
@@ -292,7 +353,113 @@ const Meta = (function () {
   }
   function renderBar() {
     for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); el.parentNode.classList.toggle('lg', el.textContent.length >= 6); }   // "12.3만"처럼 6글자 이상이면 글자를 살짝 줄여 칩 안에 담는다
+    const mb = document.querySelector('#lobby-nav .tabbtn[data-tab="mission"]'); if (mb) mb.classList.toggle('dot', missionDot());   // 받을 게 있으면 미션 탭에 빨간 점
   }
+
+  // ── 공용 팝업(확인 창) · 재화 설명 · 출석 · 이어하기 ──
+  // ask({ title, html, buttons:[{ label, primary, onClick }], dismiss }) — 버튼을 누르면 창을 먼저 닫고 onClick 을 부른다. 바깥을 눌러 닫기는 dismiss !== false 일 때(동작 없이 닫힘)
+  let askBtns = [];
+  function closeAsk() { const m = $('ask-modal'); if (m) m.hidden = true; }
+  function ask(o) {
+    let m = $('ask-modal');
+    if (!m) {
+      m = document.createElement('div'); m.id = 'ask-modal'; m.className = 'modal'; m.hidden = true; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+      m.innerHTML = '<div class="modal-box" id="ask-box"></div>';
+      $('app').appendChild(m);
+      m.onclick = (e) => {
+        const b = e.target.closest('[data-ask]');
+        if (b) { const def = askBtns[+b.dataset.ask]; closeAsk(); if (def && def.onClick) def.onClick(); return; }
+        if (e.target === m && m._dismiss) closeAsk();
+      };
+    }
+    askBtns = o.buttons || []; m._dismiss = o.dismiss !== false;
+    $('ask-box').innerHTML = '<h2>' + o.title + '</h2>' + (o.html || '')
+      + '<div class="ex-row' + (o.stack ? ' stack' : '') + '">' + askBtns.map((b, i) => '<button class="btn' + (b.primary ? ' primary' : '') + '" data-ask="' + i + '">' + b.label + '</button>').join('') + '</div>';
+    m.hidden = false; if (typeof Sound !== 'undefined') Sound.play('click');
+  }
+  let _mtT = 0;                                                                    // 로비용 토스트(전투 쪽 토스트와 같은 #toast)
+  function mToast(html, color) { const el = $('toast'); if (!el) return; el.innerHTML = html; el.style.setProperty('--c', color || '#ffcf5c'); el.className = 'toast show'; clearTimeout(_mtT); _mtT = setTimeout(() => { el.className = 'toast'; }, 1900); }
+  function goTab(tab, opts) {                                                      // 로비 탭으로 이동(결과 화면의 '다음 행동'·팝업 버튼이 쓴다)
+    if (['home', 'sortie', 'formation', 'shop', 'mission'].indexOf(tab) < 0) return;
+    if (opts && opts.stage) setStage(opts.stage);
+    activeTab = tab; renderLobby();
+  }
+
+  // 상단 재화 칩을 누르면: 이 재화를 어디에 쓰고 어디서 얻는지
+  function openCurInfo(k) {
+    const ci = CUR_INFO[k]; if (!ci) return;
+    const list = (a) => '<ul class="ci-list">' + a.map(t => '<li>' + t + '</li>').join('') + '</ul>';
+    ask({
+      title: uiCur(k) + ' ' + ci.name,
+      html: '<p class="ci-have">보유 <b>' + Math.floor(M.currencies[k]).toLocaleString() + '</b></p>'
+        + '<div class="ci-sec"><span class="ci-h">쓰는 곳</span>' + list(ci.use) + '</div>'
+        + '<div class="ci-sec"><span class="ci-h">얻는 곳</span>' + list(ci.earn()) + '</div>',
+      buttons: [{ label: '닫기', primary: true }]
+    });
+  }
+
+  // 출석 보상 7칸 — 미션 탭과 출석 팝업이 같은 모양을 쓴다
+  function attendGrid(info) {
+    const shownDone = info.claimedToday ? M.attend.count : info.done;
+    return '<div class="at-grid">' + ATTEND.map((r, i) => {
+      const day = i + 1, got = day <= shownDone, today = info.can && day === info.day;
+      return '<div class="at-cell' + (got ? ' got' : '') + (today ? ' today' : '') + (day === ATTEND.length ? ' last' : '') + '"><span class="at-d">' + day + '일</span><span class="at-r">' + fmtCost(r) + '</span><span class="at-s">' + (got ? '✓' : today ? '오늘' : '') + '</span></div>';
+    }).join('') + '</div>';
+  }
+  function openAttend() {
+    const info = attendInfo();
+    ask({
+      title: '출석 보상',
+      html: attendGrid(info) + '<p class="ex-body at-note">' + (info.can ? '<b>' + info.day + '일째</b> 보상이에요. 접속한 날마다 1칸씩 받고, 7일째까지 받으면 처음부터 다시 시작해요.' : '오늘 보상은 이미 받았어요. 내일 또 만나요!') + '</p>',
+      buttons: info.can ? [{ label: '나중에', }, { label: '🎁 받기', primary: true, onClick: () => { const r = claimAttend(); if (r) { if (typeof Sound !== 'undefined') Sound.play('charge'); mToast(ui('ic_reward', '🎁') + ' 출석 ' + r.day + '일째 · ' + fmtCost(r.reward)); } renderLobby(); } }] : [{ label: '확인', primary: true }]
+    });
+  }
+
+  // 이어하기: 저장된 런이 있으면 로비에 들어온 직후 묻는다. game.js 가 init 에서 onResume · onAbandonSaved 를 넘겨 준다
+  const runLabelOf = (s) => s.mode === 'endless' ? '무한 ' + ((s.loop || 0) + 1) + '막' : s.mode === 'daily' ? '일일 도전' : '스테이지 ' + s.stage;
+  function openResumePrompt(sv) {
+    const s = sv.s, mins = Math.max(0, Math.round((Date.now() - (sv.t || Date.now())) / 60000));
+    const ago = mins < 1 ? '방금' : mins < 60 ? mins + '분 전' : mins < 1440 ? Math.floor(mins / 60) + '시간 전' : Math.floor(mins / 1440) + '일 전';
+    const earn = runEarn({ won: false, kills: s.runKills, floors: s.floorsCleared, gold: s.gold, stage: s.stage, mode: s.mode, loop: s.loop });
+    const chips = [['gold', earn.gold], ['mats', earn.mats], ['docs', earn.docs]].filter(x => x[1] > 0).map(x => '<span class="rs-chip">' + uiCur(x[0]) + ' +' + x[1].toLocaleString() + '</span>').join('');
+    const row = (ic, lb, v) => '<div class="rr-row"><span class="rr-ic">' + ic + '</span><span class="rr-lb">' + lb + '</span><b class="rr-v">' + v + '</b></div>';
+    ask({
+      title: '진행 중인 런이 있어요',
+      html: '<p class="ex-body">' + ago + '까지 하던 <b>' + runLabelOf(s) + '</b> 런이 저장돼 있어요.</p>'
+        + '<div class="rr-box">' + row(ui('node_battle', '⚔'), '돌파한 전투', (s.floorsCleared || 0) + '개') + row(ui('ic_levelup', '⬆'), '레벨', 'Lv.' + (s.level || 1)) + row(ui('stat_hp', '🛡'), '방벽', Math.ceil(s.wallHp) + '/' + s.wallHpMax) + row(uiCur('gold'), '크레딧', (s.gold || 0).toLocaleString()) + '</div>'
+        + '<p class="muted rr-note">전투 도중에 나갔다면 그 전투는 처음부터 다시 시작해요.</p>'
+        + (chips ? '<div class="ex-earn"><span class="ex-lb">지금 포기하면 받는 보상</span>' + chips + '</div>' : ''),
+      buttons: [{ label: '이어하기', primary: true, onClick: () => { if (onResumeRun) onResumeRun(s); } }, { label: '포기하고 보상 받기', onClick: () => { if (onAbandonSaved) onAbandonSaved(s); } }],
+      stack: true, dismiss: false
+    });
+  }
+  // 로비에 들어온 직후(타이틀에서, 결과 화면에서 돌아올 때) 한 번: ① 저장된 런이 있으면 이어하기 확인 ② 오늘 출석 보상이 남았으면 출석 창(하루 한 번만 자동으로 띄운다 — 닫아도 미션 탭에 남는다)
+  function lobbyEnter() {
+    if (!M || needsLogin() || tutOn()) return;
+    const sv = loadRun(); if (sv) { openResumePrompt(sv); return; }
+    if (attendInfo().can && M.attend.shown !== todayKey()) { M.attend.shown = todayKey(); save(); openAttend(); }
+  }
+
+  // 패배 결과 화면의 '다음에 해볼 일'(최대 3개 + 다시 도전) — 정산이 끝난 뒤의 상태로 지금 도움이 되는 것만
+  function nextActions(info) {
+    const acts = [], n = partySlots().filter(Boolean).length, benched = ownedIds().filter(id => !inParty(id)).length;
+    const row = (tab, ic, em, t, s, extra) => Object.assign({ tab, ic: uiIcon(ic, em, 'width:100%;height:100%'), t, s }, extra || {});
+    if (n < 3 && benched > 0) acts.push(row('formation', 'nav_formation', '👥', '빈 레인에 동료 배치', '쉬고 있는 동료 ' + benched + '명'));
+    const up = ownedIds().filter(id => { const o = M.owned[id]; return o.level < levelCap(id) && M.currencies.gold >= GROWTH.levelUpCost(o.level); });
+    if (up.length) acts.push(row('formation', 'ic_levelup', '⬆', '동료 레벨업', uiCur('gold') + Math.floor(M.currencies.gold).toLocaleString() + ' · ' + up.length + '명 올릴 수 있어요'));
+    const promo = ownedIds().filter(id => { const o = M.owned[id]; if (o.star >= GROWTH.starMax) return false; const c = GROWTH.promoteCost(o.star); return (M.shards[id] || 0) >= c.shards && M.currencies.mats >= c.mats; });
+    if (promo.length) acts.push(row('formation', 'ic_promote', '⏫', '동료 승급', promo.length + '명 ★을 올릴 수 있어요'));
+    if (!tutOn()) {
+      if (freeAvailable()) acts.push(row('shop', 'nav_shop', '🛒', '무료 뽑기', '오늘 1회 남았어요'));
+      else if (M.currencies.gems >= GACHA.cost1) acts.push(row('shop', 'nav_shop', '🛒', '가챠', uiCur('gems') + Math.floor(M.currencies.gems).toLocaleString() + ' · ' + Math.floor(M.currencies.gems / GACHA.cost1) + '회 뽑을 수 있어요'));
+    }
+    if (missionDot()) acts.push(row('mission', 'nav_mission', '📋', '받을 보상이 있어요', '미션 · 출석 보상'));
+    if (info && info.mode === 'normal' && info.stage > 1 && (info.floors || 0) <= 2) acts.push(row('sortie', 'nav_sortie', '🚀', '스테이지 ' + (info.stage - 1) + '에서 다시 모으기', '낮은 스테이지에서 재화를 모아 성장해 보세요', { stage: info.stage - 1 }));
+    acts.length = Math.min(acts.length, 2);                       // 결과 상자가 프레임을 넘지 않도록 제안은 2개까지(우선순위순) + 다시 도전
+    acts.push(row('sortie', 'nav_sortie', '🚀', '다시 도전', runLabelOf({ mode: M.runMode || 'normal', stage: M.stage, loop: 0 }), { primary: true }));
+    return acts;
+  }
+  const nextActionsHTML = (info) => '<span class="rn-h">다음에 해볼 일</span>' + nextActions(info).map(a => '<button class="rn-row' + (a.primary ? ' primary' : '') + '" data-go="' + a.tab + '"' + (a.stage ? ' data-gostage="' + a.stage + '"' : '') + '><span class="rn-ic">' + a.ic + '</span><span class="rn-tx"><b>' + a.t + '</b><small>' + a.s + '</small></span><i class="rn-go">›</i></button>').join('');
 
   function charChip(id, opts) {
     opts = opts || {};
@@ -714,22 +881,32 @@ const Meta = (function () {
     $('gacha-modal').hidden = false;
   }
 
+  // 미션 탭 = 출석 보상 · 일일 미션(매일 0시 초기화) · 도전 과제(누적 1회성). 카드 하나: o = { name, desc, reward, p, goal, claimed, attr(받기 버튼 data 속성), id, ready }
+  function missionCard(o) {
+    const done = o.ready && !o.claimed, pct = o.goal ? Math.min(100, 100 * o.p / o.goal) : 0;
+    const label = o.claimed ? '수령 완료' : o.ready ? ui('ic_reward', '🎁') + ' 받기' : '진행 중';
+    return '<div class="sns-card"><div class="sns-row" style="align-items:flex-start">'
+      + '<div class="sns-ico">' + uiIcon('ic_mission', '🎯', 'width:100%;height:100%') + '</div>'
+      + '<div class="sns-grow">'
+      +   '<div class="sns-nm">' + o.name + ' <span class="mi-reward">' + fmtCost(o.reward) + '</span></div>'
+      +   '<div class="sns-ds">' + o.desc + (o.goal ? ' (' + o.p + '/' + o.goal + ')' : '') + '</div>'
+      +   (o.goal ? '<div class="mi-bar"><div style="width:' + pct + '%"></div></div>' : '')
+      + '</div>'
+      + '<div class="sns-act"><button class="sns-btn sm ' + (done ? '' : 'sub') + '" ' + o.attr + '="' + o.id + '"' + (done ? '' : ' disabled') + '>' + label + '</button></div>'
+      + '</div></div>';
+  }
   function renderMissions() {
-    const list = $('mission-list');
-    list.innerHTML = MISSIONS.map(m => {
-      const p = missionProgress(m), done = p >= m.goal, claimed = !!M.claimed[m.id];
-      const pct = Math.min(100, 100 * p / m.goal);
-      const label = claimed ? '수령 완료' : done ? ui('ic_reward', '🎁') + ' 받기' : '진행 중';
-      return '<div class="sns-card"><div class="sns-row" style="align-items:flex-start">'
-        + '<div class="sns-ico">' + uiIcon('ic_mission', '🎯', 'width:100%;height:100%') + '</div>'
-        + '<div class="sns-grow">'
-        +   '<div class="sns-nm">' + m.name + ' <span class="mi-reward">' + fmtCost(m.reward) + '</span></div>'
-        +   '<div class="sns-ds">' + m.desc + ' (' + p + '/' + m.goal + ')</div>'
-        +   '<div class="mi-bar"><div style="width:' + pct + '%"></div></div>'
-        + '</div>'
-        + '<div class="sns-act"><button class="sns-btn sm ' + (done && !claimed ? '' : 'sub') + '" data-mission="' + m.id + '"' + (done && !claimed ? '' : ' disabled') + '>' + label + '</button></div>'
-        + '</div></div>';
-    }).join('');
+    const list = $('mission-list'), info = attendInfo(), d = dmState();
+    const dailyDone = DAILY_MISSIONS.filter(m => d.claimed[m.id]).length;
+    const at = '<div class="sns-h">출석 보상 <span class="sns-sub">' + (info.claimedToday ? M.attend.count : info.done) + '/' + ATTEND.length + '일</span></div>'
+      + '<div class="sns-card at-card">' + attendGrid(info)
+      + '<button class="sns-btn full' + (info.can ? '' : ' sub') + '" data-attend="1"' + (info.can ? '' : ' disabled') + '>' + (info.can ? ui('ic_reward', '🎁') + ' ' + info.day + '일째 출석 보상 받기' : '오늘 보상을 받았어요 · 내일 또 만나요') + '</button></div>';
+    const dl = '<div class="sns-h">일일 미션 <span class="sns-sub">' + dailyDone + '/' + DAILY_MISSIONS.length + ' · 매일 0시에 새로 시작</span></div>'
+      + DAILY_MISSIONS.map(m => missionCard({ name: m.name, desc: m.desc, reward: m.reward, p: dmProg(m), goal: m.goal, claimed: !!d.claimed[m.id], ready: dmProg(m) >= m.goal, attr: 'data-dm', id: m.id })).join('')
+      + missionCard({ name: '모두 완료 보너스', desc: '일일 미션 보상을 모두 받으면', reward: DAILY_BONUS, p: 0, goal: 0, claimed: d.bonus, ready: dmAllClaimed(), attr: 'data-dmbonus', id: 'bonus' });
+    const ch = '<div class="sns-h">도전 과제 <span class="sns-sub">한 번만 받을 수 있어요</span></div>'
+      + MISSIONS.map(m => missionCard({ name: m.name, desc: m.desc, reward: m.reward, p: missionProgress(m), goal: m.goal, claimed: !!M.claimed[m.id], ready: missionProgress(m) >= m.goal, attr: 'data-mission', id: m.id })).join('');
+    list.innerHTML = at + dl + ch;
   }
 
   // ── 치트(디버그) ──
@@ -745,6 +922,8 @@ const Meta = (function () {
       + '<button class="btn" data-cheat="stages">전 스테이지 해금</button>'
       + '<button class="btn" data-cheat="relics">전 모듈 해금</button>'
       + '<button class="btn" data-cheat="mission">미션 수치 채우기</button>'
+      + '<button class="btn" data-cheat="dm">일일 미션 수치 채우기</button>'
+      + '<button class="btn" data-cheat="attend">출석 다시 받기(다음 날로)</button>'
       + '<button class="btn" data-cheat="freegacha">무료 뽑기 리셋</button>'
       + '<button class="btn" data-cheat="tut">튜토리얼 다시 보기</button>'
       + '<button class="btn" data-cheat="reset">데이터 초기화</button>'
@@ -760,9 +939,11 @@ const Meta = (function () {
     else if (k === 'relics') M.relicsUnlocked = Object.keys(RELICS);
     else if (k === 'stages') M.maxStage = STAGE_MAX;
     else if (k === 'mission') { M.stats.runsWon = 99; M.stats.kills = 999; M.stats.floors = 99; }
+    else if (k === 'dm') { const d = dmState(); DAILY_MISSIONS.forEach(m => { d.p[m.stat] = Math.max(d.p[m.stat] || 0, m.goal); }); }
+    else if (k === 'attend') { M.attend.last = ''; M.attend.shown = ''; }                     // 오늘 받은 표시를 지워 '다음 날'처럼 다시 받을 수 있게(7일째까지 받은 뒤엔 1일째부터)
     else if (k === 'freegacha') M.daily.freeGachaDate = '';
     else if (k === 'tut') { $('cheat-modal').hidden = true; if (typeof Tutorial !== 'undefined') Tutorial.replay(); }
-    else if (k === 'reset') { try { localStorage.removeItem(saveKey()); } catch (e) {} load(); }
+    else if (k === 'reset') { try { localStorage.removeItem(saveKey()); } catch (e) {} clearRun(); load(); }
     save(); renderCheat(); renderLobby();
   }
 
@@ -876,7 +1057,7 @@ const Meta = (function () {
 
   // ── 이벤트 와이어링(위임) ──
   function init(opts) {
-    onSortie = opts && opts.onSortie;
+    onSortie = opts && opts.onSortie; onResumeRun = opts && opts.onResume; onAbandonSaved = opts && opts.onAbandonSaved;
     // 로그인 게이트 배선
     const lgBtn = $('lg-login'); if (lgBtn) lgBtn.onclick = submitLogin;
     const lgId = $('lg-id'); if (lgId) lgId.addEventListener('keydown', e => { if (e.key === 'Enter') { const p = $('lg-pw'); if (p) p.focus(); } });
@@ -884,7 +1065,22 @@ const Meta = (function () {
     const acct = $('acct-btn'); if (acct) { acct.innerHTML = curAcct ? uiIcon('ic_account', '👤', 'width:72%;height:72%') : ''; acct.title = curAcct ? ('계정: ' + curAcct + ' (누르면 계정 메뉴)') : ''; acct.style.display = curAcct ? '' : 'none'; acct.onclick = openAcctMenu; }   // 이름은 공간을 못 쓰므로 아이콘만 — 이름은 title 과 로그아웃 확인창에
     if (needsLogin()) showLogin();
     document.querySelectorAll('#lobby-nav .tabbtn').forEach(t => t.onclick = () => { activeTab = t.dataset.tab; renderTab(); });
-    $('btn-sortie').onclick = () => { if (partySlots().some(x => x)) onSortie && onSortie(); };
+    // 출격: 빈 레인이 있는데 쉬고 있는 동료가 있으면 출발 전에 한 번 묻는다(같은 편성으로 '그대로 출격'을 고른 뒤엔 다시 묻지 않는다)
+    $('btn-sortie').onclick = () => {
+      const slots = partySlots(); if (!slots.some(x => x)) return;
+      const empties = slots.map((id, i) => id ? 0 : i + 1).filter(Boolean), benched = ownedIds().filter(id => !inParty(id)).length, key = slots.map(x => x ? 1 : 0).join('');
+      if (empties.length && benched > 0 && askedEmpty !== key) {
+        ask({
+          title: '빈 레인이 있어요',
+          html: '<p class="ex-body"><b>' + empties.map(n => n + '레인').join(' · ') + '</b>에 동료가 없어요.<br>지금 <b>' + (3 - empties.length) + '명</b>으로 출격할까요? 쉬고 있는 동료가 <b>' + benched + '명</b> 있어요.</p>',
+          buttons: [{ label: '편성하러 가기', primary: true, onClick: () => goTab('formation') }, { label: '그대로 출격', onClick: () => { askedEmpty = key; onSortie && onSortie(); } }]
+        });
+        return;
+      }
+      onSortie && onSortie();
+    };
+    // 상단 재화 칩: 누르면 쓰는 곳 · 얻는 곳 설명
+    const topBar = $('lobby-top'); if (topBar) topBar.onclick = (e) => { const c = e.target.closest('.cur[data-cur]'); if (c) openCurInfo(c.dataset.cur); };
     $('stage-select').onclick = (e) => { const b = e.target.closest('[data-stage]'); if (b && !b.disabled) { setStage(+b.dataset.stage); renderSortie(); } };
     $('mode-select').onclick = (e) => { const b = e.target.closest('[data-mode]'); if (b && MODES[b.dataset.mode]) { M.runMode = b.dataset.mode; save(); renderSortie(); if (typeof Sound !== 'undefined') Sound.play('click'); } };
     // 편성 탭: 드래그하여 레인 배치(스틸앤샷式) — 임계 넘으면 고스트, 드롭한 레인에 할당 / 탭=상세
@@ -950,7 +1146,16 @@ const Meta = (function () {
       const dc = e.target.closest('[data-doc]'); if (dc && !dc.disabled) { buyShards(dc.dataset.doc); renderShop(); renderBar(); }
     };
     // 미션
-    $('mission-list').onclick = (e) => { const el = e.target.closest('[data-mission]'); if (el && !el.disabled) { claimMission(el.dataset.mission); renderMissions(); renderBar(); } };
+    $('mission-list').onclick = (e) => {
+      const b = e.target.closest('[data-mission],[data-dm],[data-dmbonus],[data-attend]'); if (!b || b.disabled) return;
+      let got = null, rn = null;
+      if (b.dataset.mission) { if (claimMission(b.dataset.mission)) got = MISSIONS.find(x => x.id === b.dataset.mission).reward; }
+      else if (b.dataset.dm) { if (claimDaily(b.dataset.dm)) got = DAILY_MISSIONS.find(x => x.id === b.dataset.dm).reward; }
+      else if (b.dataset.dmbonus) { if (claimDailyBonus()) got = DAILY_BONUS; }
+      else if (b.dataset.attend) { rn = claimAttend(); if (rn) got = rn.reward; }
+      if (got) { if (typeof Sound !== 'undefined') Sound.play('charge'); mToast(ui('ic_reward', '🎁') + ' ' + (rn ? '출석 ' + rn.day + '일째 · ' : '받았어요 · ') + fmtCost(got)); }
+      renderMissions(); renderBar();
+    };
     // 방치 보상 받기
     const ir = $('idle-reward'); if (ir) ir.onclick = (e) => { const b = e.target.closest('[data-idle]'); if (b && !b.disabled) { const p = claimIdle(); if (p && typeof Sound !== 'undefined') Sound.play('charge'); renderIdleCard(); renderBar(); } };
     // 캐릭터 모달
@@ -994,5 +1199,7 @@ const Meta = (function () {
   return { load, save, init, renderLobby, partySlots, leveledDef, onRunEnd, runEarn, openCheat, stage, maxStage, needsLogin, doLogin: submitLogin, logout, curAccount, runOptions, unlockedRelics, idleDebug, skillText,   // skillText = 도감도 쓴다
     tutOn, tutPullDue, tutorialPull, tutRewardPlan, tutGrantRewards, grantChar,           // 튜토리얼 보상·가챠(js/tutorial.js 가 사용)
     showGachaResult,                                                                       // 개발용: 뽑기 결과 창을 가짜 결과로 띄워 모양 점검(tools/shots.js)
+    saveRun, loadRun, clearRun, lobbyEnter, goTab, nextActionsHTML, ask, mToast,           // 런 저장·이어하기 · 로비 진입 팝업 · 결과 화면의 다음 행동 · 공용 팝업(js/game.js 가 사용)
+    debug: { dmState, attendInfo, missionDot, openCurInfo, openAttend, claimAttend, claimDaily, dmAdd },   // 개발용(점검 도구)
     get state() { return M; } };
 })();

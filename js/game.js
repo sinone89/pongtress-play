@@ -80,32 +80,49 @@
 
   // ============ 런 시작 ============
   // mode 'tutorial' = 튜토리얼 전투(js/tutorial.js): 분기 지도 없이 전투 1회, 루비 1명(계정 편성과 무관), 약한 적, 패배 불가, 레벨업·결과·정산 없음(승리 횟수·미션에 안 셈)
-  function startRun(opts) {
-    opts = opts || (Meta.runOptions ? Meta.runOptions() : {});
-    const mode = opts.mode || 'normal', tut = mode === 'tutorial';
-    const party = tut ? ['knight', null, null] : Meta.partySlots();                // [id|null ×3] — 편성
-    const stage = tut ? 1 : (opts.stage || Meta.stage()), scale = tut ? Object.assign({}, TUTORIAL.scale) : stageScale(stage);   // 스테이지 난이도 배수
-    const wallMax = tut ? TUTORIAL.wallHp : party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
-    S = {
-      mode, tutorial: tut, stage, scale, seedBase: opts.seed || 0, loop: 0,
+  function newRunState(mode, tut, stage, scale, seed, party, wallMax) {
+    return {
+      mode, tutorial: tut, stage, scale, seedBase: seed || 0, loop: 0,
       combatIndex: 0, nodeIdx: 0, level: 1, exp: 0, expNext: tut ? Infinity : expToNext(1),
       atkBonus: 0, bonusBalls: 0, party, gold: 0, turnAtk: 0, pocketBonus: [0, 0, 0], buffBonus: 0,
       runKills: 0, floorsCleared: 0, runMaxCombo: 0, codexNew: [],      // codexNew = 이번 런에 도감에 처음 올린 적·모듈 이름(결과 화면에 알림)
       wallBase: wallMax, wallHpMax: wallMax, wallHp: wallMax,
       relics: {}, setsOn: {}, rewardQueue: [], guardUsed: false, nextBoardFx: [],
-      map: null, mapPos: { f: -1, i: -1 },
+      map: null, mapPos: { f: -1, i: -1 }, pendingNode: null,           // pendingNode = 지도에서 들어갔지만 아직 안 끝낸 상점·정비('shop'|'rest') — 이어하기 때 그 창을 다시 연다
       // 아래는 전투마다 초기화
       phase: 'map', layoutT: 0, layoutTarget: 0, chars: [], pegs: [], pockets: [], balls: [], obstacles: [],
       enemies: [], waves: [], waveIdx: 0, launchesLeft: 0, passiveBalls: 0,
       shotQueue: [], battleTimer: 0, pendingRewards: 0, autoSkill: false, autoLoad: false,
       combat: null, over: false
     };
+  }
+  // 런 저장(이어하기): 지도(분기 선택 화면)에 올 때마다 '전투와 전투 사이' 상태를 저장한다 — 전투 도중의 판·적·볼은 저장하지 않으므로, 전투 중에 닫으면 그 전투 직전(지도)부터 이어진다
+  const RUN_KEEP = ['mode', 'stage', 'scale', 'seedBase', 'loop', 'combatIndex', 'nodeIdx', 'level', 'exp', 'expNext', 'atkBonus', 'bonusBalls', 'party', 'gold', 'pocketBonus', 'buffBonus',
+    'runKills', 'floorsCleared', 'runMaxCombo', 'codexNew', 'wallBase', 'wallHpMax', 'wallHp', 'relics', 'setsOn', 'guardUsed', 'nextBoardFx', 'map', 'mapPos', 'shop', 'pendingNode', 'autoSkill', 'autoLoad'];
+  function snapshotRun() { const o = {}; RUN_KEEP.forEach(k => { if (S[k] !== undefined) o[k] = S[k]; }); return JSON.parse(JSON.stringify(o)); }   // 깊은 복사(JSON) — 순환·함수가 끼어 있으면 던져서 저장을 건너뛴다
+  function saveCheckpoint() { if (!S || S.over || S.tutorial) return; try { Meta.saveRun(snapshotRun()); } catch (e) { console.warn('[run-save]', e); } }
+  function applySnapshot(snap) { Object.assign(S, snap); S.over = false; S.phase = 'map'; S.rewardQueue = []; S.pendingRewards = 0; if (!S.pocketBonus) S.pocketBonus = [0, 0, 0]; if (!S.nextBoardFx) S.nextBoardFx = []; if (!S.codexNew) S.codexNew = []; }
+  function resumeRun(snap) { startRun({ mode: snap.mode, stage: snap.stage, seed: snap.seedBase || 0, resume: snap }); }
+  // 이어하기 확인 창에서 [포기하고 보상 받기]: 화면 없이 저장된 런을 되살려 곧바로 '나가기'로 정산한다(결과 화면이 로비 위에 뜬다)
+  function abandonSaved(snap) {
+    S = newRunState(snap.mode, false, snap.stage, snap.scale || stageScale(snap.stage), snap.seedBase, snap.party, snap.wallHpMax);
+    applySnapshot(snap); abandonRun();
+  }
+  function startRun(opts) {
+    opts = opts || (Meta.runOptions ? Meta.runOptions() : {});
+    const mode = opts.mode || 'normal', tut = mode === 'tutorial', resume = tut ? null : opts.resume;
+    const party = tut ? ['knight', null, null] : resume ? resume.party.slice() : Meta.partySlots();                // [id|null ×3] — 편성
+    const stage = tut ? 1 : (opts.stage || Meta.stage()), scale = tut ? Object.assign({}, TUTORIAL.scale) : stageScale(stage);   // 스테이지 난이도 배수
+    const wallMax = tut ? TUTORIAL.wallHp : party.reduce((s, id) => s + (id ? Meta.leveledDef(id).hp : 0), 0);
+    S = newRunState(mode, tut, stage, scale, opts.seed, party, wallMax);
+    if (resume) applySnapshot(resume); else if (!tut) Meta.clearRun();    // 새 런이 시작되면 예전에 저장돼 있던 런은 버린다(이어하기로 시작한 경우만 유지)
     tScale = 1; demoAim = null; aimShown = null; aimActive = false;      // 튜토리얼 슬로모션·시범 조준은 새 런에 들고 가지 않는다
     if ($('exit-modal')) closeExit();                                    // 나가기 확인 창이 열린 채 새 런이 시작되지 않게
     CharArt.preload(party.filter(Boolean), ['sheet', 'thumb', 'cgm']);   // 편성 3인 시트·컷인 CG(중간 크기)는 지도 화면을 보는 동안 받아 둔다
     show('combat'); resize();
     $('combat').classList.toggle('tut-battle', tut);                      // 튜토리얼 전투: 레벨·경험치·스킬 열·자동 버튼을 숨긴다(css)
     if (tut) { window.__tutPause = false; renderRelicBar(); startCombat({ name: TUTORIAL.combat.name, tutorial: true, waves: TUTORIAL.combat.waves.map(w => w.slice()) }, 0, 0); }   // renderRelicBar: 직전 런의 모듈 막대가 연습 전투에 남지 않게(build 156)
+    else if (resume) { showMap(); if (S.pendingNode === 'shop') openShop(); else if (S.pendingNode === 'rest') openRest(); }   // 이어하기: 저장된 지도로 · 상점·정비 도중이었으면 그 창을 다시 연다
     else { S.map = genMap(); showMap(); }
     if (!loopStarted) { loopStarted = true; requestAnimationFrame(loop); }
   }
@@ -1235,7 +1252,9 @@
     if (e.dailyReward) notes.push(uiCur('gems') + ' 일일 보상 +' + e.dailyReward);
     if (S.codexNew && S.codexNew.length) notes.push(ui('ic_codex', '📖') + ' 도감 등록 · ' + S.codexNew.join(' · '));
     $('result-notes').innerHTML = notes.map((t, i) => '<div class="rs-note" style="animation-delay:' + (0.8 + i * 0.07).toFixed(2) + 's">' + t + '</div>').join('');
-    $('result').hidden = false;
+    const nx = $('result-next');                                  // 패배(방벽 붕괴·무한 모드 종료)일 때만 '다음에 해볼 일' — 정산이 끝난 뒤의 재화·편성 상태로 지금 도움이 되는 것을 고른다
+    if (nx) { nx.innerHTML = (!o.win && !o.abandon) ? Meta.nextActionsHTML(runInfo(false)) : ''; nx.classList.toggle('on', !!nx.innerHTML); }
+    $('result').hidden = false; $('result-box').scrollTop = 0;
     Sound.play(o.win ? 'win' : o.abandon ? 'click' : 'lose');
   }
 
@@ -1323,14 +1342,15 @@
       + '<span>' + ui('stat_hp', '🛡') + ' ' + Math.ceil(S.wallHp) + '/' + S.wallHpMax + '</span><span>' + uiCur('gold') + ' ' + (S.gold || 0) + '</span><span>Lv.' + S.level + '</span>' + helpBtn('map-help');
     renderRelicBar();
     $('map').hidden = false;
+    saveCheckpoint();                                          // 전투와 전투 사이(여기)가 이어하기 저장 지점
   }
   function enterNode(f, i) {
-    const n = S.map.floors[f][i]; n.visited = true; S.mapPos = { f, i }; S.combatIndex = f; S.nodeIdx = i;
+    const n = S.map.floors[f][i]; n.visited = true; S.mapPos = { f, i }; S.combatIndex = f; S.nodeIdx = i; S.pendingNode = null;
     Sound.play('click');
     if (n.type === 'battle' || n.type === 'elite') { $('map').hidden = true; startCombat(nodeCombat(n.type, f), f, i); }
     else if (n.type === 'boss') { $('map').hidden = true; startCombat(Object.assign({ name: '보스 · ' + BOSSES[stageBoss(S.stage)].name, boss: true }, bossMul()), f, i); }
-    else if (n.type === 'shop') { showMap(); openShop(); }
-    else if (n.type === 'rest') { showMap(); openRest(); }
+    else if (n.type === 'shop') { S.pendingNode = 'shop'; showMap(); openShop(); }
+    else if (n.type === 'rest') { S.pendingNode = 'rest'; showMap(); openRest(); }
   }
   // 상점: 런 골드로 모듈·개량·회복 구매(쓴 골드는 런 종료 정산에서 빠짐 → 선택의 무게)
   function openShop() {
@@ -1345,6 +1365,7 @@
     h += '<div class="shop-item"><div class="rc-top"><span class="rc-ic">' + uiIcon('rw_heal', '🔧') + '</span><span class="rc-name">방벽 수리</span></div><div class="rc-desc">방벽 HP +30%</div><button class="btn sm" data-buy="heal"' + (sh.healed || g < SHOP_PRICE.heal ? ' disabled' : '') + '>' + (sh.healed ? '구매 완료' : uiCur('gold') + ' ' + SHOP_PRICE.heal) + '</button></div>';
     h += '</div><button class="btn primary" data-leave="1">떠나기</button>';
     $('run-modal-box').innerHTML = h; $('run-modal').hidden = false;
+    saveCheckpoint();                                          // 상점 목록(S.shop)·산 것까지 저장 — 새로고침으로 목록을 다시 뽑거나 산 것을 되돌리지 못하게
   }
   function shopBuy(what) {
     const sh = S.shop; if (!sh) return;
@@ -1361,11 +1382,12 @@
       : '<button class="reward-card" disabled><div class="rc-name">' + ui('ic_promote', '⚙️') + ' 개량</div><div class="rc-desc">개량할 모듈이 없어요(Lv1 모듈 필요)</div></button>';
     h += '</div>';
     $('run-modal-box').innerHTML = h; $('run-modal').hidden = false;
+    saveCheckpoint();
   }
   function restPick(v) {
     if (v === 'heal') { S.wallHp = Math.min(S.wallHpMax, S.wallHp + Math.round(S.wallHpMax * REST_HEAL)); toast(ui('rw_heal', '🔧') + ' 정비 · 방벽 회복', '#6cf'); Sound.play('charge'); }
     else if (v.indexOf('evo:') === 0) gainRelic(v.slice(4));
-    $('run-modal').hidden = true; showMap();
+    S.pendingNode = null; $('run-modal').hidden = true; showMap();
   }
   // 무한 모드: 보스 격파 → 적 강화된 다음 막(새 맵). 빌드는 유지.
   function nextLoop() {
@@ -2204,7 +2226,7 @@
 
   // ============ 와이어링 ============
   Meta.load();
-  Meta.init({ onSortie: startRun });
+  Meta.init({ onSortie: startRun, onResume: resumeRun, onAbandonSaved: abandonSaved });
   initTitleHero();
   initTitleArt();
   Sound.syncIcons();
@@ -2212,11 +2234,15 @@
   const enterLobby = () => {
     Sound.resume(); Sound.play('click');
     if (typeof Tutorial !== 'undefined' && Tutorial.battleDue()) { startRun({ mode: 'tutorial' }); return; }   // 새 계정의 첫 진입 = 튜토리얼 전투부터(로비는 그 뒤)
-    show('lobby'); Meta.renderLobby();
+    show('lobby'); Meta.renderLobby(); Meta.lobbyEnter();      // lobbyEnter: 저장된 런이 있으면 이어하기 확인 · 오늘 출석 보상이 남았으면 출석 창
   };
   $('title').onclick = enterLobby;        // 타이틀 아무 곳이나 탭 → 시작
   $('btn-start').onclick = (e) => { e.stopPropagation(); enterLobby(); };
-  $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); };
+  $('btn-result').onclick = () => { $('result').hidden = true; show('lobby'); Meta.renderLobby(); Meta.lobbyEnter(); };
+  $('result-next').onclick = (e) => {                               // 패배 결과의 '다음에 해볼 일' 행 → 로비의 해당 탭으로
+    const b = e.target.closest('[data-go]'); if (!b) return;
+    $('result').hidden = true; show('lobby'); Meta.goTab(b.dataset.go, b.dataset.gostage ? { stage: +b.dataset.gostage } : null); Meta.lobbyEnter();
+  };
   $('auto-skill-btn').onclick = () => { if (!S) return; S.autoSkill = !S.autoSkill; syncAutoBtns(); };  // 스킬 자동사용
   $('btn-auto').onclick = () => { if (!S) return; S.autoLoad = !S.autoLoad; syncAutoBtns(); };            // 자동 전투(장전 자동진행)
   function syncSpeedBtn() { const b = $('speed-btn'); if (!b) return; b.textContent = '×' + battleSpeed; b.classList.toggle('on', battleSpeed > 1); }
@@ -2237,7 +2263,7 @@
     if (!S) return;
     const buy = e.target.closest('[data-buy]'); if (buy && !buy.disabled) { shopBuy(buy.dataset.buy); return; }
     const rest = e.target.closest('[data-rest]'); if (rest && !rest.disabled) { restPick(rest.dataset.rest); return; }
-    if (e.target.closest('[data-leave]')) { $('run-modal').hidden = true; showMap(); return; }
+    if (e.target.closest('[data-leave]')) { S.pendingNode = null; $('run-modal').hidden = true; showMap(); return; }
     if (e.target.closest('[data-close]') || e.target === $('run-modal')) {   // 모듈 정보 닫기(상점·정비은 선택 필요)
       const inShopRest = $('run-modal-box').querySelector('[data-buy],[data-rest]');
       if (!inShopRest) $('run-modal').hidden = true;
@@ -2284,7 +2310,7 @@
     get BU() { return BU; }, get aiming() { return aimActive; },
     setTimeScale(x) { tScale = Math.max(0.05, Math.min(1, +x || 1)); },
     setDemoAim(p) { demoAim = p ? { x: p.x, y: p.y } : null; },       // 시범 조준점(캔버스 px) — 조준 점선·포신만 보여 준다
-    setBattleSpeed(v) { battleSpeed = SPEEDS.indexOf(v) >= 0 ? v : 1; syncSpeedBtn(); }, get SPEEDS() { return SPEEDS; }, openExit, closeExit, abandonRun,
+    setBattleSpeed(v) { battleSpeed = SPEEDS.indexOf(v) >= 0 ? v : 1; syncSpeedBtn(); }, get SPEEDS() { return SPEEDS; }, openExit, closeExit, abandonRun, saveCheckpoint, snapshotRun, resumeRun, abandonSaved,
     get timeScale() { return tScale; }
   };
 

@@ -138,6 +138,8 @@ const Help = (function () {
       + H('레벨업 보상')
       + P('적을 쓰러뜨리면 경험치가 쌓여 레벨이 올라요. 올릴 때마다 보상을 <b>3개 중 1개</b> 골라요 — <b>짝수 레벨은 모듈</b>, <b>홀수 레벨은 능력치 강화</b>예요.')
       + rw
+      + H('저장 · 이어하기')
+      + P('런은 <b>지도 화면에 올 때마다 자동 저장</b>돼요. 앱을 닫아도 다시 열면 <b>[이어하기]</b>를 물어봐요. 전투 도중에 닫았다면 그 전투 직전(지도)부터 이어져요.')
       + LINK('relic', '모듈 목록 보기');
   }
   function tRelic() {
@@ -229,6 +231,7 @@ const Help = (function () {
   function tEcon() {
     let ms = '';
     MISSIONS.forEach((m) => { ms += ROW(big('ic_mission', '📋'), m.name, m.desc + ' → ' + cost(m.reward)); });
+    let dm = ''; DAILY_MISSIONS.forEach((m) => { dm += ROW(big('ic_mission', '📋'), m.name, m.desc + ' → ' + cost(m.reward)); });
     const rates = GACHA.rates.map((r) => RARITY[r.rarity].name + ' ' + r.w + '%').join(' · ');
     return H('재화')
       + ROW(big('cur_gold', '🪙'), '크레딧', '동료 <b>레벨업</b>에 써요. 런 중에는 상점에서 모듈을 사는 데 쓰고, 런이 끝나면 남은 크레딧이 정산돼요.')
@@ -242,9 +245,14 @@ const Help = (function () {
       + P('문서로 <b>보유한 동료</b>의 조각을 살 수 있어요(커먼 제외). 조각 1개당 레어 ' + uiCur('docs') + DOC_SHOP.price.rare + ', 에픽 ' + uiCur('docs') + DOC_SHOP.price.epic + ', 레전더리 ' + uiCur('docs') + DOC_SHOP.price.legendary + '.')
       + H('패키지')
       + ROW(big('ic_package', '📦'), '보석 패키지·주간 패스', '아직 준비 중이에요. 곧 열려요!')
-      + H('미션')
+      + H('출석 보상')
+      + P('접속한 날마다 <b>1칸씩</b> 받아요(7일 주기 — 하루 빠져도 처음으로 돌아가지 않아요). 받을 게 있으면 <b>미션</b> 탭에 빨간 점이 떠요.')
+      + H('일일 미션')
+      + P('매일 <b>0시에 새로 시작</b>해요. 4개를 모두 받으면 보너스 ' + cost(DAILY_BONUS) + '.')
+      + dm
+      + H('도전 과제')
       + ms
-      + P('진행도가 가득 차면 <b>[받기]</b> 버튼이 켜져요.')
+      + P('진행도가 가득 차면 <b>[받기]</b> 버튼이 켜져요. 도전 과제는 한 번만 받을 수 있어요.')
       + H('방치 보상')
       + ROW(big('ic_idle', '💤'), '홈에서 쌓여요', '출격하지 않아도 시간이 지나면 ' + uiCur('gold') + '크레딧(분당 ' + IDLE.goldPerMin + ')과 ' + uiCur('mats') + '재료(분당 ' + IDLE.matsPerMin + ')가 쌓여요. 최대 ' + IDLE.capHours + '시간, 해금한 스테이지가 높을수록 많아요(최대 ×' + IDLE.mul(STAGE_MAX) + ').')
       + H('런 정산')

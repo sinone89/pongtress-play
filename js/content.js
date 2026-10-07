@@ -160,6 +160,24 @@ const MISSIONS = [
   { id: 'floors12', name: '연전연승', desc: '전투 12회 클리어', stat: 'floors', goal: 12, reward: { gems: 100, mats: 80 } },
   { id: 'wins3', name: '삼전삼승', desc: '런 3회 클리어', stat: 'runsWon', goal: 3, reward: { gems: 200, docs: 20 } }
 ];
+// 일일 미션: 매일 기기 현지 0시에 새로 시작(진행도·받은 표시 모두). 도전 과제(MISSIONS)는 누적·1회성, 이쪽은 하루치.
+//  stat: runs = 전투 1회 이상 돌파한 런을 마친 횟수(승리·패배·나가기 무관, 모드 무관) · wins = 클리어한 런 · kills = 처치 · lvups = 동료 레벨업 횟수
+const DAILY_MISSIONS = [
+  { id: 'runs',  name: '오늘의 출격', desc: '런 2회 마치기(전투 1회 이상 돌파)', stat: 'runs',  goal: 2,  reward: { gold: 300 } },
+  { id: 'win',   name: '오늘의 승리', desc: '런 1회 클리어',                      stat: 'wins',  goal: 1,  reward: { gems: 30 } },
+  { id: 'kills', name: '오늘의 섬멸', desc: '적 80기 격파',                        stat: 'kills', goal: 80, reward: { mats: 60 } },
+  { id: 'lvup',  name: '오늘의 훈련', desc: '동료 레벨업 2회',                     stat: 'lvups', goal: 2,  reward: { docs: 2 } }
+];
+const DAILY_BONUS = { gems: 50 };            // 일일 미션 보상을 4개 다 받으면 더해 주는 보너스
+// 출석 보상: 접속한 날마다 1칸씩 받는다(7일 누적 주기 — 하루 빠져도 처음으로 돌아가지 않는다). 7일째를 받으면 다음 접속 때 1일째부터 다시.
+const ATTEND = [{ gold: 300 }, { mats: 60 }, { gems: 50 }, { gold: 500 }, { docs: 3 }, { mats: 120 }, { gems: 150 }];
+// 상단 재화 칩을 누르면 뜨는 설명(쓰는 곳 · 얻는 곳). 수치는 위의 상수에서 읽는다 — 값이 바뀌어도 설명이 따라간다.
+const CUR_INFO = {
+  gold: { name: '크레딧', use: ['동료 <b>레벨업</b>'], earn: () => ['런 정산 — 모은 크레딧과 돌파한 전투 수(스테이지가 높을수록 ↑)', '홈의 <b>방치 보상</b>(분당 ' + IDLE.goldPerMin + ' · 최대 ' + IDLE.capHours + '시간)', '일일 미션 · 출석 · 도전 과제'] },
+  mats: { name: '재료', use: ['동료 <b>승급</b>(★ 올리기)'], earn: () => ['런 정산 — 돌파한 전투 수와 승리 보너스', '홈의 <b>방치 보상</b>(분당 ' + IDLE.matsPerMin + ')', '일일 미션 · 출석 · 도전 과제'] },
+  gems: { name: '보석', use: ['상점 <b>가챠</b>(1회 ' + GACHA.cost1 + ' · 10연 ' + GACHA.cost10 + ')'], earn: () => ['런 <b>승리</b> 정산', '<b>일일 도전</b> 오늘 첫 클리어 +' + MODES.daily.reward.gems, '일일 미션 · 출석 · 도전 과제'] },
+  docs: { name: '문서', use: ['상점 <b>문서</b> 탭에서 보유 동료의 <b>조각</b> 구매(레어 ' + DOC_SHOP.price.rare + ' · 에픽 ' + DOC_SHOP.price.epic + ' · 레전더리 ' + DOC_SHOP.price.legendary + ')'], earn: () => ['런 <b>승리</b> 정산 +2', '<b>무한 모드</b> 정산 — 넘긴 막마다 +4', '일일 미션 · 출석 · 도전 과제'] }
+};
 // ── 스테이지 (높을수록 난이도↑) ──
 const STAGE_MAX = 5;
 //  ⚠ 적 기본 체력(ENEMIES·BOSSES)은 'S1' 기준이다. 스테이지 배수는 그 위에 곱하고, 층이 깊어지면 CFG.floorHp0·floorHp·floorHp2 로 한 번 더 단단해진다(nodeCombat · 첫 전투 ×0.8 → 5번째 전투 ×3.2).

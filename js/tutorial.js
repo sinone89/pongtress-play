@@ -43,6 +43,7 @@ const Tutorial = (function () {
   const lobbyOn = () => vis('lobby'), combatOn = () => vis('combat');
   const loginOn = () => { const l = $('login'); return !!l && l.classList.contains('show'); };
   const tabOn = (t) => vis('tab-' + t);
+  const CLAIMABLE = ['data-attend', 'data-dm', 'data-dmbonus', 'data-mission'].map((a) => '#mission-list [' + a + ']:not([disabled])').join(',');   // 미션 탭에서 지금 받을 수 있는 버튼(출석 · 일일 미션 · 보너스 · 도전 과제)
   const navBtn = (k) => q('#lobby-nav .tabbtn[data-tab="' + k + '"]');
   const goTab = (k) => { const b = navBtn(k); if (b) b.click(); };
   const partyCount = () => document.querySelectorAll('#lane-slots .lane-slot.on').length;
@@ -391,8 +392,8 @@ const Tutorial = (function () {
       msg: '{docs}문서로 보유한 동료의 <b>조각</b>을 살 수 있어요. 등급이 높을수록 비싸요.' },
     { id: 'shop.pkg', ctx: 'lobby', when: () => tabOn('shop') && !!q('.shoptabs .sns-tab.on[data-stab="pkg"]'), target: () => q('.shoptabs'),
       msg: '<b>패키지</b>는 아직 준비 중이에요. 곧 보석 패키지와 주간 패스가 열릴 예정이에요!' },
-    { id: 'mission.claim', ctx: 'lobby', when: () => tabOn('mission') && !!q('#mission-list [data-mission]:not([disabled])'), target: () => q('#mission-list [data-mission]:not([disabled])'),
-      msg: '달성한 미션이 있어요! <b>[받기]</b>를 눌러 보상을 챙겨요.' },
+    { id: 'mission.claim', ctx: 'lobby', when: () => tabOn('mission') && !!q(CLAIMABLE), target: () => q(CLAIMABLE),
+      msg: '받을 수 있는 보상이 있어요! <b>[받기]</b>를 눌러 챙겨요. 일일 미션은 <b>매일 0시</b>에 새로 시작해요.' },
     // ── 런 ──
     { id: 'run.map', ctx: 'run', help: 'map', modal: 'map', when: () => { const s = run(); return !!s && !s.tutorial && vis('map') && !vis('reward') && !vis('run-modal'); }, target: () => $('map-body'),
       msg: ['<b>분기 지도</b>예요. 빛나는 노드 중 하나를 골라 위로 올라가요!', '{ic:node_battle|💥}전투 {ic:node_elite|💀}정예 {ic:node_shop|🛒}상점 {ic:node_rest|🔧}정비 {ic:node_boss|👾}보스<br>맨 위의 <b>보스</b>를 쓰러뜨리면 스테이지 클리어예요!'] },
