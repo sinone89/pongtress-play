@@ -581,7 +581,7 @@ const Meta = (function () {
   // ── 방치 홈 자동전투 연출(코스메틱) ──
   // 캐릭터가 '재장전(정면 대기·재장전 동작) → 돌아서서 점사(뒷모습 조준·발사 프레임) → 다시 정면'을 반복한다 — 전투와 같은 CharAnim.
   // 포탄은 실측한 총구(SHEET_META)에서 날아가 '도착한 순간' 피해·타격 이펙트가 나온다(발사 즉시 피해 처리하지 않음).
-  // 홈 배경 assets/bg/bg_lobby.webp(1080×1920)에서 뒷벽이 바닥과 만나는 선(문턱)의 y(이미지 좌표). 배경을 바꾸면 js/artmeta.js 의 ART.lobby.farY 도 다시 잴 것.
+  // 홈 배경(ART.lobby.home — 없으면 bg, 둘 다 9:16 그림)에서 뒷벽이 바닥과 만나는 선(문턱)의 y(1080×1920 환산 좌표). 배경을 바꾸면 js/artmeta.js 의 ART.lobby.farY 도 다시 잴 것.
   const BG_LOBBY = { w: 1080, h: 1920, farY: ART.lobby.farY };
   let _idleRAF = 0, _idleDbg = null;
   function idleStop() { if (_idleRAF) { cancelAnimationFrame(_idleRAF); _idleRAF = 0; } }

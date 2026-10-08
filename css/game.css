@@ -690,9 +690,9 @@ body {
 /* ═══ 배경 이미지 슬롯 (파일 있으면 적용, 없으면 그라데이션 폴백) ═══
    background-image 목록의 이미지가 404면 그 레이어만 비고 아래 그라데이션이 그대로 보임 */
 #combat { background: url('../assets/bg/bg_battle.webp') center/cover no-repeat; }   /* 파일이 없으면 투명 → #app 그라데이션 */
-/* 로비 탭(출격·편성·상점·미션)과 분기 맵도 홈과 같은 격납고 그림을 어둡게 깔아 새 아트와 분위기를 맞춘다(카드·글자 가독성은 어둡힘으로 유지) */
+/* 로비 탭(출격·편성·상점·미션)과 분기 맵은 격납고 그림(--bg-lobby)을 어둡게 깔아 새 아트와 분위기를 맞춘다(카드·글자 가독성은 어둡힘으로 유지). 홈 탭만 따로 --bg-home(build 159: 노을 그림) */
 #lobby { background: linear-gradient(180deg, #080b18ec 0%, #0a0e1cde 50%, #080b18f2 100%), var(--bg-lobby, url('../assets/bg/bg_lobby.webp')) center / cover no-repeat; }   /* --bg-lobby = js/artmeta.js 가 ART.lobby 설정에 맞춰 넣는다(옛 격납고 / 뒷벽이 뚫린 새 그림) */
-#tab-home { background-image: var(--bg-lobby, url('../assets/bg/bg_lobby.webp')), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
+#tab-home { background-image: var(--bg-home, var(--bg-lobby, url('../assets/bg/bg_lobby.webp'))), radial-gradient(120% 90% at 50% 0%, #201a48, #0f0c24 80%); background-size: cover, cover; background-position: center, center; background-repeat: no-repeat, no-repeat; }
 #login { background-image: linear-gradient(180deg, #0d0b1e55 0%, #0d0b1e88 50%, #0d0b1ec8 100%), url('../assets/bg/bg_login.webp'), radial-gradient(120% 80% at 50% 0%, var(--bg-2), var(--bg)); background-size: cover, cover, cover; background-position: center; background-repeat: no-repeat; }   /* 위에서부터: 가독성용 어둡힘 → 배경 → 폴백 그라데이션 */
 
 /* 로고 이미지(assets/logo.webp) — 불러오면 글자 로고 대신 표시 */

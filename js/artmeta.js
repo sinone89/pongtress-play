@@ -15,9 +15,12 @@ const ART = (function () {
 
   // 홈 자동전투 연출 — 뒷벽이 바닥과 만나는 선(문턱)에서 적이 나타나 캐릭터 쪽으로 걸어온다. 값은 홈 배경 그림(1080×1920)에서 잰 것.
   //   farY: 문턱의 y(이미지 좌표) · farHalf/nearHalf: 바닥 절반 폭(화면 폭 비율) 문턱 / 캐릭터 줄 · spawnD: 적이 나타나는 깊이(0=문턱, 음수=문턱 너머) · fade: 나타날 때 서서히 보이는 깊이 구간 · rate: 초당 생성 확률
-  //   bg: 이 설정이 쓰는 배경 그림(CSS 변수 --bg-lobby 로 홈·로비 배경에 깔린다) — 켜고 끄면 그림과 적 동선이 항상 함께 바뀐다.
+  //   bg: 이 설정이 쓰는 배경 그림(CSS 변수 --bg-lobby 로 홈 말고 다른 로비 탭·분기 맵 뒤에 어둡게 깔린다) — 켜고 끄면 그림과 적 동선이 항상 함께 바뀐다.
+  //   home: 홈 탭(#tab-home)에만 까는 그림(CSS 변수 --bg-home). 없으면 bg 를 홈에도 쓴다. 위 동선 값은 '홈에 깔리는 그림'에서 잰 것.
   const lobbyClosed = { bg: 'assets/bg/bg_lobby.webp', farY: 930, farHalf: 0.25, nearHalf: 0.62, spawnD: 0, fade: 0.09, rate: 1 };      // 현행 배경(뒷벽이 닫힌 격납고) — 벽 앞 바닥에서 서서히 나타난다
-  const lobbyBreach = { bg: 'assets/bg/bg_lobby_breach.webp', farY: 930, farHalf: 0.25, nearHalf: 0.62, spawnD: -0.3, fade: 0.05, rate: 0.8 };  // 폭파로 뚫린 뒷벽(개구부 x 270~810 · 잔해선 y 930) — 개구부 너머 길에서 작게 나타나 잔해선을 넘어 걸어 나온다(확정 2026-10-02)
+  // 홈 = 노을 격납고 그림(2026-10-08 사용자 확정 — 신규 이미지 148종 중 홈 배경만 채택, 나머지 그림은 전부 기존). 원본 BG-breach-study-v2.png(948×1659)를 9:16 가운데 크롭(933×1659) → WebP q90.
+  //   무너진 뒷벽 개구부 너머로 길이 소실점(y≈775)까지 이어지고 바닥 타일 위 주황 안내선이 부채꼴로 벌어진다 → 적은 소실점 근처 먼 길에서 아주 작게 나타나 잔해선(y≈900)을 지나 걸어 나온다.
+  const lobbyBreach = { bg: 'assets/bg/bg_lobby_breach.webp', home: 'assets/bg/bg_home_sunset.webp', farY: 900, farHalf: 0.25, nearHalf: 0.62, spawnD: -0.12, fade: 0.06, rate: 0.8 };
 
   return {
     on: on,
@@ -28,11 +31,14 @@ const ART = (function () {
     launcher: { on: on.launcher, base: 'launcher_base', barrel: 'launcher_barrel', size: 0.18, baseSrc: 256, barrelW: 128, barrelH: 235, pivotX: 64, pivotY: 166.7, recoil: 0.04, flashSize: 0.28, flashColor: '#8ff6ea' },
     // 타이틀 키아트(루비 1인이 적 군단과 전투 중인 9:16 일러스트 — 확정 2026-10-02): 켜면 #title-art 를 교체하고 편성 캐릭터 겹침(#title-hero)을 숨긴다
     title: { on: on.title, src: 'assets/bg/bg_title_key.webp' },
-    // 홈 배경: 그림은 bg_lobby.webp 를 교체해서 넣고(뒷벽이 폭파로 뚫린 그림), 이 플래그는 적 동선만 바꾼다(개구부 너머에서 걸어 나옴)
+    // 홈 배경: 켜면 뒷벽이 폭파로 뚫린 노을 그림(홈 탭 전용)과 그 그림에 맞춘 적 동선, 끄면 예전 닫힌 격납고(?art=off)
     lobby: Object.assign({ on: on.lobby }, on.lobby ? lobbyBreach : lobbyClosed)
   };
 })();
 // UI 스킨: <html class="skin"> 이면 css/skin.css 의 규칙이 켜진다(버튼·카드·모달·헤더·칩·내비를 assets/ui/skin/*.png 9분할 그림으로)
 if (ART.on.skin) document.documentElement.classList.add('skin');
-// 홈·로비 배경 그림 — css/game.css 가 var(--bg-lobby, 옛 그림)으로 읽는다. 절대 주소로 넣어 CSS 파일 위치와 상관없이 같은 파일을 가리키게 한다.
-try { document.documentElement.style.setProperty('--bg-lobby', 'url("' + new URL(ART.lobby.bg, document.baseURI).href + '")'); } catch (e) {}
+// 로비·홈 배경 그림 — css/game.css 가 var(--bg-lobby, 옛 그림)(다른 로비 탭·분기 맵 뒤)과 var(--bg-home, …)(홈 탭)으로 읽는다. 절대 주소로 넣어 CSS 파일 위치와 상관없이 같은 파일을 가리키게 한다.
+try {
+  document.documentElement.style.setProperty('--bg-lobby', 'url("' + new URL(ART.lobby.bg, document.baseURI).href + '")');
+  document.documentElement.style.setProperty('--bg-home', 'url("' + new URL(ART.lobby.home || ART.lobby.bg, document.baseURI).href + '")');
+} catch (e) {}
