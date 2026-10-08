@@ -48,13 +48,14 @@ const Help = (function () {
       + TIP('주제 탭을 눌러 핀볼 판·전투·모듈·적·동료·재화·모드를 자세히 볼 수 있어요.');
   }
 
-  const PEG_ORDER = ['normal', 'mult2', 'mult5', 'charge', 'gold', 'bomb', 'bumper', 'scrap', 'sludge'];
+  const PEG_ORDER = ['normal', 'mult2', 'mult5', 'charge', 'gold', 'reset', 'bomb', 'bumper', 'scrap', 'sludge'];
   const PEG_DESC = {
     normal: () => '맞으면 터져서 <b>장전 볼 1개</b>가 돼요. 판의 대부분이 이 탄약이에요.',
     mult2: () => '장전 볼이 <b>' + (1 + PEG_TYPES.mult2.split) + '개</b>로 늘어나요.',
     mult5: () => '장전 볼이 <b>' + (1 + PEG_TYPES.mult5.split) + '개</b>로 늘어나요!',
     charge: () => '<b>장전 ×' + PEG_TYPES.charge.charge + '</b> 볼 1개 — 한 번에 탄환을 많이 장전해요.',
     gold: () => '장전 볼과 함께 <b>크레딧 ' + PEG_TYPES.gold.gold + '</b>' + eulReul(PEG_TYPES.gold.gold) + ' 줘요(상점에서 써요).',
+    reset: () => '맞으면 장전 볼 1개가 되고, 이번 장전에 <b>터진 탄약이 전부 되살아나요</b>. 볼이 <b>3발 이상</b>일 때만 판 위쪽에 켜져요(볼이 많을수록 최대 ' + CFG.resetPegMax + '개).',
     bomb: () => '맞으면 <b>주변 탄약을 연쇄로 터뜨려요</b>. 스킬을 쓴 다음 판에 생겨요.',
     bumper: () => '볼을 <b>세게 튕겨 내요</b>. 사라지지 않고 콤보도 올리지 않아요. 기절 스킬 등으로 생겨요.',
     scrap: () => '볼을 튕기기만 해요(효과 없음). 헤비아머가 뿌려요.',

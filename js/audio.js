@@ -123,7 +123,8 @@ const Sound = (function () {
     win() { [523, 659, 784, 1047].forEach((f, i) => blip(f, f, 0.2, 'triangle', 0.24, i * 0.12)); },
     lose() { [420, 340, 262, 196].forEach((f, i) => blip(f, f * 0.97, 0.26, 'sine', 0.24, i * 0.14)); },
     click() { blip(520, 520, 0.03, 'square', 0.08); },
-    gacha() { [400, 600, 800, 1200].forEach((f, i) => blip(f, f * 1.2, 0.1, 'triangle', 0.18, i * 0.06)); }
+    gacha() { [400, 600, 800, 1200].forEach((f, i) => blip(f, f * 1.2, 0.1, 'triangle', 0.18, i * 0.06)); },
+    reset() { [660, 880, 1320, 1760].forEach((f, i) => blip(f, f * 1.06, 0.1, 'triangle', 0.15, i * 0.045)); }   // 초기화 탄약: 반짝이며 올라가는 짧은 아르페지오(터진 탄약이 되살아난다)
   };
 
   // ═════════ 효과음 목록(id 별 설정) ═════════
@@ -140,7 +141,7 @@ const Sound = (function () {
     ball_launch: { synth: 'launch', voices: 3 }, ball_multi: { synth: 'launch' },
     peg_hit: { synth: 'peg', gap: 45, voices: 4, grp: 'board', ladder: true },
     peg_mult2: BOARD, peg_mult5: BOARD, peg_gold: BOARD, peg_charge: BOARD, peg_scrap: BOARD, obst_bumper: BOARD, obst_pillar: BOARD,
-    peg_bomb: { synth: 'kill', voices: 3, grp: 'board' }, peg_sludge: { synth: 'wall', grp: 'board' },
+    peg_bomb: { synth: 'kill', voices: 3, grp: 'board' }, peg_sludge: { synth: 'wall', grp: 'board' }, peg_reset: { synth: 'reset', grp: 'board' },
     combo_hit: { synth: 'charge' }, pocket_charge: { synth: 'charge', voices: 3 }, pocket_jackpot: { synth: 'charge' }, pocket_buff: { synth: 'charge' }, pocket_lucky: { synth: 'charge' },
     // 전투 단계
     shot_gunner: { synth: 'shot', voices: 3, grp: 'battle' }, shot_cannon: { synth: 'shot', voices: 3, grp: 'battle' }, shot_support: { synth: 'shot', voices: 3, grp: 'battle' },

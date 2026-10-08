@@ -352,9 +352,22 @@ const Meta = (function () {
     return (Math.floor(n / 1e7) / 10).toFixed(1) + '억';
   }
   function renderBar() {
-    for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); el.parentNode.classList.toggle('lg', el.textContent.length >= 6); }   // "12.3만"처럼 6글자 이상이면 글자를 살짝 줄여 칩 안에 담는다
+    for (const [id, k] of [['cur-gold', 'gold'], ['cur-mats', 'mats'], ['cur-gems', 'gems'], ['cur-docs', 'docs']]) { const el = $(id); el.textContent = fmtCur(M.currencies[k]); el.title = String(M.currencies[k]); }
+    fitCurChips();
     const mb = document.querySelector('#lobby-nav .tabbtn[data-tab="mission"]'); if (mb) mb.classList.toggle('dot', missionDot());   // 받을 게 있으면 미션 탭에 빨간 점
   }
+  // 칩 안 숫자 맞춤(build 161): 글자 폭이 칩의 남는 칸(아이콘 옆)보다 크면 그 비율만큼 글자를 줄인다(--cs, 최소 0.6배) — "3.3만"·"1234만" 같은 짧지 않은 글자의 끝이 잘리던 것(예전엔 6글자 이상만 줄였다).
+  //   칸은 화면 폭에 비례(cqw)하므로 창 크기·기기가 바뀌면 다시 잰다(아래 ResizeObserver). 로비가 숨어 있어 폭이 0 이면 건너뛴다(다시 보일 때 관찰자가 부른다).
+  function fitCurChips() {
+    document.querySelectorAll('#lobby-top .cur').forEach((chip) => {
+      const b = chip.querySelector('b'); if (!b) return;
+      chip.style.removeProperty('--cs');
+      if (!b.offsetWidth && !b.clientWidth) return;
+      const need = b.scrollWidth, have = b.clientWidth;
+      if (need > have + 0.5) chip.style.setProperty('--cs', Math.max(0.6, have / need * 0.96).toFixed(3));
+    });
+  }
+  try { const lt = document.getElementById('lobby-top'); if (lt && window.ResizeObserver) { let w0 = 0; new ResizeObserver(() => { const w = lt.clientWidth; if (w !== w0) { w0 = w; fitCurChips(); } }).observe(lt); } } catch (e) {}
 
   // ── 공용 팝업(확인 창) · 재화 설명 · 출석 · 이어하기 ──
   // ask({ title, html, buttons:[{ label, primary, onClick }], dismiss }) — 버튼을 누르면 창을 먼저 닫고 onClick 을 부른다. 바깥을 눌러 닫기는 dismiss !== false 일 때(동작 없이 닫힘)
@@ -913,7 +926,7 @@ const Meta = (function () {
   function renderCheat() {
     const box = $('cheat-box');
     box.innerHTML = '<h2>치트 · 디버그</h2>'
-      + '<p class="muted">' + uiCur('gold') + M.currencies.gold + ' ' + uiCur('mats') + M.currencies.mats + ' ' + uiCur('gems') + M.currencies.gems + ' ' + uiCur('docs') + M.currencies.docs + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'
+      + '<p class="muted">' + uiCur('gold') + fmtCur(M.currencies.gold) + ' ' + uiCur('mats') + fmtCur(M.currencies.mats) + ' ' + uiCur('gems') + fmtCur(M.currencies.gems) + ' ' + uiCur('docs') + fmtCur(M.currencies.docs) + ' · 보유 ' + Object.keys(M.owned).length + '/' + ROSTER.length + '</p>'   // 큰 숫자는 만·억 단위로(좁은 폰에서 한 줄이 상자를 넘던 것)
       + '<div class="cd-btns">'
       + '<button class="btn" data-cheat="cur">화폐 전체 +9999</button>'
       + '<button class="btn" data-cheat="unlock">전 동료 획득</button>'

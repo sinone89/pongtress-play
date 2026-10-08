@@ -413,8 +413,8 @@ body {
 /* 칩 4개는 남는 폭을 나눠 쓰고(큰 숫자는 meta.js fmtCur 가 만 단위로 줄임), 음소거·계정은 고정 크기 원형 아이콘 버튼 — 숫자가 커져도 넘치지 않는다 */
 #lobby-top { gap: 1.2cqw; padding: 3cqw 2.8cqw; padding-top: max(3cqw, env(safe-area-inset-top)); font-size: 3.3cqw; }
 #lobby-top .cur { flex: 1 1 0; min-width: 0; justify-content: center; gap: 0.7cqw; padding: 1.5cqw 1cqw; border-radius: 999px; font-size: 3.3cqw; }   /* 칩 4개 + 원형 버튼 3개(음소거·도움말·계정): 4자리 숫자·"1.3만"이 잘리지 않을 폭 */
-#lobby-top .cur b { white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; }
-#lobby-top .cur.lg b { font-size: 2.8cqw; }
+#lobby-top .cur .uic { flex: 0 0 auto; }                                                  /* 칸이 모자라면 줄어드는 건 숫자뿐 — 아이콘이 찌그러지지 않게 */
+#lobby-top .cur b { flex: 0 1 auto; min-width: 0; white-space: nowrap; font-variant-numeric: tabular-nums; overflow: hidden; font-size: calc(1em * var(--cs, 1)); }   /* --cs = 숫자가 칸보다 클 때 meta.js fitCurChips 가 넣는 축소 비율(0.6~1) */
 .lobby-mute, .acct-btn, .lobby-help { flex: 0 0 auto; width: 8.2cqw; height: 8.2cqw; margin: 0; padding: 0; display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid #ffffff22; background: #ffffff10; border-radius: 50%; cursor: pointer; font-size: 4.6cqw; color: var(--muted); }
 /* 패널/스크롤 영역 */

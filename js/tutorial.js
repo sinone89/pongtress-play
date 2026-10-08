@@ -427,6 +427,10 @@ const Tutorial = (function () {
     { id: 'board.interfere', ctx: 'run', pause: true, help: 'enemy',
       when: () => { const s = run(), g = game(); return !!s && !!g && loadReady() && g.anim.floats.some(f => f.note && /교란|오염|파편/.test(f.text)); }, target: () => canvasRect('pins'),
       msg: '적이 <b>핀볼 판을 방해</b>해요! 해킹드론·슬러지·헤비아머를 먼저 잡으면 판이 깨끗해져요.' },
+    { id: 'board.reset', ctx: 'run', pause: true, help: 'board',                                      // 발사 볼이 3발 이상이라 판 위쪽에 초기화 탄약이 처음 켜졌을 때(안내 문구가 뜨는 순간)
+      when: () => { const s = run(), g = game(); return !!s && !!g && !s.tutorial && loadReady() && g.anim.floats.some(f => f.note && /초기화 탄약/.test(f.text)); },
+      target: () => { const s = run(), i = s ? s.pegs.findIndex(p => p.type === 'reset') : -1; return i >= 0 ? canvasRect('peg:' + i) : canvasRect('pins'); },
+      msg: ['<b>초기화 탄약</b>이 나타났어요! 볼이 <b>3발 이상</b>일 때 판 위쪽에 켜져요.', '이걸 맞히면 이번 장전에 <b>터진 탄약이 전부 되살아나요</b>. 볼이 많아도 맞힐 탄약이 바닥나지 않게 해 줘요.'] },
     { id: 'result', ctx: 'run', modal: 'result', when: () => vis('result'), target: () => $('result-box'),
       msg: () => { const k = ($('result-box') && $('result-box').dataset.kind) || ''; return k === 'win' ? '<b>승리!</b> 스테이지를 <b>처음 클리어</b>하면 다음 스테이지와 새 모듈이 열려요.' : k === 'abandon' ? '중간에 나가도 지금까지 모은 보상은 받아요. 다음엔 끝까지 도전해 봐요!' : '방벽이 무너져도 모은 보상은 받아요. 동료를 키워 다시 도전해요!'; } }
   ];

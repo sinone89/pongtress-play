@@ -48,7 +48,7 @@ html.skin .tabbtn.active { box-shadow: none; }
 html.skin .sns-h { border: solid transparent; border-width: 0 10cqw 0 10.4cqw; border-image: url('../assets/ui/skin/header_banner.png') 0 88 0 92 fill / 0 10cqw 0 10.4cqw stretch;
   border-radius: 0; background: none; padding: 2.2cqw 0; }
 /* 상단 재화 칩: chip_frame.png 316×84 · 캡 좌우 56 */
-html.skin #lobby-top .cur { border: solid transparent; border-width: 0 2.2cqw; border-image: url('../assets/ui/skin/chip_frame.png') 0 56 0 56 fill / 0 2.2cqw stretch;
+html.skin #lobby-top .cur { border: solid transparent; border-width: 0 1.9cqw; border-image: url('../assets/ui/skin/chip_frame.png') 0 56 0 56 fill / 0 1.9cqw stretch;
   border-radius: 0; background: none; padding: 1.6cqw 0; }
 
 /* ═══════════ 2026-10-06 추가 납품(PONGTRESS_new_53_approved: U-4~U-12 + 핀볼) ═══════════

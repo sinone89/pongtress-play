@@ -148,7 +148,7 @@
   const PEG_KEYS = Object.keys(PEG_TYPES);
   const PEG_WEIGHT_TOTAL = PEG_KEYS.reduce((s, k) => s + PEG_TYPES[k].weight, 0);
   // 소리 id(js/audio.js DEFS — 파일이 없으면 예전 합성음으로 폴백): 맞은 탄약 종류별 · 사격하는 동료 클래스별. 폭탄·오염은 터짐/흡수 소리(peg_bomb·peg_sludge)가 따로 난다
-  const PEG_SND = { normal: 'peg_hit', mult2: 'peg_mult2', mult5: 'peg_mult5', gold: 'peg_gold', charge: 'peg_charge', scrap: 'peg_scrap', bumper: 'obst_bumper', bomb: 'peg_hit', sludge: 'peg_hit' };
+  const PEG_SND = { normal: 'peg_hit', mult2: 'peg_mult2', mult5: 'peg_mult5', gold: 'peg_gold', charge: 'peg_charge', scrap: 'peg_scrap', bumper: 'obst_bumper', bomb: 'peg_hit', sludge: 'peg_hit', reset: 'peg_reset' };
   const SHOT_SND = { gunner: 'shot_gunner', cannon: 'shot_cannon', support: 'shot_support' };
   function pickPegType() {
     let r = Math.random() * PEG_WEIGHT_TOTAL;
@@ -162,7 +162,7 @@
   function startCombat(combat, floor, nodeIdx) {
     S.combatIndex = floor || 0; S.nodeIdx = nodeIdx || 0;
     S.combat = combat; S.over = false; S.bossDown = false;
-    S.chainAdded = 0; S.focusId = null; S.focusStack = 0; S.bossIntent = null;
+    S.chainAdded = 0; S.focusId = null; S.focusStack = 0; S.bossIntent = null; S._resetShown = 0; S._resetNote = null;
     S.jack = { x: 0.5, v: JACKPOT_SPEED / 9 };     // 움직이는 잭팟 포켓(골 영역 폭 비율)
     $('map').hidden = true; $('run-modal').hidden = true;
     // 캐릭터(레인 배치): 편성 슬롯 순서 = 레인 0,1,2. 빈 슬롯은 캐릭터 없음. 레벨/성급 반영.
@@ -333,34 +333,94 @@
     S.pegs = keep;
   }
 
+  // ── 빈자리 메우기(build 162) ──
+  // 패턴 점을 장애물에 맞춰 걸러 내면 S3~S5 판은 장애물 둘레가 크게 비어 듬성듬성해 보인다(24~30개). 가장 큰 빈자리(= 이미 놓인 탄약 중심에서 가장 먼 자리)부터 한 개씩 채워 CFG.pegCountTarget 개까지 올린다.
+  // 자리 후보는 4px 격자 — 장애물 가장자리에서 obstMargin 만큼, 다른 탄약 중심에서 pegFillMinD 만큼 떨어진 곳만. 큰 탄약(×5)은 쓰지 않는다(장애물에 걸치지 않게). 시드 난수 안에서 부르므로 같은 판은 늘 같다.
+  function fillGaps() {
+    const R = boardRef(), g = PEG_REG(R), obst = S.obstacles || [], need = CFG.pegFillMinD, target = CFG.pegCountTarget, mg = CFG.obstMargin, pr0 = CFG.pegRadius * 1.05;
+    if (S.pegs.length >= target) return;
+    const cand = [];
+    for (let y = g.y0; y <= g.y1 + 0.1; y += 4) for (let x = g.x0; x <= g.x1 + 0.1; x += 4) {
+      let ok = true;
+      for (const o of obst) {
+        if (o.t === 'bar') { const ox = o.fx * R.w, oy = o.fy * R.h, ow = o.fw * R.w, oh = o.fh * R.h, cx = Math.max(ox, Math.min(x, ox + ow)), cy = Math.max(oy, Math.min(y, oy + oh)); if ((x - cx) ** 2 + (y - cy) ** 2 < (pr0 + mg) ** 2) { ok = false; break; } continue; }
+        const rr = o.r * R.w + pr0 + mg; if ((x - o.fx * R.w) ** 2 + (y - o.fy * R.h) ** 2 < rr * rr) { ok = false; break; }
+      }
+      if (ok) cand.push({ x, y, d: 1e9 });
+    }
+    for (const c of cand) for (const p of S.pegs) { const d = Math.hypot(c.x - p.fx * R.w, c.y - p.fy * R.h); if (d < c.d) c.d = d; }
+    const used = { charge: 0 }; for (const p of S.pegs) if (p.type in used) used[p.type]++;
+    while (S.pegs.length < target) {
+      let best = null; for (const c of cand) if (c.d >= need && (!best || c.d > best.d)) best = c;
+      if (!best) break;
+      let type = pickPegType();
+      if (type === 'mult5') type = 'mult2';
+      if (type === 'charge' && (used.charge >= 3 || best.y > g.y0 + (g.y1 - g.y0) * 0.72)) type = 'normal';
+      if (type in used) used[type]++;
+      S.pegs.push(makePeg(best.x / R.w, best.y / R.h, type));
+      for (const c of cand) { const d = Math.hypot(c.x - best.x, c.y - best.y); if (d < c.d) c.d = d; }
+    }
+  }
+  // ── 초기화 탄약 자리(build 162) ──
+  // 한 발이 판의 2/3 쯤을 터뜨리고 둘째 발부터는 3~6개밖에 못 맞혀서(측정), 볼이 늘어난 후반엔 맞힐 탄약이 바닥난다 → 맞히면 터진 탄약이 전부 되살아나는 '초기화' 탄약.
+  // 판마다 위쪽 절반의 일반 탄약 중 서로 멀리 떨어진 최대 CFG.resetPegMax 곳을 '자리'로 정해 두고(시드 고정), 장전마다 발사 볼 수에 맞춰 앞에서부터 몇 개를 켠다(activateResetSites).
+  // 위쪽에 두는 이유: 발사 볼은 아래에서 위로 훑으며 터뜨리므로 위쪽 탄약은 그 볼이 거의 다 터뜨린 뒤에 맞는다 → 방금 터뜨린 탄약이 되살아난다(아래쪽이면 아직 안 터뜨린 걸 되살려 헛수고).
+  function placeResetSites() {
+    const R = boardRef(), g = PEG_REG(R), sp = CFG.pegSpacing, upper = g.y0 + (g.y1 - g.y0) * 0.5, sites = [];
+    const pool = S.pegs.filter(p => p.type === 'normal' && p.fy * R.h <= upper && p.fx > 0.16 && p.fx < 0.84);
+    for (let k = 0; k < CFG.resetPegMax && pool.length; k++) {
+      let best = null, bd = -1;
+      if (!sites.length) best = pool[Math.floor(Math.random() * pool.length)];
+      else for (const p of pool) { let md = 1e9; for (const s of sites) md = Math.min(md, Math.hypot((p.fx - s.fx) * R.w, (p.fy - s.fy) * R.h)); if (md > bd) { bd = md; best = p; } }
+      if (!best || (sites.length && bd < sp * 2.2)) break;
+      best.site = sites.length; best.baseType = best.type; sites.push(best); pool.splice(pool.indexOf(best), 1);
+    }
+  }
+  // 이번 장전의 발사 볼 수 → 켤 초기화 탄약 수: 2발까지는 0, 3~4발 1개, 5~6발 2개, 7발 이상 3개(자리 수가 상한)
+  const resetCountFor = (launches) => launches <= 2 ? 0 : Math.min(CFG.resetPegMax, 1 + Math.floor((launches - 3) / 2));
+  function activateResetSites() {
+    const n = resetCountFor(S.launchesLeft); let on = 0;
+    for (const p of S.pegs) {
+      if (p.site == null) continue;
+      const want = p.site < n ? 'reset' : p.baseType;
+      if (p.type !== want) { p.type = want; p.shape = (PEG_TYPES[want] || PEG_TYPES.normal).shape; }
+      if (want === 'reset') on++;
+    }
+    return on;
+  }
+
   // ============ 보드(탄약·포켓) 생성 ============
   function buildBoard() {
     S.pegs = [];
     // 탄약 종류·크기·모양도 스테이지·전투별로 고정(시드 난수) → 같은 스테이지는 항상 동일한 판
     const seed = boardSeed();
     const _rand = Math.random; Math.random = makeRng(seed);
-    try { assignPegs(pegLayout()); }
-    finally { Math.random = _rand; }
-    // 스테이지별 고정 장애물(범퍼/기둥) — 실제 핀볼판처럼
-    S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
-    // 장애물과 겹치는 탄약 제거(겹침 방지) — px 공간에서 판정
-    if (S.obstacles.length) {
-      const rp = layout().pins, mg = CFG.obstMargin * BU;
-      S.pegs = S.pegs.filter(p => {
-        const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius) * BU;
-        for (const o of S.obstacles) {
-          if (o.t === 'bar') {
-            const ox = o.fx * rp.w, oy = o.fy * rp.h, ow = o.fw * rp.w, oh = o.fh * rp.h;
-            const cx = Math.max(ox, Math.min(px, ox + ow)), cy = Math.max(oy, Math.min(py, oy + oh));
-            if ((px - cx) ** 2 + (py - cy) ** 2 < (pr + mg) ** 2) return false;
-          } else {
-            const ox = o.fx * rp.w, oy = o.fy * rp.h, rr = o.r * rp.w + pr + mg;
-            if ((px - ox) ** 2 + (py - oy) ** 2 < rr * rr) return false;
+    try {
+      assignPegs(pegLayout());
+      // 스테이지별 고정 장애물(범퍼/기둥) — 실제 핀볼판처럼
+      S.obstacles = ((typeof STAGE_OBST !== 'undefined' && (STAGE_OBST[S.stage] || STAGE_OBST[1])) || []).map(o => Object.assign({}, o));
+      // 장애물과 겹치는 탄약 제거(겹침 방지) — px 공간에서 판정
+      // ⚠ 항상 '장전' 비율의 기준 판 좌표(boardRef)로 잰다. 예전엔 layout().pins 를 썼는데, 전투가 끝난 뒤(layoutT=1)에는 핀볼 영역이 납작해 세로 거리가 거의 0 으로 눌려
+      //   장애물 둘레가 아니라 장애물이 선 세로 띠 전체의 탄약이 지워졌다 — 런의 두 번째 전투부터 판이 30~50% 듬성듬성하던 버그(build 162 에서 고침). 같은 이유로 pegLayout·assignPegs 도 boardRef 를 쓴다.
+      if (S.obstacles.length) {
+        const rp = boardRef(), mg = CFG.obstMargin;
+        S.pegs = S.pegs.filter(p => {
+          const px = p.fx * rp.w, py = p.fy * rp.h, pr = (p.pr || CFG.pegRadius);
+          for (const o of S.obstacles) {
+            if (o.t === 'bar') {
+              const ox = o.fx * rp.w, oy = o.fy * rp.h, ow = o.fw * rp.w, oh = o.fh * rp.h;
+              const cx = Math.max(ox, Math.min(px, ox + ow)), cy = Math.max(oy, Math.min(py, oy + oh));
+              if ((px - cx) ** 2 + (py - cy) ** 2 < (pr + mg) ** 2) return false;
+            } else {
+              const ox = o.fx * rp.w, oy = o.fy * rp.h, rr = o.r * rp.w + pr + mg;
+              if ((px - ox) ** 2 + (py - oy) ** 2 < rr * rr) return false;
+            }
           }
-        }
-        return true;
-      });
-    }
+          return true;
+        });
+      }
+      if (!S.tutorial) { fillGaps(); placeResetSites(); }   // 튜토리얼 판은 안내 장면이 탄약 자리에 맞춰 짜여 있어 그대로 둔다
+    } finally { Math.random = _rand; }
     // 포켓 9칸: 레인별 3칸, 캐릭터 gol 만큼 장전
     S.pockets = [];
     for (let i = 0; i < 9; i++) {
@@ -392,6 +452,8 @@
     for (const c of S.chars) { c.ammo = 0; c.armed = false; CharAnim.toIdle(c.anim); }   // 정면 대기로 복귀(뒷모습이었다면 돌아선다)
     for (const p of S.pegs) p.alive = true;   // 특수·일반 탄약 턴마다 부활
     S.launchesLeft = CFG.launchesPerTurn + S.bonusBalls + S.passiveBalls;
+    const nReset = activateResetSites();       // 발사 볼이 3발 이상이면 판 위쪽에 초기화 탄약이 켜진다(볼이 많아도 맞힐 탄약이 바닥나지 않게)
+    if (nReset > (S._resetShown || 0)) { S._resetNote = nReset; S._resetShown = nReset; }   // 전투마다 개수가 처음 늘 때만 알린다(applyBoardEffects 가 안내 문구를 띄운다)
     S.balls = []; S.launchedThisTurn = 0; S.turnMaxCombo = 0;
     const heal = rv('steel', 'heal');          // 재생 방벽: 매 턴 회복
     if (heal && S.wallHp < S.wallHpMax && S._turns) { S.wallHp = Math.min(S.wallHpMax, S.wallHp + heal); anim.floats.push({ x: W / 2, y: layout().wall.y + 14, text: '🧱+' + heal, color: '#5ce0a0', t: 1, ld: true }); }
@@ -503,13 +565,14 @@
     if (def.scrap) return;
     if (def.bomb) { dryBomb(i, w, 0); return; }
     w.alive[i] = 0;
+    if (def.reset) for (let j = 0; j < S.pegs.length; j++) { if (w.alive[j]) continue; const d = PEG_TYPES[S.pegs[j].type] || PEG_TYPES.normal; if (!d.reset && !d.sludge) w.alive[j] = 1; }   // resetBoardPegs 의 거울
   }
   function dryBomb(bi, w, depth) {
     const r = w.r, R = (PEG_TYPES.bomb.bomb || 0.16) * r.w, bp = S.pegs[bi], bx = r.x + bp.fx * r.w, by = r.y + bp.fy * r.h;
     w.alive[bi] = 0;
     for (let j = 0; j < S.pegs.length; j++) {
       if (!w.alive[j] || j === bi) continue;
-      const q = S.pegs[j], def = PEG_TYPES[q.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost) continue;
+      const q = S.pegs[j], def = PEG_TYPES[q.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost || def.reset) continue;
       if (Math.hypot(r.x + q.fx * r.w - bx, r.y + q.fy * r.h - by) > R) continue;
       if (def.bomb && depth < 3) dryBomb(j, w, depth + 1); else w.alive[j] = 0;
     }
@@ -607,15 +670,16 @@
   // opt.toCell 이 있으면(튜토리얼 시범) 퍼짐 대신 그 칸 한가운데로 곧게 올라간다.
   function spawnBalls(x, y, n, color, charge, opt) {
     for (let k = 0; k < n && S.balls.length < CFG.maxBalls; k++) {
-      let vx = (Math.random() - 0.5) * 200 * BU;                 // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
-      const vy = -CFG.launchSpeed * 0.92 * BU;
+      const kv = CFG.harvestSpeedMul / 0.92;                      // 예전 속도(0.92)에 대한 비율 — 올라가는 속도를 줄인 만큼 가로 속도도 같은 비율로 줄여 각도(= 들어가는 칸 분포)는 예전과 같게
+      let vx = (Math.random() - 0.5) * 200 * BU * kv;            // 약간의 좌우 퍼짐(여러 개가 다른 포켓으로)
+      const vy = -CFG.launchSpeed * CFG.harvestSpeedMul * BU;
       let sx = x;
       if (opt && opt.demo && n > 1) sx = x + (k - (n - 1) / 2) * CFG.ballRadius * BU * 2.5;   // 시범: 늘어난 볼이 처음부터 따로 보이게 나란히 놓는다
       if (opt && opt.toCell != null) {
         const g = layout().goal, tx = g.x + (opt.toCell + 0.5) * (g.w / 9) + (k - (n - 1) / 2) * g.w / 9 * 0.18, t = Math.max(0.05, (y - layout().pins.y) / -vy);
         vx = (tx - sx) / t;
       }
-      S.balls.push({ x: sx, y, vx, vy, r: CFG.ballRadius * BU, age: 0, color, harvest: true, charge: charge || 1, demo: !!(opt && opt.demo) });
+      S.balls.push({ x: sx, y, vx, vy, r: CFG.ballRadius * BU, age: 0, color, harvest: true, charge: charge || 1, demo: !!(opt && opt.demo), ptype: opt && opt.ptype });
     }
   }
 
@@ -637,7 +701,22 @@
     addCombo(b, 1, px, py);                // 콤보 = 터뜨린(소모되는) 탄약 수
     if (def.bomb) { explodeBomb(b, p, px, py, 0); return; }   // 폭탄: 주변 탄약 연쇄 폭발
     convertPeg(p, def, px, py, b);
+    if (def.reset) resetBoardPegs(px, py); // 초기화: 일반 탄약처럼 볼 1개가 되고(장전량 같음) 그다음 터진 탄약이 되살아난다 — 자신은 터진 채 남는다
     if (b.demoOnce) b.eaten = true;        // 튜토리얼 시범 볼: 첫 탄약를 맞히면 사라진다(그 뒤 튕겨 다니며 판을 어지럽히지 않게)
+  }
+  // 초기화 탄약 효과: 이번 장전에 터진 탄약을 전부 되살린다(오염 탄약·다른 초기화 탄약은 제외 — 오염이 되살아 또 볼을 삼키거나, 초기화끼리 서로 되살려 끝없이 도는 걸 막는다). 되살아난 탄약마다 작은 번쩍임.
+  // ⚠ dryPegHit 가 같은 규칙으로 거울처럼 따라간다(조준 점선이 되살아난 탄약까지 반영해야 하므로) — 바꾸면 둘 다.
+  function resetBoardPegs(px, py) {
+    const r = layout().pins; let n = 0;
+    for (const q of S.pegs) {
+      if (q.alive) continue;
+      const d = PEG_TYPES[q.type] || PEG_TYPES.normal; if (d.reset || d.sludge) continue;
+      q.alive = true; n++;
+      anim.flashes.push({ x: r.x + q.fx * r.w, y: r.y + q.fy * r.h, t: 1, color: PEG_TYPES.reset.color });
+    }
+    S.runResets = (S.runResets || 0) + 1;                  // 시험용 통계(밸런스 봇이 읽는다)
+    anim.fx.push({ type: 'ring', x: px, y: py, t: 1, r: 54 * BU, color: PEG_TYPES.reset.color });
+    anim.floats.push({ x: px, y: py - 16, text: '↺ 초기화' + (n ? ' +' + n : ''), color: PEG_TYPES.reset.color, t: 1.2, big: true, ld: true });
   }
   // 튜토리얼 시범 볼이 만든 장전 볼은 지정한 칸(S.demoCell)으로 곧게 올라가게 한다(없으면 일반 볼과 똑같이)
   const demoOpt = (src) => (src && src.demo) ? { demo: true, toCell: S.demoCell == null ? null : S.demoCell } : null;
@@ -653,7 +732,8 @@
       charge = rv('overcharge', 'charge') || def.charge;
       anim.floats.push({ x: px, y: py, text: '장전 ×' + charge, color: def.color, t: 1, ld: true });
     }
-    spawnBalls(px, py, n, def.color, charge, demoOpt(src));
+    const dop = demoOpt(src);
+    spawnBalls(px, py, n, def.color, charge, dop ? Object.assign(dop, { ptype: p.type }) : { ptype: p.type });   // ptype: 어떤 탄약에서 나온 볼인지 — 볼 그림을 그 탄약 알맹이 색으로 물들이는 데 쓴다
     p.alive = false;
   }
   // 폭탄 탄약: 반경 안 탄약를 전부 터뜨림(폭탄끼리 연쇄, 깊이 3 제한). 터진 수만큼 콤보 누적.
@@ -664,7 +744,7 @@
     let popped = 0;
     for (const p of S.pegs) {
       if (!p.alive || p === bp) continue;
-      const def = PEG_TYPES[p.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost) continue;
+      const def = PEG_TYPES[p.type] || PEG_TYPES.normal; if (def.scrap || def.sludge || def.boost || def.reset) continue;   // 초기화 탄약은 폭발에 휩쓸려 헛되이 터지지 않는다
       const qx = r.x + p.fx * r.w, qy = r.y + p.fy * r.h; if (Math.hypot(qx - px, qy - py) > R) continue;
       if (def.bomb && depth < 3) explodeBomb(b, p, qx, qy, depth + 1);
       else convertPeg(p, def, qx, qy, b);
@@ -1049,7 +1129,7 @@
 
   // 적 체력·공격 = 종류 기본값 × 스테이지 배수 × 이 전투의 층 배수(nodeCombat 의 hpMul·dmgMul — 보스 전투엔 없음)
   function bossMul() { const f = CFG.bossFloor; return { hpMul: floorHpMul(f), dmgMul: floorDmgMul(f) }; }   // 보스는 'bossFloor 층의 적'처럼 — 보스 체력이 너무 부풀어 한 판의 1/3 을 먹지 않게 맨 위 층(5)보다 낮춘 층 배수를 쓴다
-  function enemyHp(def) { return Math.round(def.hp * S.scale.hp * ((S.combat && S.combat.hpMul) || 1)); }
+  function enemyHp(def) { return Math.round(def.hp * S.scale.hp * ((S.combat && S.combat.hpMul) || 1) * (S.tutorial ? 1 : CFG.enemyHpMul)); }   // enemyHpMul = 전체 난이도 손잡이(content.js) — 튜토리얼 전투는 고정 체력
   function enemyDmg(def) { return Math.round(def.dmg * S.scale.dmg * ((S.combat && S.combat.dmgMul) || 1)); }
 
   function spawnWave() {
@@ -1422,6 +1502,10 @@
       notes.push({ text: '✨ ' + fx.who + ' · ' + fx.text, color: '#ffcf5c' });
     }
     S.nextBoardFx = [];
+    if (S._resetNote) {                                                             // 초기화 탄약이 새로 켜졌을 때 — 두 줄(한 줄로 쓰면 판 폭을 넘는다)
+      notes.push({ text: '↺ 초기화 탄약 ' + S._resetNote + '개 등장', color: PEG_TYPES.reset.color }, { text: '맞히면 터진 탄약이 되살아나요', color: PEG_TYPES.reset.color });
+      S._resetNote = null;
+    }
     const cnt = {}; for (const e of S.enemies) cnt[e.type] = (cnt[e.type] || 0) + 1;   // 적 간섭(필드에 있는 동안)
     const boss = S.enemies.find(e => e.isBoss);
     if (boss && boss.kind === 'titan') cnt.heavy = (cnt.heavy || 0) + 1;
@@ -1518,8 +1602,55 @@
         ctx.beginPath(); ctx.arc(px, py, R * 1.4, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = col; ctx.stroke();
         ctx.beginPath(); ctx.arc(px, py, R * 0.66, 0, 7); ctx.fillStyle = col; ctx.fill();
         break;
+      case 'refresh': {                                // 초기화: 밝은 원 안에 서로를 쫓는 둥근 화살표 두 개(되살린다) — 그림(peg_reset.png)이 없을 때의 도형
+        ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.fill();
+        ctx.save(); ctx.strokeStyle = ctx.fillStyle = '#17324a'; ctx.lineWidth = Math.max(1.6, R * 0.22); ctx.lineCap = 'round';
+        const rr = R * 0.56, hs = R * 0.34;
+        for (let k = 0; k < 2; k++) {
+          const a0 = k * Math.PI + 0.3, a1 = a0 + Math.PI * 0.7, ca = Math.cos(a1), sa = Math.sin(a1);
+          ctx.beginPath(); ctx.arc(px, py, rr, a0, a1); ctx.stroke();
+          const ex = px + ca * rr, ey = py + sa * rr;   // 호의 끝에 접선 방향 화살촉
+          ctx.beginPath(); ctx.moveTo(ex - sa * hs * 1.2, ey + ca * hs * 1.2); ctx.lineTo(ex + ca * hs, ey + sa * hs); ctx.lineTo(ex - ca * hs, ey - sa * hs); ctx.closePath(); ctx.fill();
+        }
+        ctx.restore();
+        break;
+      }
       default: ctx.beginPath(); ctx.arc(px, py, R, 0, 7); ctx.fill();
     }
+  }
+  // ── 장전 볼 그림 ──
+  // 발사 볼 그림(ball.png · 은색 구)을 '탄약 알맹이 색'으로 물들여 쓴다 — 어떤 탄약에서 나온 볼인지 색으로 알아본다. 색마다 한 번만 만들어 캐시(96×96: 구 60 + 둘레 은은한 빛).
+  // 알맹이 색은 그 탄약 그림(peg_<종류>.png)에서 채도 높은 픽셀만 골라 평균낸다(회색 틀·검은 윤곽은 거의 안 센다). 그림이 아직 없거나 읽을 수 없으면 볼에 실린 색(탄약 정의 색)을 쓴다.
+  const HV_DRAW = 3.68;                     // 캐시 그림(96)을 그리는 크기 = 볼 반지름 × 이 값 → 안의 구(60/96)는 반지름 × 2.3 = 발사 볼 그림과 같은 크기
+  const hvCache = {}, coreCache = {};
+  function pegCoreColor(type) {
+    if (type in coreCache) return coreCache[type];
+    const img = (typeof PegArt !== 'undefined') ? PegArt.ready('peg_' + type) : null; if (!img) return null;   // 아직 못 받았으면 다음 프레임에 다시
+    try {
+      const c = document.createElement('canvas'); c.width = c.height = 32; const g = c.getContext('2d'); g.drawImage(img, 0, 0, 32, 32);
+      const d = g.getImageData(0, 0, 32, 32).data; let sr = 0, sg = 0, sb = 0, sw = 0;
+      for (let i = 0; i < d.length; i += 4) {
+        if (d[i + 3] < 200) continue;
+        const mx = Math.max(d[i], d[i + 1], d[i + 2]), mn = Math.min(d[i], d[i + 1], d[i + 2]), sat = mx ? (mx - mn) / mx : 0, wt = sat * sat * sat;
+        sr += d[i] * wt; sg += d[i + 1] * wt; sb += d[i + 2] * wt; sw += wt;
+      }
+      coreCache[type] = sw < 0.5 ? '' : '#' + [sr, sg, sb].map(v => Math.round(v / sw).toString(16).padStart(2, '0')).join('');
+    } catch (e) { coreCache[type] = ''; }
+    return coreCache[type];
+  }
+  function harvestSprite(ballImg, b) {
+    const col = (b.ptype && pegCoreColor(b.ptype)) || b.color;
+    if (!col || col.length !== 7 || col.charAt(0) !== '#') return null;
+    let s = hvCache[col]; if (s) return s;
+    s = document.createElement('canvas'); s.width = s.height = 96; const g = s.getContext('2d');
+    const glow = g.createRadialGradient(48, 48, 15, 48, 48, 48); glow.addColorStop(0, col + '88'); glow.addColorStop(1, col + '00');
+    g.fillStyle = glow; g.fillRect(0, 0, 96, 96);
+    const t = document.createElement('canvas'); t.width = t.height = 60; const h = t.getContext('2d'); h.imageSmoothingEnabled = true; h.imageSmoothingQuality = 'high';
+    h.drawImage(ballImg, 0, 0, 60, 60);
+    h.globalCompositeOperation = 'color'; h.fillStyle = col; h.fillRect(0, 0, 60, 60);           // 색조·채도만 바꾸고 밝기(광택·그림자)는 그대로
+    h.globalCompositeOperation = 'destination-in'; h.drawImage(ballImg, 0, 0, 60, 60);           // 구 바깥은 다시 투명하게
+    g.drawImage(t, 18, 18);
+    return (hvCache[col] = s);
   }
 
   // 조준 점선: 꺾이는 점을 잇고(뒤로 갈수록 흐려짐), 부딪힐 탄약에 고리를 두르고, 첫 접촉 자리에 '볼 크기 그림자'를 놓는다 — 선이 아니라 볼(굵기)이 탄약에 닿는다는 걸 보여 준다.
@@ -1784,6 +1915,11 @@
       if (!p.alive) ctx.globalAlpha = 0.15 * pinAlpha;   // 터진 탄약: 흐린 유령(다음 턴 부활)
       drawPeg(px, py, R, p.shape || def.shape, def.color, p.alive, 'peg_' + p.type);
       ctx.restore();
+      if (def.reset && p.alive) {                          // 초기화 탄약은 한눈에 띄게: 천천히 맥동하는 하늘색 고리
+        const pu = 0.5 + 0.5 * Math.sin(performance.now() / 260);
+        ctx.save(); ctx.globalAlpha = (0.35 + 0.45 * pu) * pinAlpha; ctx.strokeStyle = def.color; ctx.lineWidth = Math.max(1.6, 1.8 * BU);
+        ctx.beginPath(); ctx.arc(px, py, PR * (1.45 + 0.14 * pu), 0, 7); ctx.stroke(); ctx.restore();
+      }
       const pegImg = (typeof PegArt !== 'undefined') && PegArt.ready('peg_' + p.type);
       if (p.alive && def.label && !pegImg) { ctx.fillStyle = '#1a1430'; ctx.font = 'bold ' + Math.max(8, Math.round(PR * 1.05)) + 'px system-ui'; ctx.textAlign = 'center'; ctx.fillText(def.label, px, py + PR * 0.35); }
     }
@@ -1817,7 +1953,11 @@
     for (const b of S.balls) {
       const bx = b.px == null ? b.x : b.px + (b.x - b.px) * palpha, by = b.py == null ? b.y : b.py + (b.y - b.py) * palpha;
       if (ballImg && !b.harvest) { const bs = b.r * 2.3; ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(ballImg, bx - bs / 2, by - bs / 2, bs, bs); ctx.restore(); }
-      else { ctx.beginPath(); ctx.arc(bx, by, b.r, 0, 7); ctx.fillStyle = b.color || '#eafcff'; ctx.fill(); }
+      else {
+        const hs = (ballImg && b.harvest) ? harvestSprite(ballImg, b) : null;   // 장전 볼: 탄약 알맹이 색으로 물들인 구 그림(그림이 없으면 색 동그라미)
+        if (hs) { const s = b.r * HV_DRAW; ctx.save(); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(hs, bx - s / 2, by - s / 2, s, s); ctx.restore(); }
+        else { ctx.beginPath(); ctx.arc(bx, by, b.r, 0, 7); ctx.fillStyle = b.color || '#eafcff'; ctx.fill(); }
+      }
       if (!b.harvest && b.combo >= 3) {                  // 콤보 카운터(발사볼 위)
         const big = b.combo >= 10;
         const k = COMBO_TEXT_SCALE, ty = by - b.r - 10 * k;
@@ -2306,7 +2446,7 @@
 
   // 디버그/스모크 훅
   window.__PONGTRESS__ = {
-    get S() { return S; }, get anim() { return anim; }, get idle() { return Meta.idleDebug ? Meta.idleDebug() : null; }, startRun, launchBall, enterBattle, CFG,
+    get S() { return S; }, get anim() { return anim; }, get idle() { return Meta.idleDebug ? Meta.idleDebug() : null; }, startRun, launchBall, enterBattle, CFG, activateResetSites, resetCountFor,
     showMap, enterNode, gainRelic, relicOffer, genMap, applyBoardEffects, advanceEnemies, showReward, showRelicPick, openShop, openRest, openRelicInfo, loseRun,
     setPattern(n) { forcedPattern = n; }, patternList() { return Object.keys(pegPatterns(boardRef(), CFG.pegSpacing)); },
     rawPattern(n) { const R = boardRef(); return { R, g: PEG_REG(R), pts: pegPatterns(R, CFG.pegSpacing * ((CFG.patSpacing || {})[n] || 1))[n]() }; },   // 디버그: 걸러내기 전 패턴 점(px)
